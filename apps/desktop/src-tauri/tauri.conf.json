@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/schemas/main/tauri/config.schema.json",
+  "productName": "Metis",
+  "version": "0.1.0",
+  "identifier": "com.metis.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Metis",
+        "width": 960,
+        "height": 680,
+        "minWidth": 680,
+        "minHeight": 480
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}

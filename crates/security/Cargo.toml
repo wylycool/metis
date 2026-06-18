@@ -1,0 +1,14 @@
+[package]
+name = "metis-security"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Metis Security — static security checks for skill updates"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+log.workspace = true
+walkdir.workspace = true

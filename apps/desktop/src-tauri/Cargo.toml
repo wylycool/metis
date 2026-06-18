@@ -1,0 +1,21 @@
+[package]
+name = "metis-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Metis Desktop App — Tauri-based GUI for Agent Skill Manager"
+
+[lib]
+name = "metis_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+
+metis-core = { path = "../../../crates/core" }

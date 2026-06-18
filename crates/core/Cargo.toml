@@ -1,0 +1,21 @@
+[package]
+name = "metis-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Metis Core Engine — skill scanning, source binding, update/rollback, audit"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+log.workspace = true
+sha2.workspace = true
+
+metis-adapters = { path = "../adapters" }
+metis-git-provider = { path = "../git-provider" }
+metis-storage = { path = "../storage" }
+metis-security = { path = "../security" }

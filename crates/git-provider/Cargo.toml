@@ -1,0 +1,13 @@
+[package]
+name = "metis-git-provider"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Metis Git Provider — Git operations (fetch, diff, checkout) via system git CLI"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+log.workspace = true

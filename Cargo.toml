@@ -1,0 +1,48 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/adapters",
+    "crates/git-provider",
+    "crates/storage",
+    "crates/security",
+    "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/wylycool/metis"
+authors = ["Metis Contributors"]
+
+[workspace.dependencies]
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# 数据库
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# 错误处理
+thiserror = "1"
+
+# UUID
+uuid = { version = "1", features = ["v4"] }
+
+# 时间
+chrono = { version = "0.4", features = ["serde"] }
+
+# 日志
+log = "0.4"
+env_logger = "0.11"
+
+# 哈希
+sha2 = "0.10"
+
+# 文件系统操作
+walkdir = "2"
+
+# 跨平台路径
+dirs = "5"
