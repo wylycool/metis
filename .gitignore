@@ -1,0 +1,46 @@
+# Rust
+target/
+*.rs.bk
+*.pdb
+
+# Node.js
+node_modules/
+dist/
+.vite/
+
+# Tauri
+apps/desktop/src-tauri/target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Backup files (generated at runtime, don't commit)
+backup/
+
+# Database (generated at runtime)
+*.db
+*.db-journal
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# Build artifacts
+release/
+*.dmg
+*.AppImage
+*.msi
+*.exe
