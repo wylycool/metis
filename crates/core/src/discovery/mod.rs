@@ -6,10 +6,11 @@ use metis_adapters::hermes::HermesAdapter;
 use metis_adapters::openclaw::OpenClawAdapter;
 use metis_adapters::opencode::OpencodeAdapter;
 use metis_adapters::{AdapterError, AdapterRegistry, AgentAdapter, SkillScope};
+use metis_storage::db::{SkillIndexStore, SkillRecord, StorageError};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Default)]
 pub struct ListAgentsOptions {
@@ -91,6 +92,12 @@ pub enum ScanWarningKind {
     MetadataParseError,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum DiscoveryStorageError {
+    #[error("storage error: {0}")]
+    Storage(#[from] StorageError),
+}
+
 pub fn list_agents(options: ListAgentsOptions) -> Vec<AgentStatus> {
     let registry = build_registry(options.custom_paths);
 
@@ -156,24 +163,27 @@ pub fn scan_skills(options: ScanOptions) -> ScanResult {
                 let skill_path = root.join(&relative_skill_dir);
                 let skill_path_display = skill_path.to_string_lossy().to_string();
                 match adapter.parse_metadata(&skill_path_display) {
-                    Ok(metadata) => skills.push(Skill {
-                        id: Uuid::new_v4().to_string(),
-                        agent_id: adapter.agent_id().to_string(),
-                        name: metadata.name,
-                        description: metadata.description,
-                        install_path: skill_path_display.clone(),
-                        scope: scope_to_path_scope(
-                            adapter.resolve_scope(&skill_path_display, &root_display),
-                        ),
-                        metadata_path: Some(
-                            skill_path.join("SKILL.md").to_string_lossy().to_string(),
-                        ),
-                        metadata_status: MetadataStatus::Found,
-                        source_id: None,
-                        local_fingerprint: None,
-                        local_modified: None,
-                        last_scanned_at: Utc::now(),
-                    }),
+                    Ok(metadata) => {
+                        let agent_id = adapter.agent_id().to_string();
+                        skills.push(Skill {
+                            id: stable_skill_id(&agent_id, &skill_path_display),
+                            agent_id,
+                            name: metadata.name,
+                            description: metadata.description,
+                            install_path: skill_path_display.clone(),
+                            scope: scope_to_path_scope(
+                                adapter.resolve_scope(&skill_path_display, &root_display),
+                            ),
+                            metadata_path: Some(
+                                skill_path.join("SKILL.md").to_string_lossy().to_string(),
+                            ),
+                            metadata_status: MetadataStatus::Found,
+                            source_id: None,
+                            local_fingerprint: None,
+                            local_modified: None,
+                            last_scanned_at: Utc::now(),
+                        })
+                    }
                     Err(error) => warnings.push(ScanWarning {
                         agent_id: adapter.agent_id().to_string(),
                         path: root_display.clone(),
@@ -199,6 +209,19 @@ pub fn scan_skills(options: ScanOptions) -> ScanResult {
     });
 
     ScanResult { skills, warnings }
+}
+
+pub fn scan_and_index_skills(
+    options: ScanOptions,
+    store: &SkillIndexStore,
+) -> Result<ScanResult, DiscoveryStorageError> {
+    let result = scan_skills(options);
+
+    for skill in &result.skills {
+        store.upsert_skill(&skill_to_record(skill))?;
+    }
+
+    Ok(result)
 }
 
 fn build_registry(custom_paths: Vec<String>) -> AdapterRegistry {
@@ -295,9 +318,71 @@ fn warning_kind_for_error(error: &AdapterError) -> ScanWarningKind {
     }
 }
 
+fn skill_to_record(skill: &Skill) -> SkillRecord {
+    SkillRecord {
+        id: skill.id.clone(),
+        agent_id: skill.agent_id.clone(),
+        name: skill.name.clone(),
+        description: skill.description.clone(),
+        version: None,
+        author: None,
+        license: None,
+        tags: vec![],
+        category: None,
+        install_path: skill.install_path.clone(),
+        scope: path_scope_to_storage(&skill.scope),
+        metadata_path: skill.metadata_path.clone(),
+        metadata_status: metadata_status_to_storage(&skill.metadata_status),
+        metadata_error: metadata_error(&skill.metadata_status),
+        source_id: skill.source_id.clone(),
+        local_fingerprint: skill.local_fingerprint.clone(),
+        local_modified: skill.local_modified,
+        last_scanned_at: skill.last_scanned_at.to_rfc3339(),
+    }
+}
+
+fn stable_skill_id(agent_id: &str, install_path: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(agent_id.as_bytes());
+    hasher.update([0]);
+    hasher.update(install_path.as_bytes());
+    let digest = hasher.finalize();
+    let hex = digest
+        .iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<String>();
+    format!("skill_{}", hex)
+}
+
+fn path_scope_to_storage(scope: &PathScope) -> String {
+    match scope {
+        PathScope::User => "user",
+        PathScope::Project => "project",
+        PathScope::System => "system",
+    }
+    .to_string()
+}
+
+fn metadata_status_to_storage(status: &MetadataStatus) -> String {
+    match status {
+        MetadataStatus::Found => "found",
+        MetadataStatus::Missing => "missing",
+        MetadataStatus::ParseError { .. } => "parse_error",
+    }
+    .to_string()
+}
+
+fn metadata_error(status: &MetadataStatus) -> Option<String> {
+    match status {
+        MetadataStatus::ParseError { reason } => Some(reason.clone()),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use metis_storage::db::SkillIndexStore;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -403,5 +488,124 @@ name: [broken
             result.warnings[0].kind,
             ScanWarningKind::MetadataParseError
         ));
+    }
+
+    #[test]
+    fn scan_and_index_skills_persists_successful_scan_results() {
+        let root = temp_dir("generic-index");
+        let skill_dir = root.join("indexed-skill");
+        fs::create_dir_all(&skill_dir).expect("skill directory should be created");
+        write_file(
+            &skill_dir.join("SKILL.md"),
+            r#"---
+name: indexed-skill
+description: Stored in SQLite
+---
+"#,
+        );
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+
+        let result = scan_and_index_skills(
+            ScanOptions {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![root.to_string_lossy().to_string()],
+            },
+            &store,
+        )
+        .expect("scan and index should succeed");
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert!(result.warnings.is_empty());
+        assert_eq!(result.skills.len(), 1);
+
+        let stored = store.list_skills().expect("skills should list");
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].agent_id, "generic");
+        assert_eq!(stored[0].name, "indexed-skill");
+        assert_eq!(stored[0].description.as_deref(), Some("Stored in SQLite"));
+        assert_eq!(stored[0].install_path, skill_dir.to_string_lossy());
+        assert_eq!(stored[0].id, result.skills[0].id);
+    }
+
+    #[test]
+    fn scan_and_index_skills_updates_existing_record_on_repeat_scan() {
+        let root = temp_dir("generic-index-update");
+        let skill_dir = root.join("indexed-skill");
+        fs::create_dir_all(&skill_dir).expect("skill directory should be created");
+        let skill_md = skill_dir.join("SKILL.md");
+        write_file(
+            &skill_md,
+            r#"---
+name: indexed-skill
+description: First description
+---
+"#,
+        );
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let options = ScanOptions {
+            agent_ids: Some(vec!["generic".to_string()]),
+            custom_paths: vec![root.to_string_lossy().to_string()],
+        };
+
+        let first = scan_and_index_skills(options.clone(), &store)
+            .expect("first scan and index should succeed");
+        write_file(
+            &skill_md,
+            r#"---
+name: indexed-skill
+description: Updated description
+---
+"#,
+        );
+        let second =
+            scan_and_index_skills(options, &store).expect("second scan and index should succeed");
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        let stored = store.list_skills().expect("skills should list");
+        assert_eq!(stored.len(), 1);
+        assert_eq!(
+            stored[0].description.as_deref(),
+            Some("Updated description")
+        );
+        assert_eq!(stored[0].id, first.skills[0].id);
+        assert_eq!(stored[0].id, second.skills[0].id);
+    }
+
+    #[test]
+    fn scan_and_index_skills_does_not_persist_parse_warning_entries() {
+        let root = temp_dir("generic-index-warning");
+        let good_skill = root.join("good-skill");
+        let broken_skill = root.join("broken-skill");
+        fs::create_dir_all(&good_skill).expect("good skill directory should be created");
+        fs::create_dir_all(&broken_skill).expect("broken skill directory should be created");
+        write_file(&good_skill.join("SKILL.md"), "# Good Skill\n");
+        write_file(
+            &broken_skill.join("SKILL.md"),
+            "---
+name: [broken
+---
+",
+        );
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+
+        let result = scan_and_index_skills(
+            ScanOptions {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![root.to_string_lossy().to_string()],
+            },
+            &store,
+        )
+        .expect("scan and index should succeed");
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(result.skills.len(), 1);
+        assert_eq!(result.warnings.len(), 1);
+
+        let stored = store.list_skills().expect("skills should list");
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].name, "Good Skill");
     }
 }
