@@ -14,20 +14,20 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - name: macOS
+          - name: macOS Universal
             os: macos-latest
-            artifact: metis-desktop-macos
-            bundles: app
-            bundle: target/release/bundle
+            artifact: metis-desktop-macos-universal
+            build_args: --target universal-apple-darwin --bundles dmg
+            bundle: target/universal-apple-darwin/release/bundle
           - name: Windows
             os: windows-latest
             artifact: metis-desktop-windows
-            bundles: nsis
+            build_args: --bundles nsis
             bundle: target/release/bundle
           - name: Linux
             os: ubuntu-22.04
             artifact: metis-desktop-linux
-            bundles: deb,appimage
+            build_args: --bundles deb,appimage
             bundle: target/release/bundle
 
     steps:
@@ -47,6 +47,10 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install macOS universal Rust targets
+        if: matrix.platform.os == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -69,7 +73,7 @@ jobs:
 
       - name: Build desktop package
         working-directory: apps/desktop
-        run: pnpm tauri build --bundles ${{ matrix.platform.bundles }}
+        run: pnpm tauri build ${{ matrix.platform.build_args }}
 
       - name: Upload preview bundle
         uses: actions/upload-artifact@v4

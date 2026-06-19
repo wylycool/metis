@@ -71,9 +71,10 @@ cargo test
 cargo clippy
 cd apps/desktop && pnpm build
 cd apps/desktop && pnpm tauri build
+cd apps/desktop && pnpm tauri:build:mac-universal
 ```
 
-macOS 本机分发预览包输出在 `target/release/bundle/dmg/Metis_0.1.0_aarch64.dmg`。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已准备好，可在进入默认分支后构建 macOS、Windows 和 Linux artifact。当前 Phase 2 不把 Windows/Linux artifact 实跑作为阻塞项，也不做代码签名、公证或自动发布 GitHub Release。
+macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已准备好，可在进入默认分支后构建 macOS universal、Windows 和 Linux artifact。当前 Phase 2 不把 Windows/Linux artifact 实跑作为阻塞项，也不做代码签名、公证或自动发布 GitHub Release。
 
 ## 暂不进入 MVP
 
