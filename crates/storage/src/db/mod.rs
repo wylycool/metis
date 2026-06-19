@@ -509,6 +509,27 @@ impl SkillIndexStore {
         Ok(())
     }
 
+    pub fn update_source_check_result(
+        &self,
+        source_id: &str,
+        current_commit: Option<&str>,
+        remote_commit: Option<&str>,
+        last_checked_at: &str,
+    ) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            UPDATE sources
+            SET current_commit = ?1,
+                remote_commit = ?2,
+                last_checked_at = ?3,
+                updated_at = datetime('now')
+            WHERE id = ?4
+            ",
+            params![current_commit, remote_commit, last_checked_at, source_id],
+        )?;
+        Ok(())
+    }
+
     pub fn applied_migration_versions(&self) -> Result<Vec<i64>, StorageError> {
         let mut statement = self
             .connection
@@ -1030,5 +1051,36 @@ mod tests {
 
         assert_eq!(stored.local_fingerprint.as_deref(), Some("sha256:baseline"));
         assert_eq!(stored.local_modified, Some(true));
+    }
+
+    #[test]
+    fn update_source_check_result_sets_commits_and_preserves_config_fields() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let source = sample_source("source-1", true, false);
+        store.upsert_source(&source).expect("source should upsert");
+
+        store
+            .update_source_check_result(
+                "source-1",
+                Some("abc123"),
+                Some("def456"),
+                "2026-06-19T12:00:00Z",
+            )
+            .expect("source check result should update");
+
+        let stored = store
+            .get_source("source-1")
+            .expect("source lookup should succeed")
+            .expect("source should exist");
+
+        assert_eq!(stored.current_commit.as_deref(), Some("abc123"));
+        assert_eq!(stored.remote_commit.as_deref(), Some("def456"));
+        assert_eq!(
+            stored.last_checked_at.as_deref(),
+            Some("2026-06-19T12:00:00Z")
+        );
+        assert!(stored.trusted);
+        assert!(!stored.auto_update);
+        assert_eq!(stored.credential_ref.as_deref(), Some("github-main"));
     }
 }
