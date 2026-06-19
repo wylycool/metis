@@ -10,7 +10,7 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 当前阶段
 
-项目处于 **Phase 2 Desktop MVP 完成点**：Phase 1 的 Core Engine 本地管理闭环已经完成，桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板和凭据引用入口，并已完成 macOS 本机 `.app` 预览包验证。Windows/Linux 预览包由已准备好的 GitHub Actions workflow 承接到后续稳定化阶段实跑。
+项目处于 **Phase 2 Desktop MVP 完成点**：Phase 1 的 Core Engine 本地管理闭环已经完成，桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板和凭据引用入口，并已完成 macOS 本机 `.dmg` 预览包验证。Windows/Linux 预览包由已准备好的 GitHub Actions workflow 承接到后续稳定化阶段实跑。
 
 ## 技术栈
 
@@ -73,7 +73,7 @@ cd apps/desktop && pnpm build
 cd apps/desktop && pnpm tauri build
 ```
 
-跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已准备好，可在进入默认分支后构建 macOS、Windows 和 Linux artifact。当前 Phase 2 不把 Windows/Linux artifact 实跑作为阻塞项，也不做代码签名、公证或自动发布 GitHub Release。
+macOS 本机分发预览包输出在 `target/release/bundle/dmg/Metis_0.1.0_aarch64.dmg`。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已准备好，可在进入默认分支后构建 macOS、Windows 和 Linux artifact。当前 Phase 2 不把 Windows/Linux artifact 实跑作为阻塞项，也不做代码签名、公证或自动发布 GitHub Release。
 
 ## 暂不进入 MVP
 
