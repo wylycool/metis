@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   bindSkillSource,
   checkSkillUpdates,
+  getSkillDiff,
   listAgents,
   listIndexedSkills,
   scanSkills,
@@ -9,6 +10,7 @@ import {
 } from "./api";
 import type {
   DesktopAgentStatus,
+  DesktopDiffDetail,
   DesktopScanWarning,
   DesktopSkill,
   DesktopUpdateCheckResult,
@@ -28,6 +30,8 @@ function App() {
   const [skills, setSkills] = useState<DesktopSkill[]>([]);
   const [warnings, setWarnings] = useState<DesktopScanWarning[]>([]);
   const [updateResults, setUpdateResults] = useState<Record<string, DesktopUpdateCheckResult>>({});
+  const [diffDetails, setDiffDetails] = useState<Record<string, DesktopDiffDetail>>({});
+  const [diffError, setDiffError] = useState<Record<string, string>>({});
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -97,6 +101,8 @@ function App() {
       setSkills(scanResult.skills);
       setWarnings(scanResult.warnings);
       setUpdateResults({});
+      setDiffDetails({});
+      setDiffError({});
       setState("loaded");
     } catch (caught) {
       setError(errorMessage(caught));
@@ -142,6 +148,16 @@ function App() {
         delete next[skillId];
         return next;
       });
+      setDiffDetails((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+      setDiffError((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
     } catch (caught) {
       setActionError(errorMessage(caught));
     } finally {
@@ -157,6 +173,16 @@ function App() {
       await unbindSkillSource(skillId);
       await refreshIndexedSkills();
       setUpdateResults((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+      setDiffDetails((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+      setDiffError((current) => {
         const next = { ...current };
         delete next[skillId];
         return next;
@@ -185,9 +211,38 @@ function App() {
         }
         return next;
       });
+      setDiffError({});
       await refreshIndexedSkills();
     } catch (caught) {
       setActionError(errorMessage(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleToggleDiff(skillId: string) {
+    if (diffDetails[skillId]) {
+      setDiffDetails((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+      return;
+    }
+
+    setActionBusy(`diff:${skillId}`);
+    setActionError(null);
+    setDiffError((current) => {
+      const next = { ...current };
+      delete next[skillId];
+      return next;
+    });
+
+    try {
+      const detail = await getSkillDiff(skillId);
+      setDiffDetails((current) => ({ ...current, [skillId]: detail }));
+    } catch (caught) {
+      setDiffError((current) => ({ ...current, [skillId]: errorMessage(caught) }));
     } finally {
       setActionBusy(null);
     }
@@ -263,6 +318,8 @@ function App() {
                   key={skill.id}
                   skill={skill}
                   updateResult={updateResults[skill.id]}
+                  diffDetail={diffDetails[skill.id]}
+                  diffError={diffError[skill.id]}
                   isBinding={bindingSkillId === skill.id}
                   bindDraft={bindDraft}
                   busyKey={actionBusy}
@@ -272,6 +329,7 @@ function App() {
                   onBind={() => handleBindSource(skill.id)}
                   onUnbind={() => handleUnbindSource(skill.id)}
                   onCheck={() => handleCheckUpdates([skill.id])}
+                  onToggleDiff={() => handleToggleDiff(skill.id)}
                 />
               ))}
             </div>
@@ -306,6 +364,8 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
 function SkillRow({
   skill,
   updateResult,
+  diffDetail,
+  diffError,
   isBinding,
   bindDraft,
   busyKey,
@@ -315,9 +375,12 @@ function SkillRow({
   onBind,
   onUnbind,
   onCheck,
+  onToggleDiff,
 }: {
   skill: DesktopSkill;
   updateResult?: DesktopUpdateCheckResult;
+  diffDetail?: DesktopDiffDetail;
+  diffError?: string;
   isBinding: boolean;
   bindDraft: BindDraft;
   busyKey: string | null;
@@ -327,10 +390,13 @@ function SkillRow({
   onBind: () => void;
   onUnbind: () => void;
   onCheck: () => void;
+  onToggleDiff: () => void;
 }) {
   const bindingBusy = busyKey === `bind:${skill.id}`;
   const unbindingBusy = busyKey === `unbind:${skill.id}`;
   const checkingBusy = busyKey === "check-updates";
+  const diffBusy = busyKey === `diff:${skill.id}`;
+  const canShowDiff = updateResult?.status === "UpdateAvailable";
 
   return (
     <article className="skill-row">
@@ -381,6 +447,11 @@ function SkillRow({
             <button className="ghost-button compact" disabled={checkingBusy} onClick={onCheck}>
               {checkingBusy ? "检查中" : "检查更新"}
             </button>
+            {canShowDiff && (
+              <button className="ghost-button compact" disabled={diffBusy} onClick={onToggleDiff}>
+                {diffBusy ? "加载中" : diffDetail ? "收起 diff" : "查看 diff"}
+              </button>
+            )}
             <button className="ghost-button compact" onClick={onOpenBind}>
               编辑来源
             </button>
@@ -399,6 +470,9 @@ function SkillRow({
         )}
       </div>
 
+      {diffError && <div className="inline-error">{diffError}</div>}
+      {diffDetail && <DiffPanel detail={diffDetail} />}
+
       {isBinding && (
         <BindSourceForm
           draft={bindDraft}
@@ -409,6 +483,36 @@ function SkillRow({
         />
       )}
     </article>
+  );
+}
+
+function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
+  return (
+    <div className="diff-panel">
+      <div className="diff-heading">
+        <span>{shortCommit(detail.current_commit)}</span>
+        <strong>→</strong>
+        <span>{shortCommit(detail.target_commit)}</span>
+        <b>{detail.files.length} files</b>
+      </div>
+      <div className="diff-file-list">
+        {detail.files.map((file) => (
+          <article className="diff-file" key={`${file.status}-${file.old_path ?? ""}-${file.path}`}>
+            <div className="diff-file-heading">
+              <StatusBadge tone={file.status === "Deleted" ? "danger" : "muted"}>
+                {file.status}
+              </StatusBadge>
+              <code>{file.old_path ? `${file.old_path} → ${file.path}` : file.path}</code>
+            </div>
+            {file.patch ? (
+              <pre>{file.patch}</pre>
+            ) : (
+              <p className="no-patch">这个文件没有可展示的 patch 文本。</p>
+            )}
+          </article>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -603,6 +707,10 @@ function emptyBindDraft(): BindDraft {
     trusted: false,
     auto_update: false,
   };
+}
+
+function shortCommit(commit: string) {
+  return commit.length > 10 ? commit.slice(0, 10) : commit;
 }
 
 function errorMessage(caught: unknown) {

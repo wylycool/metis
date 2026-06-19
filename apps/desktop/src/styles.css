@@ -485,6 +485,79 @@ h1 {
   justify-content: flex-end;
 }
 
+.diff-panel {
+  border-top: 1px solid #323b45;
+  padding-top: 12px;
+}
+
+.diff-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.diff-heading span,
+.diff-heading b {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(16, 18, 22, 0.68);
+}
+
+.diff-heading strong {
+  color: var(--gold);
+}
+
+.diff-file-list {
+  display: grid;
+  gap: 10px;
+}
+
+.diff-file {
+  min-width: 0;
+  border: 1px solid #323b45;
+  border-radius: 8px;
+  background: rgba(16, 18, 22, 0.62);
+  padding: 10px;
+}
+
+.diff-file-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.diff-file-heading code {
+  min-width: 0;
+}
+
+.diff-file pre {
+  max-width: 100%;
+  max-height: 360px;
+  margin: 0;
+  border: 1px solid #2c333b;
+  border-radius: 7px;
+  padding: 10px;
+  overflow: auto;
+  color: #dce4df;
+  background: #0b0d10;
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.no-patch {
+  color: var(--subtle);
+  font-size: 12px;
+}
+
 .state-block {
   display: grid;
   place-items: center;

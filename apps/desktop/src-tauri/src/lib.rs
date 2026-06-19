@@ -12,7 +12,8 @@ use metis_core::source::{
     SourceType,
 };
 use metis_core::update::{
-    check_updates as core_check_updates, DiffSummary, RemoteCommitChecker, UpdateCheckOptions,
+    check_updates as core_check_updates, get_diff as core_get_diff, DiffDetail as CoreDiffDetail,
+    DiffStatus as CoreDiffStatus, DiffSummary, RemoteCommitChecker, UpdateCheckOptions,
     UpdateCheckResult, UpdateStatus,
 };
 use metis_git_provider::fetch::SystemGitCliProvider;
@@ -168,6 +169,22 @@ pub struct DesktopDiffSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopDiffDetail {
+    pub skill_id: String,
+    pub current_commit: String,
+    pub target_commit: String,
+    pub files: Vec<DesktopFileDiff>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopFileDiff {
+    pub path: String,
+    pub old_path: Option<String>,
+    pub status: String,
+    pub patch: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopScanWarning {
     pub agent_id: String,
     pub path: String,
@@ -262,6 +279,17 @@ pub fn check_skill_updates_for_state_with_checker<C: RemoteCommitChecker>(
         .collect())
 }
 
+pub fn get_skill_diff_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    skill_id: String,
+    checker: &C,
+) -> Result<DesktopDiffDetail, String> {
+    let store = state.open_store()?;
+    core_get_diff(&skill_id, &store, checker)
+        .map(desktop_diff_detail)
+        .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 fn list_agents(
     state: tauri::State<'_, DesktopAppState>,
@@ -304,6 +332,15 @@ fn check_skill_updates(
 ) -> Result<Vec<DesktopUpdateCheckResult>, String> {
     let checker = SystemGitCliProvider::default();
     check_skill_updates_for_state_with_checker(&state, request, &checker)
+}
+
+#[tauri::command]
+fn get_skill_diff(
+    state: tauri::State<'_, DesktopAppState>,
+    skill_id: String,
+) -> Result<DesktopDiffDetail, String> {
+    let checker = SystemGitCliProvider::default();
+    get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
 }
 
 fn desktop_scan_response(
@@ -422,6 +459,30 @@ fn desktop_diff_summary(summary: DiffSummary) -> DesktopDiffSummary {
     }
 }
 
+fn desktop_diff_detail(detail: CoreDiffDetail) -> DesktopDiffDetail {
+    DesktopDiffDetail {
+        skill_id: detail.skill_id,
+        current_commit: detail.current_commit,
+        target_commit: detail.target_commit,
+        files: detail
+            .files
+            .into_iter()
+            .map(|file| DesktopFileDiff {
+                path: file.path,
+                old_path: file.old_path,
+                status: match file.status {
+                    CoreDiffStatus::Added => "Added",
+                    CoreDiffStatus::Modified => "Modified",
+                    CoreDiffStatus::Deleted => "Deleted",
+                    CoreDiffStatus::Renamed => "Renamed",
+                }
+                .to_string(),
+                patch: file.patch,
+            })
+            .collect(),
+    }
+}
+
 fn desktop_agent_status(status: AgentStatus) -> DesktopAgentStatus {
     DesktopAgentStatus {
         agent_id: status.agent_id,
@@ -466,7 +527,8 @@ pub fn run() {
             list_indexed_skills,
             bind_skill_source,
             unbind_skill_source,
-            check_skill_updates
+            check_skill_updates,
+            get_skill_diff
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -475,7 +537,9 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use metis_core::update::{CheckoutResult, DiffDetail, DiffSummary, RemoteCommitChecker};
+    use metis_core::update::{
+        CheckoutResult, DiffDetail, DiffStatus, DiffSummary, FileDiff, RemoteCommitChecker,
+    };
     use metis_storage::db::SourceRecord;
     use std::collections::HashMap;
     use std::fs;
@@ -486,6 +550,7 @@ mod tests {
         commits: HashMap<String, String>,
         behind: u32,
         summary: DiffSummary,
+        details: HashMap<String, DiffDetail>,
     }
 
     impl RemoteCommitChecker for FakeUpdateChecker {
@@ -516,11 +581,14 @@ mod tests {
 
         fn diff_detail(
             &self,
-            _source: &SourceRecord,
+            source: &SourceRecord,
             _current_commit: &str,
             _target_commit: &str,
         ) -> Result<DiffDetail, String> {
-            Err("not used by desktop update status tests".to_string())
+            self.details
+                .get(&source.id)
+                .cloned()
+                .ok_or_else(|| "missing fake diff detail".to_string())
         }
 
         fn checkout_to_cache(
@@ -767,6 +835,7 @@ description: {description}
                 files_deleted: 0,
                 total_changes: 3,
             },
+            details: HashMap::new(),
         };
 
         let results = check_skill_updates_for_state_with_checker(
@@ -798,5 +867,95 @@ description: {description}
                 .and_then(|item| item.remote_commit.as_deref()),
             Some("bbb222")
         );
+    }
+
+    #[test]
+    fn get_skill_diff_for_state_returns_file_statuses_and_patch_text() {
+        let workspace = temp_dir("get-diff");
+        let skill_root = workspace.join("skills");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        write_skill(&skill_root, "differ", "differ", "Shows diff");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let skill_id = scanned.skills[0].id.clone();
+        let source = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: skill_id.clone(),
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/differ".to_string(),
+                ref_: "main".to_string(),
+                trusted: true,
+                auto_update: false,
+            },
+        )
+        .expect("source should bind");
+        let store = state.open_store().expect("store should open");
+        store
+            .update_source_check_result(
+                &source.id,
+                Some("aaa111"),
+                Some("bbb222"),
+                "2026-06-19T00:00:00Z",
+            )
+            .expect("source commits should update");
+        let mut details = HashMap::new();
+        details.insert(
+            source.id.clone(),
+            DiffDetail {
+                skill_id: skill_id.clone(),
+                current_commit: "aaa111".to_string(),
+                target_commit: "bbb222".to_string(),
+                files: vec![
+                    FileDiff {
+                        path: "SKILL.md".to_string(),
+                        old_path: None,
+                        status: DiffStatus::Modified,
+                        patch: Some("@@ -1 +1 @@\n-old\n+new".to_string()),
+                    },
+                    FileDiff {
+                        path: "renamed.md".to_string(),
+                        old_path: Some("old.md".to_string()),
+                        status: DiffStatus::Renamed,
+                        patch: None,
+                    },
+                ],
+            },
+        );
+        let checker = FakeUpdateChecker {
+            commits: HashMap::new(),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details,
+        };
+
+        let diff = get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
+            .expect("diff should load");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(diff.current_commit, "aaa111");
+        assert_eq!(diff.target_commit, "bbb222");
+        assert_eq!(diff.files.len(), 2);
+        assert_eq!(diff.files[0].path, "SKILL.md");
+        assert_eq!(diff.files[0].status, "Modified");
+        assert_eq!(
+            diff.files[0].patch.as_deref(),
+            Some("@@ -1 +1 @@\n-old\n+new")
+        );
+        assert_eq!(diff.files[1].old_path.as_deref(), Some("old.md"));
+        assert_eq!(diff.files[1].status, "Renamed");
     }
 }

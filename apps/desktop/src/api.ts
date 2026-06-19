@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   DesktopAgentStatus,
   DesktopBindSourceRequest,
+  DesktopDiffDetail,
   DesktopScanResponse,
   DesktopSkill,
   DesktopSource,
@@ -35,4 +36,8 @@ export function checkSkillUpdates(
   request: DesktopUpdateCheckRequest,
 ): Promise<DesktopUpdateCheckResult[]> {
   return invoke("check_skill_updates", { request });
+}
+
+export function getSkillDiff(skillId: string): Promise<DesktopDiffDetail> {
+  return invoke("get_skill_diff", { skillId });
 }

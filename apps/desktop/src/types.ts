@@ -64,6 +64,20 @@ export interface DesktopDiffSummary {
   total_changes: number;
 }
 
+export interface DesktopFileDiff {
+  path: string;
+  old_path?: string | null;
+  status: string;
+  patch?: string | null;
+}
+
+export interface DesktopDiffDetail {
+  skill_id: string;
+  current_commit: string;
+  target_commit: string;
+  files: DesktopFileDiff[];
+}
+
 export interface DesktopUpdateCheckResult {
   skill_id: string;
   skill_name: string;
