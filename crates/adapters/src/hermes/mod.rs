@@ -11,6 +11,12 @@ impl HermesAdapter {
     }
 }
 
+impl Default for HermesAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentAdapter for HermesAdapter {
     fn agent_id(&self) -> &str {
         "hermes"

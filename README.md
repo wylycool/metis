@@ -2,7 +2,7 @@
 
 > A cross-platform, local-first, open-source version manager for AI agent skills.
 
-Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill 管理器，用于发现、登记、更新、回滚和审计 Codex、Claude Code 以及其他 Agent 工具中的 skills。
+Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill 管理器，用于发现、登记、更新、回滚和审计 Codex、Claude Code、OpenClaw、Hermes、opencode 以及其他 Agent 工具中的 skills。
 
 它的目标不是一开始做 skill 商店，而是先解决一个更基础也更真实的问题：
 
@@ -10,7 +10,7 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 当前阶段
 
-项目处于 **Phase 0 → Phase 1 过渡期**：项目蓝图和架构设计已完成，正在进行 Core Engine API 和 Adapter 接口的详细设计，即将进入 MVP Core 开发。
+项目处于 **Phase 2 Desktop MVP 完成点**：Phase 1 的 Core Engine 本地管理闭环已经完成，桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板和凭据引用入口，并已完成 macOS 本机 `.dmg` 预览包验证。Windows/Linux 预览包由已准备好的 GitHub Actions workflow 承接到后续稳定化阶段实跑。
 
 ## 技术栈
 
@@ -37,17 +37,20 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 
 ## 目标用户
 
-- 同时使用 Codex、Claude Code、Gemini CLI、Cursor 或其他 Agent 工具的个人开发者。
+- 同时使用 Codex、Claude Code、OpenClaw、Hermes、opencode、Gemini CLI、Cursor 或其他 Agent 工具的个人开发者。
 - 维护大量 prompt、workflow、脚本和资源型 skills 的高级用户。
 - 在企业内部维护团队规范、排障流程、发布流程、行业知识和内部工具链 skills 的工程团队。
 - 需要对本机 Agent 扩展内容做来源审计、安全检查和版本回滚的组织。
 
 ## MVP 范围
 
-第一阶段只聚焦本地 skill 管理闭环：
+当前 MVP 聚焦本地 skill 管理闭环：
 
 - 自动识别本机 Codex skills 路径。
 - 自动识别本机 Claude Code skills 路径。
+- 自动识别本机 OpenClaw skills 路径。
+- 自动识别本机 Hermes skills 路径。
+- 自动识别本机 opencode skill 路径。
 - 支持通用 Agent Skills 标准目录。
 - 展示已发现的 skill 列表。
 - 解析 `SKILL.md` 中的名称、描述和基础元数据。
@@ -58,8 +61,20 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 - 更新前自动备份。
 - 更新失败自动回滚。
 - 支持查看更新 diff。
-- 支持私有仓库基础认证，敏感凭据存入系统 keychain。
+- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称，真实凭据仍由本机 Git / SSH agent 或后续 Keychain 接入管理。
 - 支持导出和导入团队 skill 清单。
+
+## 本地验证
+
+```bash
+cargo test
+cargo clippy
+cd apps/desktop && pnpm build
+cd apps/desktop && pnpm tauri build
+cd apps/desktop && pnpm tauri:build:mac-universal
+```
+
+macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已准备好，可在进入默认分支后构建 macOS universal、Windows 和 Linux artifact。当前 Phase 2 不把 Windows/Linux artifact 实跑作为阻塞项，也不做代码签名、公证或自动发布 GitHub Release。
 
 ## 暂不进入 MVP
 

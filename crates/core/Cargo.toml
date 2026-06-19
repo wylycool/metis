@@ -14,6 +14,7 @@ uuid.workspace = true
 chrono.workspace = true
 log.workspace = true
 sha2.workspace = true
+dirs.workspace = true
 
 metis-adapters = { path = "../adapters" }
 metis-git-provider = { path = "../git-provider" }

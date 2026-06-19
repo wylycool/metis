@@ -14,6 +14,12 @@ impl GenericAgentSkillsAdapter {
     }
 }
 
+impl Default for GenericAgentSkillsAdapter {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
 impl AgentAdapter for GenericAgentSkillsAdapter {
     fn agent_id(&self) -> &str {
         "generic"

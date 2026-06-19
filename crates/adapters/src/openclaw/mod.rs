@@ -11,6 +11,12 @@ impl OpenClawAdapter {
     }
 }
 
+impl Default for OpenClawAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentAdapter for OpenClawAdapter {
     fn agent_id(&self) -> &str {
         "openclaw"

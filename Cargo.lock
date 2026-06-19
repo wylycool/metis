@@ -1786,6 +1786,7 @@ name = "metis-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dirs 5.0.1",
  "log",
  "metis-adapters",
  "metis-git-provider",
@@ -1802,7 +1803,11 @@ dependencies = [
 name = "metis-desktop"
 version = "0.1.0"
 dependencies = [
+ "dirs 5.0.1",
  "metis-core",
+ "metis-git-provider",
+ "metis-security",
+ "metis-storage",
  "serde",
  "serde_json",
  "tauri",

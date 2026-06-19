@@ -11,6 +11,12 @@ impl OpencodeAdapter {
     }
 }
 
+impl Default for OpencodeAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentAdapter for OpencodeAdapter {
     fn agent_id(&self) -> &str {
         "opencode"

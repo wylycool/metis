@@ -17,5 +17,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde.workspace = true
 serde_json.workspace = true
+dirs.workspace = true
 
 metis-core = { path = "../../../crates/core" }
+metis-git-provider = { path = "../../../crates/git-provider" }
+metis-security = { path = "../../../crates/security" }
+metis-storage = { path = "../../../crates/storage" }

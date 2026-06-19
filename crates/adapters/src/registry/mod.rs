@@ -43,8 +43,8 @@ impl AdapterRegistry {
             .collect()
     }
 
-    /// 构建默认注册表（内置 adapter）
-    pub fn default() -> Self {
+    /// 构建内置 adapter 注册表
+    pub fn with_builtin_adapters() -> Self {
         let mut registry = Self::new();
         registry.register(Box::new(CodexAdapter::new()));
         registry.register(Box::new(ClaudeCodeAdapter::new()));
@@ -58,7 +58,7 @@ impl AdapterRegistry {
 
 impl Default for AdapterRegistry {
     fn default() -> Self {
-        Self::default()
+        Self::with_builtin_adapters()
     }
 }
 

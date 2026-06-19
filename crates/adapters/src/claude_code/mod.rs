@@ -11,6 +11,12 @@ impl ClaudeCodeAdapter {
     }
 }
 
+impl Default for ClaudeCodeAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentAdapter for ClaudeCodeAdapter {
     fn agent_id(&self) -> &str {
         "claude-code"

@@ -13,9 +13,8 @@
 pub mod audit;
 pub mod config;
 pub mod discovery;
+pub mod local_state;
 pub mod lockfile;
 pub mod rollback;
 pub mod source;
 pub mod update;
-
-// TODO: Phase 1 — 实现各模块
