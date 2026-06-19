@@ -2,7 +2,7 @@
 
 > A cross-platform, local-first, open-source version manager for AI agent skills.
 
-Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill 管理器，用于发现、登记、更新、回滚和审计 Codex、Claude Code 以及其他 Agent 工具中的 skills。
+Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill 管理器，用于发现、登记、更新、回滚和审计 Codex、Claude Code、OpenClaw、Hermes、opencode 以及其他 Agent 工具中的 skills。
 
 它的目标不是一开始做 skill 商店，而是先解决一个更基础也更真实的问题：
 
@@ -37,7 +37,7 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 
 ## 目标用户
 
-- 同时使用 Codex、Claude Code、Gemini CLI、Cursor 或其他 Agent 工具的个人开发者。
+- 同时使用 Codex、Claude Code、OpenClaw、Hermes、opencode、Gemini CLI、Cursor 或其他 Agent 工具的个人开发者。
 - 维护大量 prompt、workflow、脚本和资源型 skills 的高级用户。
 - 在企业内部维护团队规范、排障流程、发布流程、行业知识和内部工具链 skills 的工程团队。
 - 需要对本机 Agent 扩展内容做来源审计、安全检查和版本回滚的组织。
@@ -48,6 +48,9 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 
 - 自动识别本机 Codex skills 路径。
 - 自动识别本机 Claude Code skills 路径。
+- 自动识别本机 OpenClaw skills 路径。
+- 自动识别本机 Hermes skills 路径。
+- 自动识别本机 opencode skill 路径。
 - 支持通用 Agent Skills 标准目录。
 - 展示已发现的 skill 列表。
 - 解析 `SKILL.md` 中的名称、描述和基础元数据。
