@@ -188,11 +188,7 @@ impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
     ) -> Result<DiffSummary, String> {
         GitCliProvider::diff_summary(
             self,
-            &GitDiffRequest {
-                repo_path: source.repo_path.clone(),
-                current_commit: current_commit.to_string(),
-                target_commit: target_commit.to_string(),
-            },
+            &git_diff_request_for_source(self, source, current_commit, target_commit)?,
         )
         .map(diff_summary_from_git)
         .map_err(|error| error.to_string())
@@ -206,11 +202,7 @@ impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
     ) -> Result<u32, String> {
         GitCliProvider::commits_behind(
             self,
-            &GitDiffRequest {
-                repo_path: source.repo_path.clone(),
-                current_commit: current_commit.to_string(),
-                target_commit: target_commit.to_string(),
-            },
+            &git_diff_request_for_source(self, source, current_commit, target_commit)?,
         )
         .map_err(|error| error.to_string())
     }
@@ -223,11 +215,7 @@ impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
     ) -> Result<DiffDetail, String> {
         GitCliProvider::diff_detail(
             self,
-            &GitDiffRequest {
-                repo_path: source.repo_path.clone(),
-                current_commit: current_commit.to_string(),
-                target_commit: target_commit.to_string(),
-            },
+            &git_diff_request_for_source(self, source, current_commit, target_commit)?,
         )
         .map(|detail| diff_detail_from_git("", detail))
         .map_err(|error| error.to_string())
@@ -255,6 +243,38 @@ impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
         })
         .map_err(|error| error.to_string())
     }
+}
+
+fn git_diff_request_for_source<R: GitCommandRunner>(
+    provider: &GitCliProvider<R>,
+    source: &SourceRecord,
+    current_commit: &str,
+    target_commit: &str,
+) -> Result<GitDiffRequest, String> {
+    let repo_dir = match provider.cache_root() {
+        Some(cache_root) => {
+            let checkout = GitCliProvider::checkout_to_cache(
+                provider,
+                &GitCheckoutRequest {
+                    url: source.url.clone(),
+                    ref_: source.ref_.clone(),
+                    repo_path: source.repo_path.clone(),
+                    target_commit: target_commit.to_string(),
+                    cache_dir: cache_root.to_string(),
+                },
+            )
+            .map_err(|error| error.to_string())?;
+            Some(checkout.checkout_dir)
+        }
+        None => None,
+    };
+
+    Ok(GitDiffRequest {
+        repo_dir,
+        repo_path: source.repo_path.clone(),
+        current_commit: current_commit.to_string(),
+        target_commit: target_commit.to_string(),
+    })
 }
 
 pub fn check_updates<C: RemoteCommitChecker>(
@@ -649,11 +669,13 @@ fn failed_result(
 mod tests {
     use super::*;
     use crate::local_state::capture_local_baseline;
+    use metis_git_provider::fetch::{SystemGitCliProvider, SystemGitRunner};
     use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
     use std::cell::RefCell;
     use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     struct FakeRemoteChecker {
@@ -779,6 +801,37 @@ mod tests {
             fs::create_dir_all(parent).expect("parent directory should be created");
         }
         fs::write(path, contents).expect("test file should be writable");
+    }
+
+    fn git(repo: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .output()
+            .expect("git should run");
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn git_commit(repo: &Path, message: &str) -> String {
+        git(
+            repo,
+            &[
+                "-c",
+                "user.name=Metis Tests",
+                "-c",
+                "user.email=metis@example.invalid",
+                "commit",
+                "-m",
+                message,
+            ],
+        );
+        git(repo, &["rev-parse", "HEAD"])
     }
 
     fn sample_skill(id: &str, install_path: &Path, source_id: Option<&str>) -> SkillRecord {
@@ -978,6 +1031,81 @@ mod tests {
     }
 
     #[test]
+    fn check_updates_with_real_git_repo_uses_cache_for_behind_and_diff_summary() {
+        let root = temp_dir("real-git-check");
+        let source_repo = root.join("source");
+        let cache_root = root.join("cache");
+        let skill_dir = root.join("installed-skill");
+        fs::create_dir_all(source_repo.join("skills/example"))
+            .expect("source skill directory should be created");
+        write_file(&source_repo.join("skills/example/SKILL.md"), "# Old\n");
+        git(&source_repo, &["init"]);
+        git(&source_repo, &["add", "."]);
+        let current_commit = git_commit(&source_repo, "initial skill");
+        write_file(&source_repo.join("skills/example/SKILL.md"), "# New\n");
+        write_file(&source_repo.join("skills/example/new.md"), "new file\n");
+        git(&source_repo, &["add", "."]);
+        let remote_commit = git_commit(&source_repo, "updated skill");
+        fs::create_dir_all(&skill_dir).expect("installed skill directory should be created");
+        write_file(&skill_dir.join("SKILL.md"), "# Old\n");
+
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        let source = SourceRecord {
+            id: "source-1".to_string(),
+            source_type: "git".to_string(),
+            url: source_repo.to_string_lossy().to_string(),
+            repo_path: "skills/example".to_string(),
+            ref_: "HEAD".to_string(),
+            current_commit: Some(current_commit),
+            remote_commit: None,
+            last_checked_at: None,
+            trusted: true,
+            auto_update: false,
+            credential_ref: None,
+            created_at: None,
+            updated_at: None,
+        };
+        store.upsert_source(&source).expect("source should upsert");
+        store
+            .upsert_skill(&sample_skill("skill-1", &skill_dir, Some("source-1")))
+            .expect("skill should upsert");
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        let checker = SystemGitCliProvider::with_cache_root(
+            SystemGitRunner,
+            cache_root.to_string_lossy().to_string(),
+        );
+
+        let results = check_updates(
+            UpdateCheckOptions {
+                skill_ids: vec!["skill-1".to_string()],
+            },
+            &mut store,
+            &checker,
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, UpdateStatus::UpdateAvailable);
+        assert_eq!(results[0].commits_behind, Some(1));
+        assert_eq!(
+            results[0].diff_summary,
+            Some(DiffSummary {
+                files_added: 1,
+                files_modified: 1,
+                files_deleted: 0,
+                total_changes: 2,
+            })
+        );
+        assert_eq!(
+            results[0]
+                .source
+                .as_ref()
+                .and_then(|source| source.remote_commit.as_deref()),
+            Some(remote_commit.as_str())
+        );
+    }
+
+    #[test]
     fn get_diff_returns_patch_detail_for_bound_skill() {
         let root = temp_dir("diff-detail");
         let skill_dir = root.join("skill");
@@ -1079,6 +1207,89 @@ mod tests {
             .expect("source lookup should succeed")
             .expect("source should exist");
         assert_eq!(source.current_commit.as_deref(), Some("def456"));
+        let skill = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        assert_eq!(skill.local_modified, Some(false));
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn apply_update_with_real_git_repo_uses_cache_checkout() {
+        let root = temp_dir("real-git-apply");
+        let source_repo = root.join("source");
+        let skill_dir = root.join("installed-skill");
+        let backup_root = root.join("backups");
+        let cache_root = root.join("cache");
+        fs::create_dir_all(source_repo.join("skills/example"))
+            .expect("source skill directory should be created");
+        write_file(&source_repo.join("skills/example/SKILL.md"), "# Old\n");
+        git(&source_repo, &["init"]);
+        git(&source_repo, &["add", "."]);
+        let current_commit = git_commit(&source_repo, "initial skill");
+        write_file(&source_repo.join("skills/example/SKILL.md"), "# New\n");
+        write_file(&source_repo.join("skills/example/new.md"), "new file\n");
+        git(&source_repo, &["add", "."]);
+        let remote_commit = git_commit(&source_repo, "updated skill");
+        write_file(&skill_dir.join("SKILL.md"), "# Old\n");
+
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        let source = SourceRecord {
+            id: "source-1".to_string(),
+            source_type: "git".to_string(),
+            url: source_repo.to_string_lossy().to_string(),
+            repo_path: "skills/example".to_string(),
+            ref_: "HEAD".to_string(),
+            current_commit: Some(current_commit.clone()),
+            remote_commit: Some(remote_commit.clone()),
+            last_checked_at: Some("2026-06-19T12:00:00Z".to_string()),
+            trusted: true,
+            auto_update: false,
+            credential_ref: None,
+            created_at: None,
+            updated_at: None,
+        };
+        store.upsert_source(&source).expect("source should upsert");
+        store
+            .upsert_skill(&sample_skill("skill-1", &skill_dir, Some("source-1")))
+            .expect("skill should upsert");
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        let checker = SystemGitCliProvider::new(SystemGitRunner);
+
+        let result = apply_update(
+            ApplyUpdateOptions {
+                skill_id: "skill-1".to_string(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+                cache_dir: cache_root.to_string_lossy().to_string(),
+            },
+            &mut store,
+            &checker,
+        )
+        .expect("real git update should apply");
+
+        assert_eq!(result.previous_commit, current_commit);
+        assert_eq!(result.new_commit, remote_commit);
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("SKILL.md")).expect("updated skill should read"),
+            "# New\n"
+        );
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("new.md")).expect("new file should read"),
+            "new file\n"
+        );
+        let source = store
+            .get_source("source-1")
+            .expect("source lookup should succeed")
+            .expect("source should exist");
+        assert_eq!(
+            source.current_commit.as_deref(),
+            Some(remote_commit.as_str())
+        );
+        assert_eq!(
+            source.remote_commit.as_deref(),
+            Some(remote_commit.as_str())
+        );
         let skill = store
             .get_skill("skill-1")
             .expect("skill lookup should succeed")

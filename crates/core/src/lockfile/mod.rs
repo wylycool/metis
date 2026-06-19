@@ -1,7 +1,7 @@
 use crate::audit::{write_audit_event, AuditAction, AuditEventInput};
-use metis_storage::db::{SkillIndexStore, StorageError};
+use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord, StorageError};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -120,32 +120,29 @@ pub fn import_lockfile(
     let contents = fs::read_to_string(file_path)?;
     let lockfile = serde_json::from_str::<LockFile>(&contents)?;
     let local_skills = store.list_skills().map_err(LockfileError::from)?;
-    let local_by_key = local_skills
-        .iter()
-        .map(|skill| ((skill.agent_id.clone(), skill.name.clone()), skill))
-        .collect::<HashMap<_, _>>();
-    let lock_keys = lockfile
-        .skills
-        .iter()
-        .map(|entry| (entry.agent_id.clone(), entry.name.clone()))
-        .collect::<HashSet<_>>();
+    let mut local_candidates = Vec::new();
+    for skill in &local_skills {
+        let source = match skill.source_id.as_deref() {
+            Some(source_id) => store.get_source(source_id).map_err(LockfileError::from)?,
+            None => None,
+        };
+        local_candidates.push((skill, source));
+    }
     let mut matched = Vec::new();
     let mut outdated = Vec::new();
     let mut missing = Vec::new();
+    let mut matched_local_ids = HashSet::new();
 
     for entry in lockfile.skills {
-        let key = (entry.agent_id.clone(), entry.name.clone());
-        let Some(local_skill) = local_by_key.get(&key) else {
+        let Some((local_skill, local_source)) =
+            find_local_lockfile_match(&entry, &local_candidates)
+        else {
             missing.push(entry);
             continue;
         };
-        let local_commit = match local_skill.source_id.as_deref() {
-            Some(source_id) => store
-                .get_source(source_id)
-                .map_err(LockfileError::from)?
-                .and_then(|source| source.current_commit),
-            None => None,
-        };
+        let local_commit = local_source
+            .as_ref()
+            .and_then(|source| source.current_commit.clone());
 
         match (entry.source_commit.as_ref(), local_commit.as_ref()) {
             (Some(lock_commit), Some(local_commit)) if lock_commit != local_commit => {
@@ -161,6 +158,7 @@ pub fn import_lockfile(
                 local_skill_id: local_skill.id.clone(),
             }),
         }
+        matched_local_ids.insert(local_skill.id.clone());
         let _ = write_audit_event(
             store,
             AuditEventInput {
@@ -177,7 +175,7 @@ pub fn import_lockfile(
 
     let mut extra = local_skills
         .iter()
-        .filter(|skill| !lock_keys.contains(&(skill.agent_id.clone(), skill.name.clone())))
+        .filter(|skill| !matched_local_ids.contains(&skill.id))
         .map(|skill| skill.id.clone())
         .collect::<Vec<_>>();
     extra.sort();
@@ -188,6 +186,34 @@ pub fn import_lockfile(
         missing,
         extra,
     })
+}
+
+fn find_local_lockfile_match<'a>(
+    entry: &LockFileEntry,
+    local_candidates: &'a [(&'a SkillRecord, Option<SourceRecord>)],
+) -> Option<(&'a SkillRecord, &'a Option<SourceRecord>)> {
+    local_candidates.iter().find_map(|(skill, source)| {
+        if skill.agent_id != entry.agent_id || skill.name != entry.name {
+            return None;
+        }
+        if lock_entry_has_source_identity(entry) && !source_matches_lock_entry(source, entry) {
+            return None;
+        }
+        Some((*skill, source))
+    })
+}
+
+fn lock_entry_has_source_identity(entry: &LockFileEntry) -> bool {
+    entry.source_url.is_some() || entry.source_repo_path.is_some() || entry.source_ref.is_some()
+}
+
+fn source_matches_lock_entry(source: &Option<SourceRecord>, entry: &LockFileEntry) -> bool {
+    let Some(source) = source else {
+        return false;
+    };
+    Some(source.url.as_str()) == entry.source_url.as_deref()
+        && Some(source.repo_path.as_str()) == entry.source_repo_path.as_deref()
+        && Some(source.ref_.as_str()) == entry.source_ref.as_deref()
 }
 
 impl From<StorageError> for LockfileError {
@@ -357,5 +383,53 @@ mod tests {
         assert_eq!(diff.outdated.len(), 1);
         assert_eq!(diff.missing.len(), 1);
         assert_eq!(diff.extra, vec!["skill-extra".to_string()]);
+    }
+
+    #[test]
+    fn import_lockfile_uses_source_identity_when_names_collide() {
+        let root = temp_dir("import-name-collision");
+        let input = root.join("skills.lock.json");
+        let lockfile = LockFile {
+            version: "1".to_string(),
+            exported_at: "2026-06-19T12:00:00Z".to_string(),
+            skills: vec![LockFileEntry {
+                name: "Shared Name".to_string(),
+                agent_id: "codex".to_string(),
+                source_url: Some("https://github.com/example/source-a.git".to_string()),
+                source_repo_path: Some("skills/shared".to_string()),
+                source_ref: Some("main".to_string()),
+                source_commit: Some("aaa111".to_string()),
+                install_path_hint: None,
+            }],
+        };
+        fs::write(&input, serde_json::to_string_pretty(&lockfile).unwrap())
+            .expect("lockfile should write");
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let mut source_a = sample_source("source-a", "aaa111", None);
+        source_a.url = "https://github.com/example/source-a.git".to_string();
+        source_a.repo_path = "skills/shared".to_string();
+        let mut source_b = sample_source("source-b", "bbb222", None);
+        source_b.url = "https://github.com/example/source-b.git".to_string();
+        source_b.repo_path = "skills/shared".to_string();
+        store
+            .upsert_source(&source_a)
+            .expect("source a should upsert");
+        store
+            .upsert_source(&source_b)
+            .expect("source b should upsert");
+        store
+            .upsert_skill(&sample_skill("skill-a", "Shared Name", Some("source-a")))
+            .expect("skill a should upsert");
+        store
+            .upsert_skill(&sample_skill("skill-b", "Shared Name", Some("source-b")))
+            .expect("skill b should upsert");
+
+        let diff = import_lockfile(input.as_path(), &store).expect("lockfile should import");
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(diff.matched.len(), 1);
+        assert_eq!(diff.matched[0].local_skill_id, "skill-a");
+        assert!(diff.outdated.is_empty());
+        assert!(diff.missing.is_empty());
     }
 }

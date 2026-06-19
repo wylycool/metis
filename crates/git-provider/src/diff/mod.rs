@@ -2,6 +2,7 @@ use crate::fetch::{GitCliProvider, GitCommandRunner, GitProviderError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitDiffRequest {
+    pub repo_dir: Option<String>,
     pub repo_path: String,
     pub current_commit: String,
     pub target_commit: String,
@@ -44,21 +45,27 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
         request: &GitDiffRequest,
     ) -> Result<GitDiffSummary, GitProviderError> {
         let output = if request.repo_path.is_empty() {
-            self.runner().run_git(&[
-                "diff",
-                "--name-status",
-                &request.current_commit,
-                &request.target_commit,
-            ])?
+            self.runner().run_git_in(
+                request.repo_dir.as_deref(),
+                &[
+                    "diff",
+                    "--name-status",
+                    &request.current_commit,
+                    &request.target_commit,
+                ],
+            )?
         } else {
-            self.runner().run_git(&[
-                "diff",
-                "--name-status",
-                &request.current_commit,
-                &request.target_commit,
-                "--",
-                &request.repo_path,
-            ])?
+            self.runner().run_git_in(
+                request.repo_dir.as_deref(),
+                &[
+                    "diff",
+                    "--name-status",
+                    &request.current_commit,
+                    &request.target_commit,
+                    "--",
+                    &request.repo_path,
+                ],
+            )?
         };
 
         parse_name_status_summary(&output.stdout).map_err(|()| GitProviderError::InvalidOutput {
@@ -68,7 +75,10 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
 
     pub fn commits_behind(&self, request: &GitDiffRequest) -> Result<u32, GitProviderError> {
         let range = format!("{}..{}", request.current_commit, request.target_commit);
-        let output = self.runner().run_git(&["rev-list", "--count", &range])?;
+        let output = self.runner().run_git_in(
+            request.repo_dir.as_deref(),
+            &["rev-list", "--count", &range],
+        )?;
         output
             .stdout
             .trim()
@@ -80,38 +90,50 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
 
     pub fn diff_detail(&self, request: &GitDiffRequest) -> Result<GitDiffDetail, GitProviderError> {
         let name_status_output = if request.repo_path.is_empty() {
-            self.runner().run_git(&[
-                "diff",
-                "--name-status",
-                &request.current_commit,
-                &request.target_commit,
-            ])?
+            self.runner().run_git_in(
+                request.repo_dir.as_deref(),
+                &[
+                    "diff",
+                    "--name-status",
+                    &request.current_commit,
+                    &request.target_commit,
+                ],
+            )?
         } else {
-            self.runner().run_git(&[
-                "diff",
-                "--name-status",
-                &request.current_commit,
-                &request.target_commit,
-                "--",
-                &request.repo_path,
-            ])?
+            self.runner().run_git_in(
+                request.repo_dir.as_deref(),
+                &[
+                    "diff",
+                    "--name-status",
+                    &request.current_commit,
+                    &request.target_commit,
+                    "--",
+                    &request.repo_path,
+                ],
+            )?
         };
         let patch_output = if request.repo_path.is_empty() {
-            self.runner().run_git(&[
-                "diff",
-                "--patch",
-                &request.current_commit,
-                &request.target_commit,
-            ])?
+            self.runner().run_git_in(
+                request.repo_dir.as_deref(),
+                &[
+                    "diff",
+                    "--patch",
+                    &request.current_commit,
+                    &request.target_commit,
+                ],
+            )?
         } else {
-            self.runner().run_git(&[
-                "diff",
-                "--patch",
-                &request.current_commit,
-                &request.target_commit,
-                "--",
-                &request.repo_path,
-            ])?
+            self.runner().run_git_in(
+                request.repo_dir.as_deref(),
+                &[
+                    "diff",
+                    "--patch",
+                    &request.current_commit,
+                    &request.target_commit,
+                    "--",
+                    &request.repo_path,
+                ],
+            )?
         };
         let mut files = parse_name_status_files(&name_status_output.stdout).map_err(|()| {
             GitProviderError::InvalidOutput {
@@ -245,8 +267,12 @@ fn parse_diff_git_path(rest: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fetch::{GitCommandOutput, GitCommandRunner, GitProviderError};
+    use crate::fetch::{GitCommandOutput, GitCommandRunner, GitProviderError, SystemGitRunner};
     use std::cell::RefCell;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     struct FakeRunner {
         calls: RefCell<Vec<Vec<String>>>,
@@ -302,6 +328,7 @@ mod tests {
 
         let summary = provider
             .diff_summary(&GitDiffRequest {
+                repo_dir: None,
                 repo_path: "skills/example".to_string(),
                 current_commit: "abc123".to_string(),
                 target_commit: "def456".to_string(),
@@ -338,6 +365,7 @@ mod tests {
 
         let summary = provider
             .diff_summary(&GitDiffRequest {
+                repo_dir: None,
                 repo_path: "skills/example".to_string(),
                 current_commit: "abc123".to_string(),
                 target_commit: "def456".to_string(),
@@ -362,6 +390,7 @@ mod tests {
 
         let error = provider
             .diff_summary(&GitDiffRequest {
+                repo_dir: None,
                 repo_path: "skills/example".to_string(),
                 current_commit: "abc123".to_string(),
                 target_commit: "def456".to_string(),
@@ -378,6 +407,7 @@ mod tests {
 
         let behind = provider
             .commits_behind(&GitDiffRequest {
+                repo_dir: None,
                 repo_path: "skills/example".to_string(),
                 current_commit: "abc123".to_string(),
                 target_commit: "def456".to_string(),
@@ -411,6 +441,7 @@ mod tests {
         let provider = GitCliProvider::new(runner);
 
         let request = GitDiffRequest {
+            repo_dir: None,
             repo_path: "skills/example".to_string(),
             current_commit: "abc123".to_string(),
             target_commit: "def456".to_string(),
@@ -430,5 +461,97 @@ mod tests {
             .as_deref()
             .expect("patch should exist")
             .contains("diff --git"));
+    }
+
+    #[test]
+    fn real_git_diff_and_behind_run_inside_repo_dir() {
+        let root = temp_dir("real-git-diff");
+        let repo = root.join("repo");
+        fs::create_dir_all(repo.join("skills/example")).expect("skill directory should be created");
+        write_file(&repo.join("skills/example/SKILL.md"), "# Old\n");
+        git(&repo, &["init"]);
+        git(&repo, &["add", "."]);
+        let current_commit = git_commit(&repo, "initial skill");
+        write_file(&repo.join("skills/example/SKILL.md"), "# New\n");
+        write_file(&repo.join("skills/example/new.md"), "new file\n");
+        git(&repo, &["add", "."]);
+        let target_commit = git_commit(&repo, "updated skill");
+        let provider = GitCliProvider::new(SystemGitRunner);
+        let request = GitDiffRequest {
+            repo_dir: Some(repo.to_string_lossy().to_string()),
+            repo_path: "skills/example".to_string(),
+            current_commit,
+            target_commit,
+        };
+
+        let behind = provider
+            .commits_behind(&request)
+            .expect("behind should run in repo dir");
+        let summary = provider
+            .diff_summary(&request)
+            .expect("summary should run in repo dir");
+        let detail = provider
+            .diff_detail(&request)
+            .expect("detail should run in repo dir");
+
+        assert_eq!(behind, 1);
+        assert_eq!(summary.files_added, 1);
+        assert_eq!(summary.files_modified, 1);
+        assert_eq!(summary.total_changes, 2);
+        assert_eq!(detail.files.len(), 2);
+        assert!(detail
+            .files
+            .iter()
+            .any(|file| file.path == "skills/example/SKILL.md" && file.patch.is_some()));
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("metis-git-provider-{name}-{suffix}"));
+        fs::create_dir_all(&root).expect("temp directory should be created");
+        root
+    }
+
+    fn write_file(path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("parent directory should be created");
+        }
+        fs::write(path, contents).expect("file should be written");
+    }
+
+    fn git(repo: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .output()
+            .expect("git should run");
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn git_commit(repo: &Path, message: &str) -> String {
+        git(
+            repo,
+            &[
+                "-c",
+                "user.name=Metis Tests",
+                "-c",
+                "user.email=metis@example.invalid",
+                "commit",
+                "-m",
+                message,
+            ],
+        );
+        git(repo, &["rev-parse", "HEAD"])
     }
 }

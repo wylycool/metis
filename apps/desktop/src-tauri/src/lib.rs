@@ -487,7 +487,7 @@ fn check_skill_updates(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopUpdateCheckRequest,
 ) -> Result<Vec<DesktopUpdateCheckResult>, String> {
-    let checker = SystemGitCliProvider::default();
+    let checker = system_git_checker_for_state(&state);
     check_skill_updates_for_state_with_checker(&state, request, &checker)
 }
 
@@ -496,7 +496,7 @@ fn get_skill_diff(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopDiffDetail, String> {
-    let checker = SystemGitCliProvider::default();
+    let checker = system_git_checker_for_state(&state);
     get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -505,7 +505,7 @@ fn apply_skill_update(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopApplyUpdateResult, String> {
-    let checker = SystemGitCliProvider::default();
+    let checker = system_git_checker_for_state(&state);
     apply_skill_update_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -543,6 +543,13 @@ fn desktop_scan_response(
             })
             .collect(),
     })
+}
+
+fn system_git_checker_for_state(state: &DesktopAppState) -> SystemGitCliProvider {
+    SystemGitCliProvider::with_cache_root(
+        metis_git_provider::fetch::SystemGitRunner,
+        state.cache_root().to_string_lossy().to_string(),
+    )
 }
 
 fn normalize_paths(paths: Vec<String>) -> Vec<String> {

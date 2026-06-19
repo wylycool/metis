@@ -292,6 +292,17 @@ impl SkillIndexStore {
             .map_err(StorageError::from)
     }
 
+    pub fn delete_skill(&self, skill_id: &str) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            DELETE FROM skills
+            WHERE id = ?1
+            ",
+            params![skill_id],
+        )?;
+        Ok(())
+    }
+
     pub fn upsert_source(&self, source: &SourceRecord) -> Result<(), StorageError> {
         self.connection.execute(
             "
