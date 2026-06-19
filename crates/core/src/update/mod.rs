@@ -736,10 +736,7 @@ mod tests {
             _current_commit: &str,
             _target_commit: &str,
         ) -> Result<u32, String> {
-            self.behinds
-                .get(&source.id)
-                .cloned()
-                .unwrap_or_else(|| Ok(0))
+            self.behinds.get(&source.id).cloned().unwrap_or(Ok(0))
         }
 
         fn diff_detail(

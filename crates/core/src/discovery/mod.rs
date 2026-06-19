@@ -382,7 +382,7 @@ fn metadata_error(status: &MetadataStatus) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use metis_storage::db::SkillIndexStore;
+    use metis_storage::db::{SkillIndexStore, SourceRecord};
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -397,6 +397,24 @@ mod tests {
 
     fn write_file(path: &Path, contents: &str) {
         fs::write(path, contents).expect("test file should be writable");
+    }
+
+    fn sample_source(id: &str) -> SourceRecord {
+        SourceRecord {
+            id: id.to_string(),
+            source_type: "git".to_string(),
+            url: "https://github.com/example/metis-skills.git".to_string(),
+            repo_path: "skills/indexed-skill".to_string(),
+            ref_: "main".to_string(),
+            current_commit: Some("abc123".to_string()),
+            remote_commit: Some("def456".to_string()),
+            last_checked_at: Some("2026-06-19T12:00:00Z".to_string()),
+            trusted: true,
+            auto_update: false,
+            credential_ref: None,
+            created_at: None,
+            updated_at: None,
+        }
     }
 
     #[test]
@@ -571,6 +589,60 @@ description: Updated description
         );
         assert_eq!(stored[0].id, first.skills[0].id);
         assert_eq!(stored[0].id, second.skills[0].id);
+    }
+
+    #[test]
+    fn scan_and_index_skills_preserves_existing_source_and_local_state() {
+        let root = temp_dir("generic-index-preserve-state");
+        let skill_dir = root.join("indexed-skill");
+        fs::create_dir_all(&skill_dir).expect("skill directory should be created");
+        write_file(
+            &skill_dir.join("SKILL.md"),
+            r#"---
+name: indexed-skill
+description: First description
+---
+"#,
+        );
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let options = ScanOptions {
+            agent_ids: Some(vec!["generic".to_string()]),
+            custom_paths: vec![root.to_string_lossy().to_string()],
+        };
+
+        let first = scan_and_index_skills(options.clone(), &store)
+            .expect("first scan and index should succeed");
+        let skill_id = first.skills[0].id.clone();
+        store
+            .upsert_source(&sample_source("source-1"))
+            .expect("source should upsert");
+        store
+            .bind_skill_source(&skill_id, "source-1")
+            .expect("skill should bind source");
+        store
+            .update_skill_local_fingerprint(&skill_id, "sha256:baseline", false)
+            .expect("baseline fingerprint should update");
+
+        write_file(
+            &skill_dir.join("SKILL.md"),
+            r#"---
+name: indexed-skill
+description: Updated description
+---
+"#,
+        );
+        scan_and_index_skills(options, &store).expect("second scan and index should succeed");
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        let stored = store
+            .get_skill(&skill_id)
+            .expect("skill lookup should succeed")
+            .expect("skill should still exist");
+        assert_eq!(stored.description.as_deref(), Some("Updated description"));
+        assert_eq!(stored.source_id.as_deref(), Some("source-1"));
+        assert_eq!(stored.local_fingerprint.as_deref(), Some("sha256:baseline"));
+        assert_eq!(stored.local_modified, Some(false));
     }
 
     #[test]
