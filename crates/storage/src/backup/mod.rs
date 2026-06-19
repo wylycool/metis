@@ -60,6 +60,25 @@ pub fn copy_skill_directory(
     Ok(result)
 }
 
+pub fn replace_skill_directory(
+    source: impl AsRef<Path>,
+    target: impl AsRef<Path>,
+) -> Result<BackupCopyResult, BackupError> {
+    let target = target.as_ref();
+    if target.exists() {
+        fs::remove_dir_all(target)?;
+    }
+    copy_skill_directory(source, target)
+}
+
+pub fn delete_backup_directory(path: impl AsRef<Path>) -> Result<(), BackupError> {
+    let path = path.as_ref();
+    if path.exists() {
+        fs::remove_dir_all(path)?;
+    }
+    Ok(())
+}
+
 fn is_in_git_dir(path: &Path) -> bool {
     path.components()
         .any(|component| component == Component::Normal(".git".as_ref()))
@@ -115,6 +134,48 @@ mod tests {
         );
         assert!(!target.join(".git/config").exists());
 
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn replace_skill_directory_removes_stale_files_and_restores_backup_contents() {
+        let root = temp_dir("replace");
+        let source = root.join("backup");
+        let target = root.join("skill");
+        write_file(&source.join("SKILL.md"), "# Restored\n");
+        write_file(&source.join("nested/tool.md"), "restored");
+        write_file(&source.join(".git/config"), "git metadata");
+        write_file(&target.join("SKILL.md"), "# Old\n");
+        write_file(&target.join("stale.md"), "stale");
+
+        let result =
+            replace_skill_directory(&source, &target).expect("skill directory should restore");
+
+        assert_eq!(result.file_count, 2);
+        assert_eq!(
+            fs::read_to_string(target.join("SKILL.md")).expect("restored file should read"),
+            "# Restored\n"
+        );
+        assert_eq!(
+            fs::read_to_string(target.join("nested/tool.md")).expect("nested file should read"),
+            "restored"
+        );
+        assert!(!target.join("stale.md").exists());
+        assert!(!target.join(".git/config").exists());
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn delete_backup_directory_treats_missing_directory_as_success() {
+        let root = temp_dir("delete");
+        let backup = root.join("backup");
+        write_file(&backup.join("SKILL.md"), "# Example\n");
+
+        delete_backup_directory(&backup).expect("existing backup should delete");
+        delete_backup_directory(&backup).expect("missing backup should still delete");
+
+        assert!(!backup.exists());
         fs::remove_dir_all(&root).expect("temp directory should be removed");
     }
 }

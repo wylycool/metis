@@ -37,6 +37,117 @@ pub fn discover_standard_skill_dirs(search_root: &str) -> Result<Vec<String>, Ad
     Ok(skill_dirs)
 }
 
+pub fn discover_flat_skill_dirs(search_root: &str) -> Result<Vec<String>, AdapterError> {
+    let root = Path::new(search_root);
+    if !root.exists() {
+        return Ok(vec![]);
+    }
+
+    if root.join("SKILL.md").is_file() {
+        Ok(vec![".".to_string()])
+    } else {
+        Ok(vec![])
+    }
+}
+
+pub fn discover_packaged_skill_dirs(
+    search_root: &str,
+    manifest_file: &str,
+) -> Result<Vec<String>, AdapterError> {
+    let root = Path::new(search_root);
+    if !root.exists() {
+        return Ok(vec![]);
+    }
+
+    let manifest_path = root.join(manifest_file);
+    let contents =
+        fs::read_to_string(&manifest_path).map_err(|err| AdapterError::PathNotReadable {
+            path: manifest_path.to_string_lossy().to_string(),
+            reason: err.to_string(),
+        })?;
+    let manifest = serde_yaml::from_str::<PackagedManifest>(&contents).map_err(|err| {
+        AdapterError::ParseError {
+            path: manifest_path.to_string_lossy().to_string(),
+            detail: err.to_string(),
+        }
+    })?;
+    let mut skill_dirs = manifest
+        .skills
+        .iter()
+        .filter_map(packaged_skill_path)
+        .filter(|relative_path| root.join(relative_path).join("SKILL.md").is_file())
+        .collect::<Vec<_>>();
+    skill_dirs.sort();
+    Ok(skill_dirs)
+}
+
+pub fn discover_hierarchical_skill_dirs(search_root: &str) -> Result<Vec<String>, AdapterError> {
+    let root = Path::new(search_root);
+    if !root.exists() {
+        return Ok(vec![]);
+    }
+
+    let categories = fs::read_dir(root).map_err(|err| readable_error(search_root, err))?;
+    let mut skill_dirs = Vec::new();
+
+    for category in categories {
+        let category = category.map_err(|err| readable_error(search_root, err))?;
+        if !category
+            .file_type()
+            .map_err(|err| readable_error(search_root, err))?
+            .is_dir()
+        {
+            continue;
+        }
+
+        let skills = fs::read_dir(category.path())
+            .map_err(|err| readable_error(&category.path().to_string_lossy(), err))?;
+        for skill in skills {
+            let skill = skill.map_err(|err| readable_error(search_root, err))?;
+            if !skill
+                .file_type()
+                .map_err(|err| readable_error(search_root, err))?
+                .is_dir()
+            {
+                continue;
+            }
+            if !skill.path().join("SKILL.md").is_file() {
+                continue;
+            }
+            let relative_path = skill
+                .path()
+                .strip_prefix(root)
+                .map_err(|_| AdapterError::InvalidFormat {
+                    path: skill.path().to_string_lossy().to_string(),
+                    detail: "skill path is not under search root".to_string(),
+                })?
+                .components()
+                .map(|component| component.as_os_str().to_string_lossy().to_string())
+                .collect::<Vec<_>>()
+                .join("/");
+            skill_dirs.push(relative_path);
+        }
+    }
+
+    skill_dirs.sort();
+    Ok(skill_dirs)
+}
+
+#[derive(Debug, Deserialize)]
+struct PackagedManifest {
+    skills: Vec<Value>,
+}
+
+fn packaged_skill_path(value: &Value) -> Option<String> {
+    match value {
+        Value::String(path) => non_empty(path),
+        Value::Mapping(mapping) => mapping
+            .get(Value::String("path".to_string()))
+            .and_then(|value| string_value(Some(value))),
+        _ => None,
+    }
+}
+
 fn readable_error(path: &str, err: io::Error) -> AdapterError {
     AdapterError::PathNotReadable {
         path: path.to_string(),
@@ -239,5 +350,75 @@ fn non_empty(value: &str) -> Option<String> {
         None
     } else {
         Some(value.to_string())
+    }
+}
+
+#[cfg(test)]
+mod non_standard_tests {
+    use super::*;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("metis-adapters-{}-{}", name, suffix));
+        fs::create_dir_all(&root).expect("temp directory should be created");
+        root
+    }
+
+    fn write_file(path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("parent directory should be created");
+        }
+        fs::write(path, contents).expect("test file should be writable");
+    }
+
+    #[test]
+    fn discover_flat_skill_dir_returns_root_when_skill_md_exists() {
+        let root = temp_dir("flat");
+        write_file(&root.join("SKILL.md"), "# Flat\n");
+
+        let dirs = discover_flat_skill_dirs(root.to_str().unwrap()).expect("flat scan should work");
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(dirs, vec![".".to_string()]);
+    }
+
+    #[test]
+    fn discover_packaged_skill_dirs_reads_manifest_skills_array() {
+        let root = temp_dir("packaged");
+        write_file(
+            &root.join("metis-package.yml"),
+            "skills:\n  - path: skills/a\n  - path: skills/b\n",
+        );
+        write_file(&root.join("skills/a/SKILL.md"), "# A\n");
+        write_file(&root.join("skills/b/SKILL.md"), "# B\n");
+
+        let dirs = discover_packaged_skill_dirs(root.to_str().unwrap(), "metis-package.yml")
+            .expect("packaged scan should work");
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(dirs, vec!["skills/a".to_string(), "skills/b".to_string()]);
+    }
+
+    #[test]
+    fn discover_hierarchical_skill_dirs_returns_category_skill_paths() {
+        let root = temp_dir("hierarchical");
+        write_file(&root.join("workflow/a/SKILL.md"), "# A\n");
+        write_file(&root.join("knowledge/b/SKILL.md"), "# B\n");
+        write_file(&root.join("workflow/not-a-skill/readme.md"), "nope");
+
+        let dirs = discover_hierarchical_skill_dirs(root.to_str().unwrap())
+            .expect("hierarchical scan should work");
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(
+            dirs,
+            vec!["knowledge/b".to_string(), "workflow/a".to_string()]
+        );
     }
 }

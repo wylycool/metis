@@ -1,3 +1,4 @@
+use crate::audit::{write_audit_event, AuditAction, AuditEventInput};
 use metis_storage::db::{SkillIndexStore, SourceRecord, StorageError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -79,6 +80,18 @@ pub fn bind_source(
     store
         .bind_skill_source(skill_id, &source_record.id)
         .map_err(BindError::from)?;
+    let _ = write_audit_event(
+        store,
+        AuditEventInput {
+            skill_id: skill_id.to_string(),
+            action: AuditAction::SourceBound,
+            detail: Some(format!("bound git source {}", source_record.url)),
+            commit_before: None,
+            commit_after: source_record.current_commit.clone(),
+            status: "success".to_string(),
+            risk_summary: None,
+        },
+    );
 
     let stored = store
         .get_source(&source_record.id)
@@ -98,6 +111,18 @@ pub fn unbind_source(skill_id: &str, store: &SkillIndexStore) -> Result<(), Bind
     store
         .unbind_skill_source(skill_id)
         .map_err(BindError::from)?;
+    let _ = write_audit_event(
+        store,
+        AuditEventInput {
+            skill_id: skill_id.to_string(),
+            action: AuditAction::SourceUnbound,
+            detail: Some("unbound source".to_string()),
+            commit_before: None,
+            commit_after: None,
+            status: "success".to_string(),
+            risk_summary: None,
+        },
+    );
     Ok(())
 }
 
@@ -252,6 +277,16 @@ mod tests {
             .expect("skill lookup should succeed")
             .expect("skill should exist");
         assert_eq!(stored_skill.source_id.as_deref(), Some(source.id.as_str()));
+        let audits = store
+            .list_audit_events(&metis_storage::db::AuditEventFilter {
+                skill_id: Some("skill-1".to_string()),
+                action: Some("source_bound".to_string()),
+                limit: 10,
+                offset: 0,
+            })
+            .expect("audit events should list");
+        assert_eq!(audits.len(), 1);
+        assert_eq!(audits[0].status, "success");
     }
 
     #[test]
@@ -310,5 +345,14 @@ mod tests {
             .expect("skill lookup should succeed")
             .expect("skill should exist");
         assert_eq!(stored_skill.source_id, None);
+        let audits = store
+            .list_audit_events(&metis_storage::db::AuditEventFilter {
+                skill_id: Some("skill-1".to_string()),
+                action: Some("source_unbound".to_string()),
+                limit: 10,
+                offset: 0,
+            })
+            .expect("audit events should list");
+        assert_eq!(audits.len(), 1);
     }
 }

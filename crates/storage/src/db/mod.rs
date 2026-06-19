@@ -70,6 +70,27 @@ pub struct BackupRecord {
     pub created_at: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditEventRecord {
+    pub id: String,
+    pub skill_id: String,
+    pub action: String,
+    pub detail: Option<String>,
+    pub commit_before: Option<String>,
+    pub commit_after: Option<String>,
+    pub status: String,
+    pub risk_summary: Option<String>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditEventFilter {
+    pub skill_id: Option<String>,
+    pub action: Option<String>,
+    pub limit: u32,
+    pub offset: u32,
+}
+
 pub struct SkillIndexStore {
     connection: Connection,
 }
@@ -625,6 +646,104 @@ impl SkillIndexStore {
         Ok(records)
     }
 
+    pub fn mark_backup_restored(
+        &self,
+        backup_id: &str,
+        restore_status: &str,
+    ) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            UPDATE backups
+            SET restore_status = ?1
+            WHERE id = ?2
+            ",
+            params![restore_status, backup_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_backup(&self, backup_id: &str) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            DELETE FROM backups
+            WHERE id = ?1
+            ",
+            params![backup_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn insert_audit_event(&self, event: &AuditEventRecord) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            INSERT INTO audit_events (
+                id,
+                skill_id,
+                action,
+                detail,
+                commit_before,
+                commit_after,
+                status,
+                risk_summary,
+                created_at
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, COALESCE(?9, datetime('now'))
+            )
+            ",
+            params![
+                event.id,
+                event.skill_id,
+                event.action,
+                event.detail,
+                event.commit_before,
+                event.commit_after,
+                event.status,
+                event.risk_summary,
+                event.created_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_audit_events(
+        &self,
+        filter: &AuditEventFilter,
+    ) -> Result<Vec<AuditEventRecord>, StorageError> {
+        let mut statement = self.connection.prepare(
+            "
+            SELECT
+                id,
+                skill_id,
+                action,
+                detail,
+                commit_before,
+                commit_after,
+                status,
+                risk_summary,
+                created_at
+            FROM audit_events
+            WHERE (?1 IS NULL OR skill_id = ?1)
+              AND (?2 IS NULL OR action = ?2)
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?3 OFFSET ?4
+            ",
+        )?;
+
+        let records = statement
+            .query_map(
+                params![
+                    filter.skill_id,
+                    filter.action,
+                    i64::from(filter.limit),
+                    i64::from(filter.offset),
+                ],
+                row_to_audit_event_record,
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(records)
+    }
+
     pub fn applied_migration_versions(&self) -> Result<Vec<i64>, StorageError> {
         let mut statement = self
             .connection
@@ -732,6 +851,20 @@ fn row_to_backup_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<BackupRecor
     })
 }
 
+fn row_to_audit_event_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<AuditEventRecord> {
+    Ok(AuditEventRecord {
+        id: row.get(0)?,
+        skill_id: row.get(1)?,
+        action: row.get(2)?,
+        detail: row.get(3)?,
+        commit_before: row.get(4)?,
+        commit_after: row.get(5)?,
+        status: row.get(6)?,
+        risk_summary: row.get(7)?,
+        created_at: row.get(8)?,
+    })
+}
+
 const INITIAL_SCHEMA_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS _migrations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -825,6 +958,24 @@ CREATE INDEX IF NOT EXISTS idx_file_manifests_skill_snapshot
     ON file_manifests(skill_id, snapshot_type, snapshot_ref);
 CREATE INDEX IF NOT EXISTS idx_file_manifests_path
     ON file_manifests(skill_id, relative_path);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    id                  TEXT PRIMARY KEY,
+    skill_id            TEXT NOT NULL,
+    action              TEXT NOT NULL,
+    detail              TEXT,
+    commit_before       TEXT,
+    commit_after        TEXT,
+    status              TEXT NOT NULL,
+    risk_summary        TEXT,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_events_skill_id ON audit_events(skill_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_action ON audit_events(action);
+CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at);
 "#;
 
 #[derive(Debug, thiserror::Error)]
@@ -912,6 +1063,20 @@ mod tests {
             total_size_bytes: 42,
             reason: reason.to_string(),
             restore_status: None,
+            created_at: Some("2026-06-19T12:00:00Z".to_string()),
+        }
+    }
+
+    fn sample_audit(id: &str, skill_id: &str, action: &str, status: &str) -> AuditEventRecord {
+        AuditEventRecord {
+            id: id.to_string(),
+            skill_id: skill_id.to_string(),
+            action: action.to_string(),
+            detail: Some(format!("{action} detail")),
+            commit_before: Some("abc123".to_string()),
+            commit_after: Some("def456".to_string()),
+            status: status.to_string(),
+            risk_summary: Some(r#"{"high":0}"#.to_string()),
             created_at: Some("2026-06-19T12:00:00Z".to_string()),
         }
     }
@@ -1192,6 +1357,43 @@ mod tests {
     }
 
     #[test]
+    fn mark_backup_restored_updates_restore_status() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        let backup = sample_backup("backup-1", "skill-1", "manual");
+        store.upsert_skill(&skill).expect("skill should upsert");
+        store.insert_backup(&backup).expect("backup should insert");
+
+        store
+            .mark_backup_restored("backup-1", "restored")
+            .expect("backup restore status should update");
+
+        let stored = store
+            .get_backup("backup-1")
+            .expect("backup lookup should succeed")
+            .expect("backup should exist");
+        assert_eq!(stored.restore_status.as_deref(), Some("restored"));
+    }
+
+    #[test]
+    fn delete_backup_removes_record() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        let backup = sample_backup("backup-1", "skill-1", "manual");
+        store.upsert_skill(&skill).expect("skill should upsert");
+        store.insert_backup(&backup).expect("backup should insert");
+
+        store
+            .delete_backup("backup-1")
+            .expect("backup record should delete");
+
+        let stored = store
+            .get_backup("backup-1")
+            .expect("backup lookup should succeed");
+        assert_eq!(stored, None);
+    }
+
+    #[test]
     fn update_skill_local_fingerprint_sets_baseline_fingerprint_and_modified_flag() {
         let store = SkillIndexStore::open_in_memory().expect("store should open");
         let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
@@ -1261,5 +1463,66 @@ mod tests {
         assert!(stored.trusted);
         assert!(!stored.auto_update);
         assert_eq!(stored.credential_ref.as_deref(), Some("github-main"));
+    }
+
+    #[test]
+    fn insert_and_list_audit_events_with_filters_and_pagination() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        let mut other_skill = sample_skill("skill-2", "Other Skill", Some("Other description"));
+        other_skill.install_path = "/tmp/metis/skills/other".to_string();
+        store.upsert_skill(&skill).expect("skill should upsert");
+        store
+            .upsert_skill(&other_skill)
+            .expect("other skill should upsert");
+        store
+            .insert_audit_event(&sample_audit(
+                "audit-1",
+                "skill-1",
+                "source_bound",
+                "success",
+            ))
+            .expect("first audit should insert");
+        store
+            .insert_audit_event(&sample_audit(
+                "audit-2",
+                "skill-1",
+                "update_checked",
+                "success",
+            ))
+            .expect("second audit should insert");
+        store
+            .insert_audit_event(&sample_audit(
+                "audit-3",
+                "skill-2",
+                "source_bound",
+                "success",
+            ))
+            .expect("third audit should insert");
+
+        let filtered = store
+            .list_audit_events(&AuditEventFilter {
+                skill_id: Some("skill-1".to_string()),
+                action: Some("source_bound".to_string()),
+                limit: 10,
+                offset: 0,
+            })
+            .expect("audit events should list");
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].id, "audit-1");
+        assert_eq!(filtered[0].detail.as_deref(), Some("source_bound detail"));
+        assert_eq!(filtered[0].risk_summary.as_deref(), Some(r#"{"high":0}"#));
+
+        let paged = store
+            .list_audit_events(&AuditEventFilter {
+                skill_id: Some("skill-1".to_string()),
+                action: None,
+                limit: 1,
+                offset: 1,
+            })
+            .expect("paged audit events should list");
+        assert_eq!(paged.len(), 1);
+        assert_eq!(paged[0].id, "audit-1");
     }
 }

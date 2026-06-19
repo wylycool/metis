@@ -1,6 +1,10 @@
-use crate::local_state::manifest_records;
+use crate::audit::{write_audit_event, AuditAction, AuditEventInput};
+use crate::local_state::{capture_local_baseline, manifest_records};
 use chrono::Utc;
-use metis_storage::backup::{copy_skill_directory, BackupError as BackupCopyError};
+use metis_storage::backup::{
+    copy_skill_directory, delete_backup_directory, replace_skill_directory,
+    BackupError as BackupCopyError,
+};
 use metis_storage::db::{BackupRecord, SkillIndexStore, StorageError};
 use metis_storage::manifest::{compute_manifest, ManifestError};
 use serde::{Deserialize, Serialize};
@@ -24,6 +28,20 @@ pub struct BackupSummary {
     pub reason: String,
     pub file_count: u64,
     pub total_size_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RestoreBackupOptions {
+    pub skill_id: String,
+    pub backup_id: String,
+    pub backup_root: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RestoreResult {
+    pub skill_id: String,
+    pub restored_from_backup_id: String,
+    pub previous_state_backup_id: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -97,6 +115,109 @@ pub fn create_backup(
         file_count: copy_result.file_count,
         total_size_bytes: copy_result.total_size_bytes,
     })
+}
+
+pub fn list_backups(
+    skill_id: &str,
+    store: &SkillIndexStore,
+) -> Result<Vec<BackupSummary>, BackupError> {
+    let backups = store.list_backups(skill_id).map_err(BackupError::from)?;
+    Ok(backups
+        .into_iter()
+        .map(backup_summary_from_record)
+        .collect())
+}
+
+pub fn restore_backup(
+    options: RestoreBackupOptions,
+    store: &mut SkillIndexStore,
+) -> Result<RestoreResult, BackupError> {
+    let skill = store
+        .get_skill(&options.skill_id)
+        .map_err(BackupError::from)?
+        .ok_or_else(|| BackupError::SkillNotFound {
+            skill_id: options.skill_id.clone(),
+        })?;
+    let backup = store
+        .get_backup(&options.backup_id)
+        .map_err(BackupError::from)?
+        .ok_or_else(|| BackupError::Storage(format!("backup not found: {}", options.backup_id)))?;
+
+    if backup.skill_id != skill.id {
+        return Err(BackupError::Storage(format!(
+            "backup {} does not belong to skill {}",
+            backup.id, skill.id
+        )));
+    }
+
+    let previous = create_backup(
+        CreateBackupOptions {
+            skill_id: skill.id.clone(),
+            backup_root: options.backup_root,
+            reason: "pre-rollback".to_string(),
+        },
+        store,
+    )?;
+
+    replace_skill_directory(&backup.backup_path, &skill.install_path).map_err(BackupError::from)?;
+    store
+        .mark_backup_restored(&backup.id, "restored")
+        .map_err(BackupError::from)?;
+    capture_local_baseline(&skill.id, store)
+        .map_err(|error| BackupError::Manifest(error.to_string()))?;
+    let _ = write_audit_event(
+        store,
+        AuditEventInput {
+            skill_id: skill.id.clone(),
+            action: AuditAction::RollbackApplied,
+            detail: Some(format!("restored backup {}", backup.id)),
+            commit_before: backup.source_commit.clone(),
+            commit_after: backup.source_commit.clone(),
+            status: "success".to_string(),
+            risk_summary: None,
+        },
+    );
+
+    Ok(RestoreResult {
+        skill_id: skill.id,
+        restored_from_backup_id: backup.id,
+        previous_state_backup_id: previous.backup_id,
+    })
+}
+
+pub fn delete_backup(backup_id: &str, store: &mut SkillIndexStore) -> Result<(), BackupError> {
+    let Some(backup) = store.get_backup(backup_id).map_err(BackupError::from)? else {
+        return Ok(());
+    };
+
+    delete_backup_directory(&backup.backup_path).map_err(BackupError::from)?;
+    store.delete_backup(backup_id).map_err(BackupError::from)?;
+    let _ = write_audit_event(
+        store,
+        AuditEventInput {
+            skill_id: backup.skill_id.clone(),
+            action: AuditAction::BackupDeleted,
+            detail: Some(format!("deleted backup {backup_id}")),
+            commit_before: backup.source_commit.clone(),
+            commit_after: None,
+            status: "success".to_string(),
+            risk_summary: None,
+        },
+    );
+    Ok(())
+}
+
+fn backup_summary_from_record(backup: BackupRecord) -> BackupSummary {
+    BackupSummary {
+        backup_id: backup.id,
+        skill_id: backup.skill_id,
+        source_commit: backup.source_commit,
+        backup_path: backup.backup_path,
+        created_at: backup.created_at.unwrap_or_default(),
+        reason: backup.reason,
+        file_count: backup.file_count,
+        total_size_bytes: backup.total_size_bytes,
+    }
 }
 
 impl From<StorageError> for BackupError {
@@ -237,6 +358,103 @@ mod tests {
         assert_eq!(manifest_entries.len(), 2);
         assert_eq!(manifest_entries[0].relative_path, "SKILL.md");
         assert_eq!(manifest_entries[1].relative_path, "nested/tool.md");
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn restore_backup_replaces_skill_directory_and_creates_previous_state_backup() {
+        let root = temp_dir("restore");
+        let skill_dir = root.join("skill");
+        let backup_root = root.join("backup-root");
+        write_file(&skill_dir.join("SKILL.md"), "# Old\n");
+        write_file(&skill_dir.join("stale.md"), "stale");
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        store
+            .upsert_skill(&sample_skill("skill-1", &skill_dir, None))
+            .expect("skill should upsert");
+        let backup = create_backup(
+            CreateBackupOptions {
+                skill_id: "skill-1".to_string(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+                reason: "manual".to_string(),
+            },
+            &mut store,
+        )
+        .expect("backup should create");
+        fs::write(skill_dir.join("SKILL.md"), "# Changed\n").expect("skill should change");
+        write_file(&skill_dir.join("new.md"), "new");
+
+        let result = restore_backup(
+            RestoreBackupOptions {
+                skill_id: "skill-1".to_string(),
+                backup_id: backup.backup_id.clone(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+            },
+            &mut store,
+        )
+        .expect("backup should restore");
+
+        assert_eq!(result.skill_id, "skill-1");
+        assert_eq!(result.restored_from_backup_id, backup.backup_id);
+        assert_ne!(
+            result.previous_state_backup_id,
+            result.restored_from_backup_id
+        );
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("SKILL.md")).expect("restored file should read"),
+            "# Old\n"
+        );
+        assert!(skill_dir.join("stale.md").exists());
+        assert!(!skill_dir.join("new.md").exists());
+
+        let restored = store
+            .get_backup(&result.restored_from_backup_id)
+            .expect("backup lookup should succeed")
+            .expect("backup should exist");
+        assert_eq!(restored.restore_status.as_deref(), Some("restored"));
+        let previous = store
+            .get_backup(&result.previous_state_backup_id)
+            .expect("previous backup lookup should succeed")
+            .expect("previous backup should exist");
+        assert_eq!(previous.reason, "pre-rollback");
+        let skill = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        assert_eq!(skill.local_modified, Some(false));
+        assert!(skill.local_fingerprint.is_some());
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn delete_backup_removes_files_and_record() {
+        let root = temp_dir("delete");
+        let skill_dir = root.join("skill");
+        let backup_root = root.join("backup-root");
+        write_file(&skill_dir.join("SKILL.md"), "# Example\n");
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        store
+            .upsert_skill(&sample_skill("skill-1", &skill_dir, None))
+            .expect("skill should upsert");
+        let backup = create_backup(
+            CreateBackupOptions {
+                skill_id: "skill-1".to_string(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+                reason: "manual".to_string(),
+            },
+            &mut store,
+        )
+        .expect("backup should create");
+
+        delete_backup(&backup.backup_id, &mut store).expect("backup should delete");
+
+        assert!(!Path::new(&backup.backup_path).exists());
+        let stored = store
+            .get_backup(&backup.backup_id)
+            .expect("backup lookup should succeed");
+        assert_eq!(stored, None);
 
         fs::remove_dir_all(&root).expect("temp directory should be removed");
     }
