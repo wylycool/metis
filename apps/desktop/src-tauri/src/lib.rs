@@ -3,8 +3,6 @@
 //! Tauri command 是 UI 到 Core Engine 的薄封装层。
 //! 核心逻辑全部在 metis-core 中实现。
 
-use tauri;
-
 /// 示例 command：健康检查
 #[tauri::command]
 fn greet(name: &str) -> String {

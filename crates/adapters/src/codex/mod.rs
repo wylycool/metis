@@ -11,6 +11,12 @@ impl CodexAdapter {
     }
 }
 
+impl Default for CodexAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentAdapter for CodexAdapter {
     fn agent_id(&self) -> &str {
         "codex"
