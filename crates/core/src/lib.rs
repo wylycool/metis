@@ -13,6 +13,7 @@
 pub mod audit;
 pub mod config;
 pub mod discovery;
+pub mod local_state;
 pub mod lockfile;
 pub mod rollback;
 pub mod source;

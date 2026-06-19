@@ -44,6 +44,19 @@ pub struct SourceRecord {
     pub updated_at: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileManifestRecord {
+    pub id: String,
+    pub skill_id: String,
+    pub snapshot_type: String,
+    pub snapshot_ref: String,
+    pub relative_path: String,
+    pub file_size: u64,
+    pub modified_at: String,
+    pub content_hash: String,
+    pub is_executable: bool,
+}
+
 pub struct SkillIndexStore {
     connection: Connection,
 }
@@ -375,6 +388,127 @@ impl SkillIndexStore {
         Ok(())
     }
 
+    pub fn replace_file_manifest(
+        &mut self,
+        skill_id: &str,
+        snapshot_type: &str,
+        snapshot_ref: &str,
+        entries: &[FileManifestRecord],
+    ) -> Result<(), StorageError> {
+        let transaction = self.connection.transaction()?;
+
+        transaction.execute(
+            "
+            DELETE FROM file_manifests
+            WHERE skill_id = ?1 AND snapshot_type = ?2 AND snapshot_ref = ?3
+            ",
+            params![skill_id, snapshot_type, snapshot_ref],
+        )?;
+
+        for entry in entries {
+            transaction.execute(
+                "
+                INSERT INTO file_manifests (
+                    id,
+                    skill_id,
+                    snapshot_type,
+                    snapshot_ref,
+                    relative_path,
+                    file_size,
+                    modified_at,
+                    content_hash,
+                    is_executable
+                ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+                )
+                ",
+                params![
+                    entry.id,
+                    entry.skill_id,
+                    entry.snapshot_type,
+                    entry.snapshot_ref,
+                    entry.relative_path,
+                    entry.file_size as i64,
+                    entry.modified_at,
+                    entry.content_hash,
+                    i64::from(entry.is_executable),
+                ],
+            )?;
+        }
+
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn list_file_manifest(
+        &self,
+        skill_id: &str,
+        snapshot_type: &str,
+        snapshot_ref: &str,
+    ) -> Result<Vec<FileManifestRecord>, StorageError> {
+        let mut statement = self.connection.prepare(
+            "
+            SELECT
+                id,
+                skill_id,
+                snapshot_type,
+                snapshot_ref,
+                relative_path,
+                file_size,
+                modified_at,
+                content_hash,
+                is_executable
+            FROM file_manifests
+            WHERE skill_id = ?1 AND snapshot_type = ?2 AND snapshot_ref = ?3
+            ORDER BY relative_path
+            ",
+        )?;
+
+        let records = statement
+            .query_map(params![skill_id, snapshot_type, snapshot_ref], |row| {
+                row_to_file_manifest_record(row)
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(records)
+    }
+
+    pub fn update_skill_local_fingerprint(
+        &self,
+        skill_id: &str,
+        local_fingerprint: &str,
+        local_modified: bool,
+    ) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            UPDATE skills
+            SET local_fingerprint = ?1,
+                local_modified = ?2,
+                updated_at = datetime('now')
+            WHERE id = ?3
+            ",
+            params![local_fingerprint, i64::from(local_modified), skill_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_skill_local_modified(
+        &self,
+        skill_id: &str,
+        local_modified: bool,
+    ) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            UPDATE skills
+            SET local_modified = ?1,
+                updated_at = datetime('now')
+            WHERE id = ?2
+            ",
+            params![i64::from(local_modified), skill_id],
+        )?;
+        Ok(())
+    }
+
     pub fn applied_migration_versions(&self) -> Result<Vec<i64>, StorageError> {
         let mut statement = self
             .connection
@@ -454,6 +588,20 @@ fn row_to_source_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<SourceRecor
     })
 }
 
+fn row_to_file_manifest_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<FileManifestRecord> {
+    Ok(FileManifestRecord {
+        id: row.get(0)?,
+        skill_id: row.get(1)?,
+        snapshot_type: row.get(2)?,
+        snapshot_ref: row.get(3)?,
+        relative_path: row.get(4)?,
+        file_size: row.get::<_, i64>(5)? as u64,
+        modified_at: row.get(6)?,
+        content_hash: row.get(7)?,
+        is_executable: row.get::<_, i64>(8)? != 0,
+    })
+}
+
 const INITIAL_SCHEMA_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS _migrations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -511,6 +659,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_skills_agent_install_path
     ON skills(agent_id, install_path);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_sources_url_path_ref
     ON sources(url, repo_path, ref_);
+
+CREATE TABLE IF NOT EXISTS file_manifests (
+    id                  TEXT PRIMARY KEY,
+    skill_id            TEXT NOT NULL,
+    snapshot_type       TEXT NOT NULL,
+    snapshot_ref        TEXT NOT NULL,
+    relative_path       TEXT NOT NULL,
+    file_size           INTEGER NOT NULL,
+    modified_at         TEXT NOT NULL,
+    content_hash        TEXT NOT NULL,
+    is_executable       INTEGER NOT NULL DEFAULT 0,
+
+    FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_manifests_skill_snapshot
+    ON file_manifests(skill_id, snapshot_type, snapshot_ref);
+CREATE INDEX IF NOT EXISTS idx_file_manifests_path
+    ON file_manifests(skill_id, relative_path);
 "#;
 
 #[derive(Debug, thiserror::Error)]
@@ -564,6 +731,27 @@ mod tests {
             credential_ref: Some("github-main".to_string()),
             created_at: None,
             updated_at: None,
+        }
+    }
+
+    fn sample_manifest(
+        id: &str,
+        skill_id: &str,
+        snapshot_type: &str,
+        snapshot_ref: &str,
+        relative_path: &str,
+        content_hash: &str,
+    ) -> FileManifestRecord {
+        FileManifestRecord {
+            id: id.to_string(),
+            skill_id: skill_id.to_string(),
+            snapshot_type: snapshot_type.to_string(),
+            snapshot_ref: snapshot_ref.to_string(),
+            relative_path: relative_path.to_string(),
+            file_size: 12,
+            modified_at: "2026-06-19T10:00:00Z".to_string(),
+            content_hash: content_hash.to_string(),
+            is_executable: false,
         }
     }
 
@@ -720,5 +908,127 @@ mod tests {
         assert_eq!(sources[0].id, "source-1");
         assert!(sources[0].trusted);
         assert!(sources[0].auto_update);
+    }
+
+    #[test]
+    fn replace_and_list_file_manifest_for_snapshot() {
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        store.upsert_skill(&skill).expect("skill should upsert");
+        let entries = vec![
+            sample_manifest(
+                "entry-1",
+                "skill-1",
+                "baseline",
+                "fingerprint-1",
+                "SKILL.md",
+                "hash-1",
+            ),
+            sample_manifest(
+                "entry-2",
+                "skill-1",
+                "baseline",
+                "fingerprint-1",
+                "src/main.rs",
+                "hash-2",
+            ),
+        ];
+
+        store
+            .replace_file_manifest("skill-1", "baseline", "fingerprint-1", &entries)
+            .expect("manifest should replace");
+
+        let stored = store
+            .list_file_manifest("skill-1", "baseline", "fingerprint-1")
+            .expect("manifest should list");
+
+        assert_eq!(stored, entries);
+    }
+
+    #[test]
+    fn replace_file_manifest_removes_old_entries_for_same_snapshot() {
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        store.upsert_skill(&skill).expect("skill should upsert");
+        let first = vec![
+            sample_manifest(
+                "entry-1",
+                "skill-1",
+                "baseline",
+                "fingerprint-1",
+                "a.txt",
+                "hash-a",
+            ),
+            sample_manifest(
+                "entry-2",
+                "skill-1",
+                "baseline",
+                "fingerprint-1",
+                "b.txt",
+                "hash-b",
+            ),
+        ];
+        let second = vec![sample_manifest(
+            "entry-3",
+            "skill-1",
+            "baseline",
+            "fingerprint-1",
+            "c.txt",
+            "hash-c",
+        )];
+
+        store
+            .replace_file_manifest("skill-1", "baseline", "fingerprint-1", &first)
+            .expect("first manifest should replace");
+        store
+            .replace_file_manifest("skill-1", "baseline", "fingerprint-1", &second)
+            .expect("second manifest should replace");
+
+        let stored = store
+            .list_file_manifest("skill-1", "baseline", "fingerprint-1")
+            .expect("manifest should list");
+
+        assert_eq!(stored, second);
+    }
+
+    #[test]
+    fn update_skill_local_fingerprint_sets_baseline_fingerprint_and_modified_flag() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        store.upsert_skill(&skill).expect("skill should upsert");
+
+        store
+            .update_skill_local_fingerprint("skill-1", "sha256:abc", false)
+            .expect("local fingerprint should update");
+
+        let stored = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+
+        assert_eq!(stored.local_fingerprint.as_deref(), Some("sha256:abc"));
+        assert_eq!(stored.local_modified, Some(false));
+    }
+
+    #[test]
+    fn update_skill_local_modified_does_not_replace_baseline_fingerprint() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        store.upsert_skill(&skill).expect("skill should upsert");
+        store
+            .update_skill_local_fingerprint("skill-1", "sha256:baseline", false)
+            .expect("local fingerprint should update");
+
+        store
+            .update_skill_local_modified("skill-1", true)
+            .expect("local modified should update");
+
+        let stored = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+
+        assert_eq!(stored.local_fingerprint.as_deref(), Some("sha256:baseline"));
+        assert_eq!(stored.local_modified, Some(true));
     }
 }
