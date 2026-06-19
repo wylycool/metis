@@ -509,11 +509,11 @@ function App() {
             <div className="settings-section credential-section">
               <div>
                 <h3>凭据引用</h3>
-                <p>在来源绑定中填写引用名，Metis 只保存名称；真实 token 仍交给本机 Git、SSH agent 或后续 Keychain 接入。</p>
+                <p>在来源绑定中填写引用名，Metis 只保存名称；真实认证由本机 Git、SSH agent 或 Git credential helper 处理。</p>
               </div>
               <div className="credential-note">
                 <code>github-main</code>
-                <code>work-gitlab-token</code>
+                <code>work-gitlab</code>
               </div>
             </div>
           </div>

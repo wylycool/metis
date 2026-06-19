@@ -18,7 +18,7 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 - **前端**：TypeScript
 - **核心引擎**：Rust（独立于 UI，可供 CLI 复用）
 - **数据库**：SQLite
-- **凭据存储**：系统 Keychain / Credential Manager
+- **凭据处理**：Metis 当前不存储凭据；Git 认证依赖系统 Git、SSH agent 或 Git credential helper
 - **版本管理**：Git
 - **分发**：macOS / Windows / Linux，通过 GitHub Releases
 
@@ -61,7 +61,7 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 - 更新前自动备份。
 - 更新失败自动回滚。
 - 支持查看更新 diff。
-- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称，真实凭据仍由本机 Git / SSH agent 或后续 Keychain 接入管理。
+- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称作为引用名/备注名，真实认证由本机 Git、SSH agent 或 Git credential helper 完成，Metis 不读取 Keychain 或 token。
 - 支持导出和导入团队 skill 清单。
 
 ## 本地验证
@@ -98,7 +98,7 @@ macOS 面向下载的首选预览包是 universal DMG，输出在 `target/univer
 - Desktop App：Tauri
 - UI：TypeScript 前端
 - Core Engine：Rust core，保持独立可复用
-- Storage：SQLite、lock 文件、系统 keychain、本地备份目录
+- Storage：SQLite、lock 文件、本地备份目录；当前不保存 token 或 secret
 - Git：支持公开仓库和私有仓库
 - Distribution：macOS、Windows、Linux，后续通过 GitHub Releases 发布
 
