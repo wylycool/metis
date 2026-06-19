@@ -78,6 +78,45 @@ export interface DesktopDiffDetail {
   files: DesktopFileDiff[];
 }
 
+export interface DesktopSecurityFinding {
+  severity: string;
+  rule_id: string;
+  message: string;
+  relative_path: string;
+  line?: number | null;
+}
+
+export interface DesktopApplyUpdateResult {
+  skill_id: string;
+  previous_commit: string;
+  new_commit: string;
+  backup_id: string;
+  security_findings: DesktopSecurityFinding[];
+  warnings: string[];
+}
+
+export interface DesktopBackupSummary {
+  backup_id: string;
+  skill_id: string;
+  source_commit?: string | null;
+  backup_path: string;
+  created_at: string;
+  reason: string;
+  file_count: number;
+  total_size_bytes: number;
+}
+
+export interface DesktopRestoreBackupRequest {
+  skill_id: string;
+  backup_id: string;
+}
+
+export interface DesktopRestoreBackupResult {
+  skill_id: string;
+  restored_from_backup_id: string;
+  previous_state_backup_id: string;
+}
+
 export interface DesktopUpdateCheckResult {
   skill_id: string;
   skill_name: string;

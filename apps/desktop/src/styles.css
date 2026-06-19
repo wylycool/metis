@@ -312,6 +312,17 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.inline-success {
+  margin-bottom: 12px;
+  border: 1px solid rgba(97, 195, 139, 0.45);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #c8f0d7;
+  background: rgba(97, 195, 139, 0.1);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .skill-list {
   display: grid;
   gap: 10px;
@@ -558,6 +569,78 @@ h1 {
   font-size: 12px;
 }
 
+.backup-panel {
+  border-top: 1px solid #323b45;
+  padding-top: 12px;
+}
+
+.backup-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.backup-heading strong {
+  font-size: 14px;
+}
+
+.backup-heading span,
+.empty-backups {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.backup-list {
+  display: grid;
+  gap: 8px;
+}
+
+.backup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #323b45;
+  border-radius: 8px;
+  background: rgba(16, 18, 22, 0.62);
+  padding: 10px;
+}
+
+.backup-row strong,
+.backup-row span {
+  display: block;
+}
+
+.backup-row strong {
+  font-size: 13px;
+}
+
+.backup-row span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.backup-row code {
+  margin-top: 7px;
+}
+
+.backup-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.backup-meta span {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(16, 18, 22, 0.68);
+}
+
 .state-block {
   display: grid;
   place-items: center;
@@ -635,12 +718,17 @@ h1 {
   .summary-strip,
   .workspace,
   .skill-row-main,
-  .source-form {
+  .source-form,
+  .backup-row {
     grid-template-columns: 1fr;
   }
 
   .skill-status {
     align-items: flex-start;
+  }
+
+  .backup-meta {
+    justify-content: flex-start;
   }
 }
 

@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  applySkillUpdate,
   bindSkillSource,
   checkSkillUpdates,
   getSkillDiff,
+  listSkillBackups,
   listAgents,
   listIndexedSkills,
+  restoreSkillBackup,
   scanSkills,
   unbindSkillSource,
 } from "./api";
 import type {
   DesktopAgentStatus,
+  DesktopBackupSummary,
   DesktopDiffDetail,
   DesktopScanWarning,
   DesktopSkill,
@@ -32,6 +36,10 @@ function App() {
   const [updateResults, setUpdateResults] = useState<Record<string, DesktopUpdateCheckResult>>({});
   const [diffDetails, setDiffDetails] = useState<Record<string, DesktopDiffDetail>>({});
   const [diffError, setDiffError] = useState<Record<string, string>>({});
+  const [backupPanels, setBackupPanels] = useState<Record<string, boolean>>({});
+  const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
+  const [backupError, setBackupError] = useState<Record<string, string>>({});
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -94,6 +102,7 @@ function App() {
     setState("loading");
     setError(null);
     setActionError(null);
+    setActionMessage(null);
 
     try {
       const [agentResult, scanResult] = await Promise.all([listAgents(), scanSkills()]);
@@ -103,6 +112,9 @@ function App() {
       setUpdateResults({});
       setDiffDetails({});
       setDiffError({});
+      setBackups({});
+      setBackupPanels({});
+      setBackupError({});
       setState("loaded");
     } catch (caught) {
       setError(errorMessage(caught));
@@ -130,6 +142,7 @@ function App() {
   async function handleBindSource(skillId: string) {
     setActionBusy(`bind:${skillId}`);
     setActionError(null);
+    setActionMessage(null);
 
     try {
       await bindSkillSource({
@@ -158,6 +171,16 @@ function App() {
         delete next[skillId];
         return next;
       });
+      setBackups((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+      setBackupPanels((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
     } catch (caught) {
       setActionError(errorMessage(caught));
     } finally {
@@ -168,6 +191,7 @@ function App() {
   async function handleUnbindSource(skillId: string) {
     setActionBusy(`unbind:${skillId}`);
     setActionError(null);
+    setActionMessage(null);
 
     try {
       await unbindSkillSource(skillId);
@@ -187,6 +211,16 @@ function App() {
         delete next[skillId];
         return next;
       });
+      setBackups((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+      setBackupPanels((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
     } catch (caught) {
       setActionError(errorMessage(caught));
     } finally {
@@ -201,6 +235,7 @@ function App() {
 
     setActionBusy("check-updates");
     setActionError(null);
+    setActionMessage(null);
 
     try {
       const results = await checkSkillUpdates({ skill_ids: skillIds });
@@ -232,6 +267,7 @@ function App() {
 
     setActionBusy(`diff:${skillId}`);
     setActionError(null);
+    setActionMessage(null);
     setDiffError((current) => {
       const next = { ...current };
       delete next[skillId];
@@ -246,6 +282,97 @@ function App() {
     } finally {
       setActionBusy(null);
     }
+  }
+
+  async function loadBackups(skillId: string) {
+    setActionBusy(`backups:${skillId}`);
+    setActionError(null);
+    setBackupError((current) => {
+      const next = { ...current };
+      delete next[skillId];
+      return next;
+    });
+
+    try {
+      const result = await listSkillBackups(skillId);
+      setBackups((current) => ({ ...current, [skillId]: result }));
+    } catch (caught) {
+      setBackupError((current) => ({ ...current, [skillId]: errorMessage(caught) }));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleToggleBackups(skillId: string) {
+    if (backupPanels[skillId]) {
+      setBackupPanels((current) => ({ ...current, [skillId]: false }));
+      return;
+    }
+
+    setBackupPanels((current) => ({ ...current, [skillId]: true }));
+    await loadBackups(skillId);
+  }
+
+  async function handleApplyUpdate(skillId: string) {
+    setActionBusy(`apply:${skillId}`);
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await applySkillUpdate(skillId);
+      setActionMessage(
+        `更新完成：${shortCommit(result.previous_commit)} -> ${shortCommit(
+          result.new_commit,
+        )}，已创建备份 ${result.backup_id}`,
+      );
+      clearSkillRuntimeState(skillId);
+      setBackupPanels((current) => ({ ...current, [skillId]: true }));
+      await refreshIndexedSkills();
+      await loadBackups(skillId);
+    } catch (caught) {
+      setActionError(errorMessage(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleRestoreBackup(skillId: string, backupId: string) {
+    setActionBusy(`restore:${backupId}`);
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await restoreSkillBackup({ skill_id: skillId, backup_id: backupId });
+      setActionMessage(
+        `已回滚到 ${result.restored_from_backup_id}，回滚前状态已备份为 ${result.previous_state_backup_id}`,
+      );
+      clearSkillRuntimeState(skillId);
+      setBackupPanels((current) => ({ ...current, [skillId]: true }));
+      await refreshIndexedSkills();
+      await loadBackups(skillId);
+    } catch (caught) {
+      setActionError(errorMessage(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  function clearSkillRuntimeState(skillId: string) {
+    setUpdateResults((current) => {
+      const next = { ...current };
+      delete next[skillId];
+      return next;
+    });
+    setDiffDetails((current) => {
+      const next = { ...current };
+      delete next[skillId];
+      return next;
+    });
+    setDiffError((current) => {
+      const next = { ...current };
+      delete next[skillId];
+      return next;
+    });
   }
 
   return (
@@ -307,6 +434,7 @@ function App() {
           </div>
 
           {actionError && <div className="inline-error">{actionError}</div>}
+          {actionMessage && <div className="inline-success">{actionMessage}</div>}
 
           {state === "loading" && <LoadingState />}
           {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
@@ -320,6 +448,9 @@ function App() {
                   updateResult={updateResults[skill.id]}
                   diffDetail={diffDetails[skill.id]}
                   diffError={diffError[skill.id]}
+                  backups={backups[skill.id] ?? []}
+                  backupOpen={backupPanels[skill.id] ?? false}
+                  backupError={backupError[skill.id]}
                   isBinding={bindingSkillId === skill.id}
                   bindDraft={bindDraft}
                   busyKey={actionBusy}
@@ -330,6 +461,9 @@ function App() {
                   onUnbind={() => handleUnbindSource(skill.id)}
                   onCheck={() => handleCheckUpdates([skill.id])}
                   onToggleDiff={() => handleToggleDiff(skill.id)}
+                  onApplyUpdate={() => handleApplyUpdate(skill.id)}
+                  onToggleBackups={() => handleToggleBackups(skill.id)}
+                  onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
                 />
               ))}
             </div>
@@ -366,6 +500,9 @@ function SkillRow({
   updateResult,
   diffDetail,
   diffError,
+  backups,
+  backupOpen,
+  backupError,
   isBinding,
   bindDraft,
   busyKey,
@@ -376,11 +513,17 @@ function SkillRow({
   onUnbind,
   onCheck,
   onToggleDiff,
+  onApplyUpdate,
+  onToggleBackups,
+  onRestoreBackup,
 }: {
   skill: DesktopSkill;
   updateResult?: DesktopUpdateCheckResult;
   diffDetail?: DesktopDiffDetail;
   diffError?: string;
+  backups: DesktopBackupSummary[];
+  backupOpen: boolean;
+  backupError?: string;
   isBinding: boolean;
   bindDraft: BindDraft;
   busyKey: string | null;
@@ -391,12 +534,18 @@ function SkillRow({
   onUnbind: () => void;
   onCheck: () => void;
   onToggleDiff: () => void;
+  onApplyUpdate: () => void;
+  onToggleBackups: () => void;
+  onRestoreBackup: (backupId: string) => void;
 }) {
   const bindingBusy = busyKey === `bind:${skill.id}`;
   const unbindingBusy = busyKey === `unbind:${skill.id}`;
   const checkingBusy = busyKey === "check-updates";
   const diffBusy = busyKey === `diff:${skill.id}`;
+  const applyBusy = busyKey === `apply:${skill.id}`;
+  const backupsBusy = busyKey === `backups:${skill.id}`;
   const canShowDiff = updateResult?.status === "UpdateAvailable";
+  const canApplyUpdate = canShowDiff && !updateResult?.local_modified;
 
   return (
     <article className="skill-row">
@@ -452,6 +601,18 @@ function SkillRow({
                 {diffBusy ? "加载中" : diffDetail ? "收起 diff" : "查看 diff"}
               </button>
             )}
+            {canShowDiff && (
+              <button
+                className="compact"
+                disabled={applyBusy || !canApplyUpdate}
+                onClick={onApplyUpdate}
+              >
+                {applyBusy ? "更新中" : "应用更新"}
+              </button>
+            )}
+            <button className="ghost-button compact" disabled={backupsBusy} onClick={onToggleBackups}>
+              {backupsBusy ? "加载中" : backupOpen ? "收起备份" : "备份/回滚"}
+            </button>
             <button className="ghost-button compact" onClick={onOpenBind}>
               编辑来源
             </button>
@@ -472,6 +633,14 @@ function SkillRow({
 
       {diffError && <div className="inline-error">{diffError}</div>}
       {diffDetail && <DiffPanel detail={diffDetail} />}
+      {backupError && <div className="inline-error">{backupError}</div>}
+      {backupOpen && (
+        <BackupPanel
+          backups={backups}
+          busyKey={busyKey}
+          onRestoreBackup={onRestoreBackup}
+        />
+      )}
 
       {isBinding && (
         <BindSourceForm
@@ -483,6 +652,55 @@ function SkillRow({
         />
       )}
     </article>
+  );
+}
+
+function BackupPanel({
+  backups,
+  busyKey,
+  onRestoreBackup,
+}: {
+  backups: DesktopBackupSummary[];
+  busyKey: string | null;
+  onRestoreBackup: (backupId: string) => void;
+}) {
+  return (
+    <div className="backup-panel">
+      <div className="backup-heading">
+        <strong>备份</strong>
+        <span>{backups.length} items</span>
+      </div>
+      {backups.length === 0 ? (
+        <p className="empty-backups">暂无备份。应用更新或手动备份后会出现在这里。</p>
+      ) : (
+        <div className="backup-list">
+          {backups.map((backup) => {
+            const restoring = busyKey === `restore:${backup.backup_id}`;
+            return (
+              <article className="backup-row" key={backup.backup_id}>
+                <div>
+                  <strong>{backup.reason}</strong>
+                  <span>{backup.created_at || "unknown time"}</span>
+                  <code>{backup.backup_id}</code>
+                </div>
+                <div className="backup-meta">
+                  {backup.source_commit && <span>{shortCommit(backup.source_commit)}</span>}
+                  <span>{backup.file_count} files</span>
+                  <span>{formatBytes(backup.total_size_bytes)}</span>
+                </div>
+                <button
+                  className="danger-button compact"
+                  disabled={restoring}
+                  onClick={() => onRestoreBackup(backup.backup_id)}
+                >
+                  {restoring ? "回滚中" : "回滚"}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -711,6 +929,16 @@ function emptyBindDraft(): BindDraft {
 
 function shortCommit(commit: string) {
   return commit.length > 10 ? commit.slice(0, 10) : commit;
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function errorMessage(caught: unknown) {

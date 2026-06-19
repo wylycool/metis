@@ -21,4 +21,5 @@ dirs.workspace = true
 
 metis-core = { path = "../../../crates/core" }
 metis-git-provider = { path = "../../../crates/git-provider" }
+metis-security = { path = "../../../crates/security" }
 metis-storage = { path = "../../../crates/storage" }

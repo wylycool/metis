@@ -7,16 +7,22 @@ use metis_core::discovery::{
     list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
     ScanOptions, ScanResult,
 };
+use metis_core::rollback::{
+    list_backups as core_list_backups, restore_backup as core_restore_backup,
+    BackupSummary as CoreBackupSummary, RestoreBackupOptions, RestoreResult as CoreRestoreResult,
+};
 use metis_core::source::{
     bind_source as core_bind_source, unbind_source as core_unbind_source, Source, SourceInput,
     SourceType,
 };
 use metis_core::update::{
-    check_updates as core_check_updates, get_diff as core_get_diff, DiffDetail as CoreDiffDetail,
-    DiffStatus as CoreDiffStatus, DiffSummary, RemoteCommitChecker, UpdateCheckOptions,
-    UpdateCheckResult, UpdateStatus,
+    apply_update as core_apply_update, check_updates as core_check_updates,
+    get_diff as core_get_diff, ApplyUpdateOptions, ApplyUpdateResult as CoreApplyUpdateResult,
+    DiffDetail as CoreDiffDetail, DiffStatus as CoreDiffStatus, DiffSummary, RemoteCommitChecker,
+    UpdateCheckOptions, UpdateCheckResult, UpdateStatus,
 };
 use metis_git_provider::fetch::SystemGitCliProvider;
+use metis_security::findings::{SecurityFinding, SecuritySeverity};
 use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -185,6 +191,50 @@ pub struct DesktopFileDiff {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopApplyUpdateResult {
+    pub skill_id: String,
+    pub previous_commit: String,
+    pub new_commit: String,
+    pub backup_id: String,
+    pub security_findings: Vec<DesktopSecurityFinding>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSecurityFinding {
+    pub severity: String,
+    pub rule_id: String,
+    pub message: String,
+    pub relative_path: String,
+    pub line: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopBackupSummary {
+    pub backup_id: String,
+    pub skill_id: String,
+    pub source_commit: Option<String>,
+    pub backup_path: String,
+    pub created_at: String,
+    pub reason: String,
+    pub file_count: u64,
+    pub total_size_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopRestoreBackupRequest {
+    pub skill_id: String,
+    pub backup_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopRestoreBackupResult {
+    pub skill_id: String,
+    pub restored_from_backup_id: String,
+    pub previous_state_backup_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopScanWarning {
     pub agent_id: String,
     pub path: String,
@@ -290,6 +340,52 @@ pub fn get_skill_diff_for_state_with_checker<C: RemoteCommitChecker>(
         .map_err(|error| error.to_string())
 }
 
+pub fn apply_skill_update_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    skill_id: String,
+    checker: &C,
+) -> Result<DesktopApplyUpdateResult, String> {
+    let mut store = state.open_store()?;
+    core_apply_update(
+        ApplyUpdateOptions {
+            skill_id,
+            backup_root: state.backup_root().to_string_lossy().to_string(),
+            cache_dir: state.cache_root().to_string_lossy().to_string(),
+        },
+        &mut store,
+        checker,
+    )
+    .map(desktop_apply_update_result)
+    .map_err(|error| error.to_string())
+}
+
+pub fn list_skill_backups_for_state(
+    state: &DesktopAppState,
+    skill_id: String,
+) -> Result<Vec<DesktopBackupSummary>, String> {
+    let store = state.open_store()?;
+    core_list_backups(&skill_id, &store)
+        .map(|backups| backups.into_iter().map(desktop_backup_summary).collect())
+        .map_err(|error| error.to_string())
+}
+
+pub fn restore_skill_backup_for_state(
+    state: &DesktopAppState,
+    request: DesktopRestoreBackupRequest,
+) -> Result<DesktopRestoreBackupResult, String> {
+    let mut store = state.open_store()?;
+    core_restore_backup(
+        RestoreBackupOptions {
+            skill_id: request.skill_id,
+            backup_id: request.backup_id,
+            backup_root: state.backup_root().to_string_lossy().to_string(),
+        },
+        &mut store,
+    )
+    .map(desktop_restore_backup_result)
+    .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 fn list_agents(
     state: tauri::State<'_, DesktopAppState>,
@@ -341,6 +437,31 @@ fn get_skill_diff(
 ) -> Result<DesktopDiffDetail, String> {
     let checker = SystemGitCliProvider::default();
     get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
+}
+
+#[tauri::command]
+fn apply_skill_update(
+    state: tauri::State<'_, DesktopAppState>,
+    skill_id: String,
+) -> Result<DesktopApplyUpdateResult, String> {
+    let checker = SystemGitCliProvider::default();
+    apply_skill_update_for_state_with_checker(&state, skill_id, &checker)
+}
+
+#[tauri::command]
+fn list_skill_backups(
+    state: tauri::State<'_, DesktopAppState>,
+    skill_id: String,
+) -> Result<Vec<DesktopBackupSummary>, String> {
+    list_skill_backups_for_state(&state, skill_id)
+}
+
+#[tauri::command]
+fn restore_skill_backup(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopRestoreBackupRequest,
+) -> Result<DesktopRestoreBackupResult, String> {
+    restore_skill_backup_for_state(&state, request)
 }
 
 fn desktop_scan_response(
@@ -483,6 +604,57 @@ fn desktop_diff_detail(detail: CoreDiffDetail) -> DesktopDiffDetail {
     }
 }
 
+fn desktop_apply_update_result(result: CoreApplyUpdateResult) -> DesktopApplyUpdateResult {
+    DesktopApplyUpdateResult {
+        skill_id: result.skill_id,
+        previous_commit: result.previous_commit,
+        new_commit: result.new_commit,
+        backup_id: result.backup_id,
+        security_findings: result
+            .security_findings
+            .into_iter()
+            .map(desktop_security_finding)
+            .collect(),
+        warnings: result.warnings,
+    }
+}
+
+fn desktop_security_finding(finding: SecurityFinding) -> DesktopSecurityFinding {
+    DesktopSecurityFinding {
+        severity: match finding.severity {
+            SecuritySeverity::Info => "Info",
+            SecuritySeverity::Warning => "Warning",
+            SecuritySeverity::High => "High",
+        }
+        .to_string(),
+        rule_id: finding.rule_id,
+        message: finding.message,
+        relative_path: finding.relative_path,
+        line: finding.line,
+    }
+}
+
+fn desktop_backup_summary(backup: CoreBackupSummary) -> DesktopBackupSummary {
+    DesktopBackupSummary {
+        backup_id: backup.backup_id,
+        skill_id: backup.skill_id,
+        source_commit: backup.source_commit,
+        backup_path: backup.backup_path,
+        created_at: backup.created_at,
+        reason: backup.reason,
+        file_count: backup.file_count,
+        total_size_bytes: backup.total_size_bytes,
+    }
+}
+
+fn desktop_restore_backup_result(result: CoreRestoreResult) -> DesktopRestoreBackupResult {
+    DesktopRestoreBackupResult {
+        skill_id: result.skill_id,
+        restored_from_backup_id: result.restored_from_backup_id,
+        previous_state_backup_id: result.previous_state_backup_id,
+    }
+}
+
 fn desktop_agent_status(status: AgentStatus) -> DesktopAgentStatus {
     DesktopAgentStatus {
         agent_id: status.agent_id,
@@ -528,7 +700,10 @@ pub fn run() {
             bind_skill_source,
             unbind_skill_source,
             check_skill_updates,
-            get_skill_diff
+            get_skill_diff,
+            apply_skill_update,
+            list_skill_backups,
+            restore_skill_backup
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -537,6 +712,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use metis_core::local_state::capture_local_baseline;
+    use metis_core::rollback::{create_backup, CreateBackupOptions};
     use metis_core::update::{
         CheckoutResult, DiffDetail, DiffStatus, DiffSummary, FileDiff, RemoteCommitChecker,
     };
@@ -551,6 +728,7 @@ mod tests {
         behind: u32,
         summary: DiffSummary,
         details: HashMap<String, DiffDetail>,
+        checkout: Option<CheckoutResult>,
     }
 
     impl RemoteCommitChecker for FakeUpdateChecker {
@@ -597,7 +775,9 @@ mod tests {
             _target_commit: &str,
             _cache_dir: &str,
         ) -> Result<CheckoutResult, String> {
-            Err("not used by desktop update status tests".to_string())
+            self.checkout
+                .clone()
+                .ok_or_else(|| "missing fake checkout".to_string())
         }
     }
 
@@ -836,6 +1016,7 @@ description: {description}
                 total_changes: 3,
             },
             details: HashMap::new(),
+            checkout: None,
         };
 
         let results = check_skill_updates_for_state_with_checker(
@@ -939,6 +1120,7 @@ description: {description}
                 total_changes: 0,
             },
             details,
+            checkout: None,
         };
 
         let diff = get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
@@ -957,5 +1139,170 @@ description: {description}
         );
         assert_eq!(diff.files[1].old_path.as_deref(), Some("old.md"));
         assert_eq!(diff.files[1].status, "Renamed");
+    }
+
+    #[test]
+    fn apply_skill_update_for_state_returns_result_and_creates_pre_update_backup() {
+        let workspace = temp_dir("apply-update");
+        let skill_root = workspace.join("skills");
+        let checkout_skill_dir = workspace.join("checkout/repo/skills/updater");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        let skill_dir = write_skill(&skill_root, "updater", "updater", "Old update skill");
+        fs::create_dir_all(&checkout_skill_dir).expect("checkout skill dir should be created");
+        fs::write(
+            checkout_skill_dir.join("SKILL.md"),
+            "---\nname: updater\ndescription: New update skill\n---\n",
+        )
+        .expect("checkout skill should be written");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let skill_id = scanned.skills[0].id.clone();
+        let source = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: skill_id.clone(),
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/updater".to_string(),
+                ref_: "main".to_string(),
+                trusted: true,
+                auto_update: false,
+            },
+        )
+        .expect("source should bind");
+        {
+            let mut store = state.open_store().expect("store should open");
+            store
+                .update_source_check_result(
+                    &source.id,
+                    Some("aaa111"),
+                    Some("bbb222"),
+                    "2026-06-19T00:00:00Z",
+                )
+                .expect("source commits should update");
+            capture_local_baseline(&skill_id, &mut store).expect("baseline should capture");
+        }
+        let checker = FakeUpdateChecker {
+            commits: HashMap::new(),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: Some(CheckoutResult {
+                checkout_dir: workspace
+                    .join("checkout/repo")
+                    .to_string_lossy()
+                    .to_string(),
+                skill_dir: checkout_skill_dir.to_string_lossy().to_string(),
+            }),
+        };
+
+        let result = apply_skill_update_for_state_with_checker(&state, skill_id.clone(), &checker)
+            .expect("update should apply");
+        let backups = list_skill_backups_for_state(&state, skill_id.clone())
+            .expect("backups should list after update");
+        let indexed = list_indexed_skills_for_state(&state).expect("indexed skills should load");
+
+        assert_eq!(result.skill_id, skill_id);
+        assert_eq!(result.previous_commit, "aaa111");
+        assert_eq!(result.new_commit, "bbb222");
+        assert!(result.backup_id.starts_with("backup_"));
+        assert!(result.security_findings.is_empty());
+        assert!(result.warnings.is_empty());
+        assert_eq!(backups.len(), 1);
+        assert_eq!(backups[0].backup_id, result.backup_id);
+        assert_eq!(backups[0].reason, "pre-update");
+        assert_eq!(backups[0].source_commit.as_deref(), Some("aaa111"));
+        assert_eq!(
+            indexed[0]
+                .source
+                .as_ref()
+                .and_then(|source| source.current_commit.as_deref()),
+            Some("bbb222")
+        );
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("SKILL.md")).expect("updated skill should read"),
+            "---\nname: updater\ndescription: New update skill\n---\n"
+        );
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn list_and_restore_skill_backups_for_state_returns_restore_dto() {
+        let workspace = temp_dir("restore-update");
+        let skill_root = workspace.join("skills");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        let skill_dir = write_skill(&skill_root, "rollback", "rollback", "Original skill");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let skill_id = scanned.skills[0].id.clone();
+        let backup_id = {
+            let mut store = state.open_store().expect("store should open");
+            create_backup(
+                CreateBackupOptions {
+                    skill_id: skill_id.clone(),
+                    backup_root: state.backup_root().to_string_lossy().to_string(),
+                    reason: "manual".to_string(),
+                },
+                &mut store,
+            )
+            .expect("backup should create")
+            .backup_id
+        };
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: rollback\ndescription: Changed skill\n---\n",
+        )
+        .expect("skill should change");
+
+        let backups =
+            list_skill_backups_for_state(&state, skill_id.clone()).expect("backups should list");
+        let restore = restore_skill_backup_for_state(
+            &state,
+            DesktopRestoreBackupRequest {
+                skill_id: skill_id.clone(),
+                backup_id: backup_id.clone(),
+            },
+        )
+        .expect("backup should restore");
+        let backups_after_restore = list_skill_backups_for_state(&state, skill_id.clone())
+            .expect("backups should list after restore");
+
+        assert_eq!(backups.len(), 1);
+        assert_eq!(backups[0].backup_id, backup_id);
+        assert_eq!(backups[0].reason, "manual");
+        assert_eq!(restore.skill_id, skill_id);
+        assert_eq!(restore.restored_from_backup_id, backup_id);
+        assert_ne!(
+            restore.previous_state_backup_id,
+            restore.restored_from_backup_id
+        );
+        assert!(backups_after_restore
+            .iter()
+            .any(|backup| backup.reason == "pre-rollback"));
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("SKILL.md")).expect("restored skill should read"),
+            "---\nname: rollback\ndescription: Original skill\n---\n"
+        );
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
     }
 }

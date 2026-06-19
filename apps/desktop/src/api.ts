@@ -1,8 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   DesktopAgentStatus,
+  DesktopApplyUpdateResult,
+  DesktopBackupSummary,
   DesktopBindSourceRequest,
   DesktopDiffDetail,
+  DesktopRestoreBackupRequest,
+  DesktopRestoreBackupResult,
   DesktopScanResponse,
   DesktopSkill,
   DesktopSource,
@@ -40,4 +44,18 @@ export function checkSkillUpdates(
 
 export function getSkillDiff(skillId: string): Promise<DesktopDiffDetail> {
   return invoke("get_skill_diff", { skillId });
+}
+
+export function applySkillUpdate(skillId: string): Promise<DesktopApplyUpdateResult> {
+  return invoke("apply_skill_update", { skillId });
+}
+
+export function listSkillBackups(skillId: string): Promise<DesktopBackupSummary[]> {
+  return invoke("list_skill_backups", { skillId });
+}
+
+export function restoreSkillBackup(
+  request: DesktopRestoreBackupRequest,
+): Promise<DesktopRestoreBackupResult> {
+  return invoke("restore_skill_backup", { request });
 }
