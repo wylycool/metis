@@ -7,7 +7,16 @@ use metis_core::discovery::{
     list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
     ScanOptions, ScanResult,
 };
-use metis_storage::db::{SkillIndexStore, SkillRecord};
+use metis_core::source::{
+    bind_source as core_bind_source, unbind_source as core_unbind_source, Source, SourceInput,
+    SourceType,
+};
+use metis_core::update::{
+    check_updates as core_check_updates, DiffSummary, RemoteCommitChecker, UpdateCheckOptions,
+    UpdateCheckResult, UpdateStatus,
+};
+use metis_git_provider::fetch::SystemGitCliProvider;
+use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -104,8 +113,58 @@ pub struct DesktopSkill {
     pub metadata_status: String,
     pub metadata_error: Option<String>,
     pub source_id: Option<String>,
+    pub source: Option<DesktopSource>,
     pub local_modified: Option<bool>,
     pub last_scanned_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSource {
+    pub id: String,
+    pub source_type: String,
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+    pub current_commit: Option<String>,
+    pub remote_commit: Option<String>,
+    pub last_checked_at: Option<String>,
+    pub trusted: bool,
+    pub auto_update: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopBindSourceRequest {
+    pub skill_id: String,
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+    pub trusted: bool,
+    pub auto_update: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopUpdateCheckRequest {
+    pub skill_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopUpdateCheckResult {
+    pub skill_id: String,
+    pub skill_name: String,
+    pub status: String,
+    pub failure_reason: Option<String>,
+    pub local_modified: bool,
+    pub commits_behind: Option<u32>,
+    pub diff_summary: Option<DesktopDiffSummary>,
+    pub source: Option<DesktopSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopDiffSummary {
+    pub files_added: u32,
+    pub files_modified: u32,
+    pub files_deleted: u32,
+    pub total_changes: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +211,57 @@ pub fn list_indexed_skills_for_state(state: &DesktopAppState) -> Result<Vec<Desk
     list_indexed_skills_from_store(&store)
 }
 
+pub fn bind_skill_source_for_state(
+    state: &DesktopAppState,
+    request: DesktopBindSourceRequest,
+) -> Result<DesktopSource, String> {
+    let store = state.open_store()?;
+    let source = core_bind_source(
+        &request.skill_id,
+        SourceInput {
+            source_type: SourceType::Git,
+            url: request.url,
+            repo_path: request.repo_path,
+            ref_: request.ref_,
+            credential_ref: None,
+            auto_update: request.auto_update,
+            trusted: request.trusted,
+        },
+        &store,
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(desktop_source_from_core(source))
+}
+
+pub fn unbind_skill_source_for_state(
+    state: &DesktopAppState,
+    skill_id: String,
+) -> Result<(), String> {
+    let store = state.open_store()?;
+    core_unbind_source(&skill_id, &store).map_err(|error| error.to_string())
+}
+
+pub fn check_skill_updates_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    request: DesktopUpdateCheckRequest,
+    checker: &C,
+) -> Result<Vec<DesktopUpdateCheckResult>, String> {
+    let mut store = state.open_store()?;
+    let results = core_check_updates(
+        UpdateCheckOptions {
+            skill_ids: request.skill_ids,
+        },
+        &mut store,
+        checker,
+    );
+
+    Ok(results
+        .into_iter()
+        .map(desktop_update_check_result)
+        .collect())
+}
+
 #[tauri::command]
 fn list_agents(
     state: tauri::State<'_, DesktopAppState>,
@@ -169,6 +279,31 @@ fn list_indexed_skills(
     state: tauri::State<'_, DesktopAppState>,
 ) -> Result<Vec<DesktopSkill>, String> {
     list_indexed_skills_for_state(&state)
+}
+
+#[tauri::command]
+fn bind_skill_source(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopBindSourceRequest,
+) -> Result<DesktopSource, String> {
+    bind_skill_source_for_state(&state, request)
+}
+
+#[tauri::command]
+fn unbind_skill_source(
+    state: tauri::State<'_, DesktopAppState>,
+    skill_id: String,
+) -> Result<(), String> {
+    unbind_skill_source_for_state(&state, skill_id)
+}
+
+#[tauri::command]
+fn check_skill_updates(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopUpdateCheckRequest,
+) -> Result<Vec<DesktopUpdateCheckResult>, String> {
+    let checker = SystemGitCliProvider::default();
+    check_skill_updates_for_state_with_checker(&state, request, &checker)
 }
 
 fn desktop_scan_response(
@@ -196,11 +331,19 @@ fn list_indexed_skills_from_store(store: &SkillIndexStore) -> Result<Vec<Desktop
         .list_skills()
         .map_err(|error| error.to_string())?
         .into_iter()
-        .map(desktop_skill)
+        .map(|skill| desktop_skill(skill, store))
         .collect()
 }
 
-fn desktop_skill(record: SkillRecord) -> Result<DesktopSkill, String> {
+fn desktop_skill(record: SkillRecord, store: &SkillIndexStore) -> Result<DesktopSkill, String> {
+    let source = match record.source_id.as_deref() {
+        Some(source_id) => store
+            .get_source(source_id)
+            .map_err(|error| error.to_string())?
+            .map(desktop_source_from_record),
+        None => None,
+    };
+
     Ok(DesktopSkill {
         id: record.id,
         agent_id: record.agent_id.clone(),
@@ -212,9 +355,71 @@ fn desktop_skill(record: SkillRecord) -> Result<DesktopSkill, String> {
         metadata_status: record.metadata_status,
         metadata_error: record.metadata_error,
         source_id: record.source_id,
+        source,
         local_modified: record.local_modified,
         last_scanned_at: record.last_scanned_at,
     })
+}
+
+fn desktop_source_from_core(source: Source) -> DesktopSource {
+    DesktopSource {
+        id: source.id,
+        source_type: match source.source_type {
+            SourceType::Git => "git".to_string(),
+        },
+        url: source.url,
+        repo_path: source.repo_path,
+        ref_: source.ref_,
+        current_commit: source.current_commit,
+        remote_commit: source.remote_commit,
+        last_checked_at: source.last_checked_at,
+        trusted: source.trusted,
+        auto_update: source.auto_update,
+    }
+}
+
+fn desktop_source_from_record(source: SourceRecord) -> DesktopSource {
+    DesktopSource {
+        id: source.id,
+        source_type: source.source_type,
+        url: source.url,
+        repo_path: source.repo_path,
+        ref_: source.ref_,
+        current_commit: source.current_commit,
+        remote_commit: source.remote_commit,
+        last_checked_at: source.last_checked_at,
+        trusted: source.trusted,
+        auto_update: source.auto_update,
+    }
+}
+
+fn desktop_update_check_result(result: UpdateCheckResult) -> DesktopUpdateCheckResult {
+    let (status, failure_reason) = match result.status {
+        UpdateStatus::UpToDate => ("UpToDate".to_string(), None),
+        UpdateStatus::UpdateAvailable => ("UpdateAvailable".to_string(), None),
+        UpdateStatus::NoSource => ("NoSource".to_string(), None),
+        UpdateStatus::CheckFailed { reason } => ("CheckFailed".to_string(), Some(reason)),
+    };
+
+    DesktopUpdateCheckResult {
+        skill_id: result.skill_id,
+        skill_name: result.skill_name,
+        status,
+        failure_reason,
+        local_modified: result.local_modified,
+        commits_behind: result.commits_behind,
+        diff_summary: result.diff_summary.map(desktop_diff_summary),
+        source: result.source.map(desktop_source_from_record),
+    }
+}
+
+fn desktop_diff_summary(summary: DiffSummary) -> DesktopDiffSummary {
+    DesktopDiffSummary {
+        files_added: summary.files_added,
+        files_modified: summary.files_modified,
+        files_deleted: summary.files_deleted,
+        total_changes: summary.total_changes,
+    }
 }
 
 fn desktop_agent_status(status: AgentStatus) -> DesktopAgentStatus {
@@ -258,7 +463,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_agents,
             scan_skills,
-            list_indexed_skills
+            list_indexed_skills,
+            bind_skill_source,
+            unbind_skill_source,
+            check_skill_updates
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -267,9 +475,63 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use metis_core::update::{CheckoutResult, DiffDetail, DiffSummary, RemoteCommitChecker};
+    use metis_storage::db::SourceRecord;
+    use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct FakeUpdateChecker {
+        commits: HashMap<String, String>,
+        behind: u32,
+        summary: DiffSummary,
+    }
+
+    impl RemoteCommitChecker for FakeUpdateChecker {
+        fn remote_commit(&self, source: &SourceRecord) -> Result<String, String> {
+            self.commits
+                .get(&source.id)
+                .cloned()
+                .ok_or_else(|| "missing fake commit".to_string())
+        }
+
+        fn diff_summary(
+            &self,
+            _source: &SourceRecord,
+            _current_commit: &str,
+            _target_commit: &str,
+        ) -> Result<DiffSummary, String> {
+            Ok(self.summary.clone())
+        }
+
+        fn commits_behind(
+            &self,
+            _source: &SourceRecord,
+            _current_commit: &str,
+            _target_commit: &str,
+        ) -> Result<u32, String> {
+            Ok(self.behind)
+        }
+
+        fn diff_detail(
+            &self,
+            _source: &SourceRecord,
+            _current_commit: &str,
+            _target_commit: &str,
+        ) -> Result<DiffDetail, String> {
+            Err("not used by desktop update status tests".to_string())
+        }
+
+        fn checkout_to_cache(
+            &self,
+            _source: &SourceRecord,
+            _target_commit: &str,
+            _cache_dir: &str,
+        ) -> Result<CheckoutResult, String> {
+            Err("not used by desktop update status tests".to_string())
+        }
+    }
 
     fn temp_dir(name: &str) -> PathBuf {
         let suffix = SystemTime::now()
@@ -371,5 +633,170 @@ description: {description}
             ]
         );
         assert!(agents.iter().all(|agent| !agent.paths.is_empty()));
+    }
+
+    #[test]
+    fn bind_skill_source_for_state_persists_source_and_embeds_it_in_skill_dto() {
+        let workspace = temp_dir("bind-source");
+        let skill_root = workspace.join("skills");
+        let data_root = workspace.join("data");
+        let cache_root = workspace.join("cache");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        write_skill(&skill_root, "writer", "writer", "Writes things");
+        let state = DesktopAppState::new(data_root, cache_root);
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let skill_id = scanned.skills[0].id.clone();
+
+        let source = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: skill_id.clone(),
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/writer".to_string(),
+                ref_: "main".to_string(),
+                trusted: true,
+                auto_update: false,
+            },
+        )
+        .expect("source should bind");
+        let indexed = list_indexed_skills_for_state(&state).expect("indexed skills should load");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(source.source_type, "git");
+        assert_eq!(source.url, "https://github.com/example/metis-skills.git");
+        assert_eq!(source.repo_path, "skills/writer");
+        assert!(source.trusted);
+        assert_eq!(indexed[0].source_id.as_deref(), Some(source.id.as_str()));
+        assert_eq!(
+            indexed[0].source.as_ref().map(|item| item.id.as_str()),
+            Some(source.id.as_str())
+        );
+    }
+
+    #[test]
+    fn unbind_skill_source_for_state_clears_source_from_skill_dto() {
+        let workspace = temp_dir("unbind-source");
+        let skill_root = workspace.join("skills");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        write_skill(&skill_root, "reviewer", "reviewer", "Reviews work");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let skill_id = scanned.skills[0].id.clone();
+        bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: skill_id.clone(),
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/reviewer".to_string(),
+                ref_: "main".to_string(),
+                trusted: false,
+                auto_update: false,
+            },
+        )
+        .expect("source should bind");
+
+        unbind_skill_source_for_state(&state, skill_id).expect("source should unbind");
+        let indexed = list_indexed_skills_for_state(&state).expect("indexed skills should load");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(indexed[0].source_id, None);
+        assert_eq!(indexed[0].source, None);
+    }
+
+    #[test]
+    fn check_skill_updates_for_state_returns_update_status_with_fake_checker() {
+        let workspace = temp_dir("check-updates");
+        let skill_root = workspace.join("skills");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        write_skill(&skill_root, "updater", "updater", "Checks updates");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let skill_id = scanned.skills[0].id.clone();
+        let source = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: skill_id.clone(),
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/updater".to_string(),
+                ref_: "main".to_string(),
+                trusted: true,
+                auto_update: false,
+            },
+        )
+        .expect("source should bind");
+        let store = state.open_store().expect("store should open");
+        store
+            .update_source_check_result(
+                &source.id,
+                Some("aaa111"),
+                Some("aaa111"),
+                "2026-06-19T00:00:00Z",
+            )
+            .expect("source current commit should update");
+        let mut commits = HashMap::new();
+        commits.insert(source.id.clone(), "bbb222".to_string());
+        let checker = FakeUpdateChecker {
+            commits,
+            behind: 2,
+            summary: DiffSummary {
+                files_added: 1,
+                files_modified: 2,
+                files_deleted: 0,
+                total_changes: 3,
+            },
+        };
+
+        let results = check_skill_updates_for_state_with_checker(
+            &state,
+            DesktopUpdateCheckRequest {
+                skill_ids: vec![skill_id],
+            },
+            &checker,
+        )
+        .expect("update check should succeed");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, "UpdateAvailable");
+        assert_eq!(results[0].failure_reason, None);
+        assert_eq!(results[0].commits_behind, Some(2));
+        assert_eq!(
+            results[0]
+                .diff_summary
+                .as_ref()
+                .map(|summary| summary.total_changes),
+            Some(3)
+        );
+        assert_eq!(
+            results[0]
+                .source
+                .as_ref()
+                .and_then(|item| item.remote_commit.as_deref()),
+            Some("bbb222")
+        );
     }
 }

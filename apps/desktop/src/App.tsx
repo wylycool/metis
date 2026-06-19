@@ -1,11 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { listAgents, listIndexedSkills, scanSkills } from "./api";
-import type { DesktopAgentStatus, DesktopScanWarning, DesktopSkill, LoadState } from "./types";
+import {
+  bindSkillSource,
+  checkSkillUpdates,
+  listAgents,
+  listIndexedSkills,
+  scanSkills,
+  unbindSkillSource,
+} from "./api";
+import type {
+  DesktopAgentStatus,
+  DesktopScanWarning,
+  DesktopSkill,
+  DesktopUpdateCheckResult,
+  LoadState,
+} from "./types";
+
+interface BindDraft {
+  url: string;
+  repo_path: string;
+  ref_: string;
+  trusted: boolean;
+  auto_update: boolean;
+}
 
 function App() {
   const [agents, setAgents] = useState<DesktopAgentStatus[]>([]);
   const [skills, setSkills] = useState<DesktopSkill[]>([]);
   const [warnings, setWarnings] = useState<DesktopScanWarning[]>([]);
+  const [updateResults, setUpdateResults] = useState<Record<string, DesktopUpdateCheckResult>>({});
+  const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
+  const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
   const didBootstrap = useRef(false);
@@ -22,6 +48,7 @@ function App() {
     0,
   );
   const modifiedCount = skills.filter((skill) => skill.local_modified).length;
+  const boundCount = skills.filter((skill) => skill.source).length;
 
   useEffect(() => {
     if (didBootstrap.current) {
@@ -62,16 +89,107 @@ function App() {
   async function handleScan() {
     setState("loading");
     setError(null);
+    setActionError(null);
 
     try {
       const [agentResult, scanResult] = await Promise.all([listAgents(), scanSkills()]);
       setAgents(agentResult);
       setSkills(scanResult.skills);
       setWarnings(scanResult.warnings);
+      setUpdateResults({});
       setState("loaded");
     } catch (caught) {
       setError(errorMessage(caught));
       setState("error");
+    }
+  }
+
+  function openBindForm(skill: DesktopSkill) {
+    setBindingSkillId(skill.id);
+    setActionError(null);
+    setBindDraft({
+      url: skill.source?.url ?? "",
+      repo_path: skill.source?.repo_path ?? "",
+      ref_: skill.source?.ref_ ?? "main",
+      trusted: skill.source?.trusted ?? false,
+      auto_update: skill.source?.auto_update ?? false,
+    });
+  }
+
+  async function refreshIndexedSkills() {
+    const indexed = await listIndexedSkills();
+    setSkills(indexed);
+  }
+
+  async function handleBindSource(skillId: string) {
+    setActionBusy(`bind:${skillId}`);
+    setActionError(null);
+
+    try {
+      await bindSkillSource({
+        skill_id: skillId,
+        url: bindDraft.url.trim(),
+        repo_path: bindDraft.repo_path.trim(),
+        ref_: bindDraft.ref_.trim() || "main",
+        trusted: bindDraft.trusted,
+        auto_update: bindDraft.auto_update,
+      });
+      await refreshIndexedSkills();
+      setBindingSkillId(null);
+      setBindDraft(emptyBindDraft());
+      setUpdateResults((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+    } catch (caught) {
+      setActionError(errorMessage(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleUnbindSource(skillId: string) {
+    setActionBusy(`unbind:${skillId}`);
+    setActionError(null);
+
+    try {
+      await unbindSkillSource(skillId);
+      await refreshIndexedSkills();
+      setUpdateResults((current) => {
+        const next = { ...current };
+        delete next[skillId];
+        return next;
+      });
+    } catch (caught) {
+      setActionError(errorMessage(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleCheckUpdates(skillIds: string[]) {
+    if (skillIds.length === 0) {
+      return;
+    }
+
+    setActionBusy("check-updates");
+    setActionError(null);
+
+    try {
+      const results = await checkSkillUpdates({ skill_ids: skillIds });
+      setUpdateResults((current) => {
+        const next = { ...current };
+        for (const result of results) {
+          next[result.skill_id] = result;
+        }
+        return next;
+      });
+      await refreshIndexedSkills();
+    } catch (caught) {
+      setActionError(errorMessage(caught));
+    } finally {
+      setActionBusy(null);
     }
   }
 
@@ -82,14 +200,23 @@ function App() {
           <p className="eyebrow">Metis Desktop MVP</p>
           <h1>本机 Skills</h1>
         </div>
-        <button className="scan-button" disabled={state === "loading"} onClick={handleScan}>
-          {state === "loading" ? "扫描中" : "重新扫描"}
-        </button>
+        <div className="topbar-actions">
+          <button
+            className="ghost-button"
+            disabled={state === "loading" || actionBusy === "check-updates" || skills.length === 0}
+            onClick={() => handleCheckUpdates(skills.map((skill) => skill.id))}
+          >
+            {actionBusy === "check-updates" ? "检查中" : "检查更新"}
+          </button>
+          <button className="scan-button" disabled={state === "loading"} onClick={handleScan}>
+            {state === "loading" ? "扫描中" : "重新扫描"}
+          </button>
+        </div>
       </header>
 
       <section className="summary-strip" aria-label="扫描摘要">
         <SummaryMetric label="已发现 skills" value={skills.length.toString()} />
-        <SummaryMetric label="已启用 Agent" value={agents.length.toString()} />
+        <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
         <SummaryMetric label="存在的路径" value={totalExistingPaths.toString()} />
         <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
       </section>
@@ -124,13 +251,28 @@ function App() {
             )}
           </div>
 
+          {actionError && <div className="inline-error">{actionError}</div>}
+
           {state === "loading" && <LoadingState />}
           {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
           {state === "loaded" && skills.length === 0 && <EmptyState onScan={handleScan} />}
           {state === "loaded" && skills.length > 0 && (
             <div className="skill-list">
               {skills.map((skill) => (
-                <SkillRow key={skill.id} skill={skill} />
+                <SkillRow
+                  key={skill.id}
+                  skill={skill}
+                  updateResult={updateResults[skill.id]}
+                  isBinding={bindingSkillId === skill.id}
+                  bindDraft={bindDraft}
+                  busyKey={actionBusy}
+                  onOpenBind={() => openBindForm(skill)}
+                  onCancelBind={() => setBindingSkillId(null)}
+                  onDraftChange={setBindDraft}
+                  onBind={() => handleBindSource(skill.id)}
+                  onUnbind={() => handleUnbindSource(skill.id)}
+                  onCheck={() => handleCheckUpdates([skill.id])}
+                />
               ))}
             </div>
           )}
@@ -161,26 +303,181 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SkillRow({ skill }: { skill: DesktopSkill }) {
+function SkillRow({
+  skill,
+  updateResult,
+  isBinding,
+  bindDraft,
+  busyKey,
+  onOpenBind,
+  onCancelBind,
+  onDraftChange,
+  onBind,
+  onUnbind,
+  onCheck,
+}: {
+  skill: DesktopSkill;
+  updateResult?: DesktopUpdateCheckResult;
+  isBinding: boolean;
+  bindDraft: BindDraft;
+  busyKey: string | null;
+  onOpenBind: () => void;
+  onCancelBind: () => void;
+  onDraftChange: (draft: BindDraft) => void;
+  onBind: () => void;
+  onUnbind: () => void;
+  onCheck: () => void;
+}) {
+  const bindingBusy = busyKey === `bind:${skill.id}`;
+  const unbindingBusy = busyKey === `unbind:${skill.id}`;
+  const checkingBusy = busyKey === "check-updates";
+
   return (
     <article className="skill-row">
-      <div className="skill-main">
-        <div className="skill-title">
-          <h3>{skill.name}</h3>
-          <span>{skill.agent_name}</span>
+      <div className="skill-row-main">
+        <div className="skill-main">
+          <div className="skill-title">
+            <h3>{skill.name}</h3>
+            <span>{skill.agent_name}</span>
+          </div>
+          {skill.description && <p>{skill.description}</p>}
+          <code>{skill.install_path}</code>
+          {skill.source && (
+            <div className="source-line">
+              <strong>{skill.source.ref_}</strong>
+              <span>{skill.source.url}</span>
+              <em>{skill.source.repo_path}</em>
+            </div>
+          )}
         </div>
-        {skill.description && <p>{skill.description}</p>}
-        <code>{skill.install_path}</code>
+
+        <div className="skill-status">
+          <StatusBadge tone={metadataTone(skill.metadata_status)}>
+            metadata: {metadataLabel(skill.metadata_status)}
+          </StatusBadge>
+          <StatusBadge tone={skill.local_modified ? "danger" : "muted"}>
+            {localModifiedLabel(skill.local_modified)}
+          </StatusBadge>
+          <StatusBadge tone={updateTone(updateResult, skill)}>
+            {updateLabel(updateResult, skill)}
+          </StatusBadge>
+        </div>
       </div>
-      <div className="skill-status">
-        <StatusBadge tone={metadataTone(skill.metadata_status)}>
-          metadata: {metadataLabel(skill.metadata_status)}
-        </StatusBadge>
-        <StatusBadge tone={skill.local_modified ? "danger" : "muted"}>
-          {localModifiedLabel(skill.local_modified)}
-        </StatusBadge>
+
+      {updateResult?.diff_summary && (
+        <div className="update-summary">
+          <span>+{updateResult.diff_summary.files_added}</span>
+          <span>~{updateResult.diff_summary.files_modified}</span>
+          <span>-{updateResult.diff_summary.files_deleted}</span>
+          {updateResult.commits_behind !== null && updateResult.commits_behind !== undefined && (
+            <strong>{updateResult.commits_behind} commits behind</strong>
+          )}
+        </div>
+      )}
+
+      <div className="skill-actions">
+        {skill.source ? (
+          <>
+            <button className="ghost-button compact" disabled={checkingBusy} onClick={onCheck}>
+              {checkingBusy ? "检查中" : "检查更新"}
+            </button>
+            <button className="ghost-button compact" onClick={onOpenBind}>
+              编辑来源
+            </button>
+            <button
+              className="danger-button compact"
+              disabled={unbindingBusy}
+              onClick={onUnbind}
+            >
+              {unbindingBusy ? "解绑中" : "解绑"}
+            </button>
+          </>
+        ) : (
+          <button className="ghost-button compact" onClick={onOpenBind}>
+            绑定来源
+          </button>
+        )}
       </div>
+
+      {isBinding && (
+        <BindSourceForm
+          draft={bindDraft}
+          busy={bindingBusy}
+          onChange={onDraftChange}
+          onCancel={onCancelBind}
+          onSubmit={onBind}
+        />
+      )}
     </article>
+  );
+}
+
+function BindSourceForm({
+  draft,
+  busy,
+  onChange,
+  onCancel,
+  onSubmit,
+}: {
+  draft: BindDraft;
+  busy: boolean;
+  onChange: (draft: BindDraft) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  const disabled = busy || !draft.url.trim() || !draft.repo_path.trim();
+
+  return (
+    <div className="source-form">
+      <label>
+        <span>Git URL</span>
+        <input
+          value={draft.url}
+          placeholder="https://github.com/org/repo.git"
+          onChange={(event) => onChange({ ...draft, url: event.target.value })}
+        />
+      </label>
+      <label>
+        <span>Repo Path</span>
+        <input
+          value={draft.repo_path}
+          placeholder="skills/example"
+          onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
+        />
+      </label>
+      <label>
+        <span>Ref</span>
+        <input
+          value={draft.ref_}
+          placeholder="main"
+          onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
+        />
+      </label>
+      <label className="check-label">
+        <input
+          checked={draft.trusted}
+          type="checkbox"
+          onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
+        />
+        <span>Trusted</span>
+      </label>
+      <label className="check-label">
+        <input
+          checked={draft.auto_update}
+          type="checkbox"
+          onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
+        />
+        <span>Auto update</span>
+      </label>
+      <div className="form-actions">
+        <button className="ghost-button compact" onClick={onCancel}>
+          取消
+        </button>
+        <button className="compact" disabled={disabled} onClick={onSubmit}>
+          {busy ? "保存中" : "保存来源"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -258,6 +555,54 @@ function localModifiedLabel(value: boolean | null | undefined) {
     return "未发现修改";
   }
   return "未检测修改";
+}
+
+function updateTone(
+  result: DesktopUpdateCheckResult | undefined,
+  skill: DesktopSkill,
+): "good" | "danger" | "muted" {
+  if (result?.local_modified || result?.status === "CheckFailed") {
+    return "danger";
+  }
+  if (result?.status === "UpToDate") {
+    return "good";
+  }
+  if (result?.status === "UpdateAvailable") {
+    return "danger";
+  }
+  if (!skill.source) {
+    return "muted";
+  }
+  return "muted";
+}
+
+function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
+  if (result?.local_modified) {
+    return "本地修改，先处理";
+  }
+  if (result?.status === "UpToDate") {
+    return "已最新";
+  }
+  if (result?.status === "UpdateAvailable") {
+    return "有更新";
+  }
+  if (result?.status === "CheckFailed") {
+    return `检查失败${result.failure_reason ? `: ${result.failure_reason}` : ""}`;
+  }
+  if (result?.status === "NoSource" || !skill.source) {
+    return "未绑定来源";
+  }
+  return "未检查更新";
+}
+
+function emptyBindDraft(): BindDraft {
+  return {
+    url: "",
+    repo_path: "",
+    ref_: "main",
+    trusted: false,
+    auto_update: false,
+  };
 }
 
 function errorMessage(caught: unknown) {

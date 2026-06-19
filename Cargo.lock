@@ -1805,6 +1805,7 @@ version = "0.1.0"
 dependencies = [
  "dirs 5.0.1",
  "metis-core",
+ "metis-git-provider",
  "metis-storage",
  "serde",
  "serde_json",

@@ -20,4 +20,5 @@ serde_json.workspace = true
 dirs.workspace = true
 
 metis-core = { path = "../../../crates/core" }
+metis-git-provider = { path = "../../../crates/git-provider" }
 metis-storage = { path = "../../../crates/storage" }

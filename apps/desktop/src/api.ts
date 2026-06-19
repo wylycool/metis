@@ -1,8 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   DesktopAgentStatus,
+  DesktopBindSourceRequest,
   DesktopScanResponse,
   DesktopSkill,
+  DesktopSource,
+  DesktopUpdateCheckRequest,
+  DesktopUpdateCheckResult,
 } from "./types";
 
 export function listAgents(): Promise<DesktopAgentStatus[]> {
@@ -15,4 +19,20 @@ export function listIndexedSkills(): Promise<DesktopSkill[]> {
 
 export function scanSkills(): Promise<DesktopScanResponse> {
   return invoke("scan_skills");
+}
+
+export function bindSkillSource(
+  request: DesktopBindSourceRequest,
+): Promise<DesktopSource> {
+  return invoke("bind_skill_source", { request });
+}
+
+export function unbindSkillSource(skillId: string): Promise<void> {
+  return invoke("unbind_skill_source", { skillId });
+}
+
+export function checkSkillUpdates(
+  request: DesktopUpdateCheckRequest,
+): Promise<DesktopUpdateCheckResult[]> {
+  return invoke("check_skill_updates", { request });
 }
