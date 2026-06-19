@@ -74,6 +74,26 @@ input:focus {
   border-color: rgba(208, 168, 79, 0.8);
 }
 
+textarea {
+  width: 100%;
+  min-height: 96px;
+  border: 1px solid #39424d;
+  border-radius: 7px;
+  padding: 10px;
+  color: var(--text);
+  background: #101216;
+  font: inherit;
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  outline: none;
+  resize: vertical;
+}
+
+textarea:focus {
+  border-color: rgba(208, 168, 79, 0.8);
+}
+
 input[type="checkbox"] {
   width: 16px;
   min-height: 16px;
@@ -174,6 +194,59 @@ h1 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.settings-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(25, 29, 35, 0.86);
+  padding: 12px;
+}
+
+.settings-toggle {
+  white-space: nowrap;
+}
+
+.custom-path-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.custom-path-chips > span {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: rgba(16, 18, 22, 0.68);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.custom-path-chips code {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+}
+
+.settings-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #323b45;
+  padding-top: 12px;
+}
+
+.path-remove-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .metric {
@@ -719,6 +792,7 @@ h1 {
   .workspace,
   .skill-row-main,
   .source-form,
+  .settings-panel,
   .backup-row {
     grid-template-columns: 1fr;
   }

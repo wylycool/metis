@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct DesktopAppState {
     sqlite_path: PathBuf,
+    settings_path: PathBuf,
     backup_root: PathBuf,
     cache_root: PathBuf,
 }
@@ -42,6 +43,7 @@ impl DesktopAppState {
 
         Self {
             sqlite_path: data_root.join("metis.db"),
+            settings_path: data_root.join("metis-settings.json"),
             backup_root: data_root.join("backups"),
             cache_root,
         }
@@ -62,6 +64,10 @@ impl DesktopAppState {
         &self.sqlite_path
     }
 
+    pub fn settings_path(&self) -> &Path {
+        &self.settings_path
+    }
+
     pub fn backup_root(&self) -> &Path {
         &self.backup_root
     }
@@ -77,6 +83,9 @@ impl DesktopAppState {
 
     fn ensure_dirs(&self) -> Result<(), String> {
         if let Some(parent) = self.sqlite_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        if let Some(parent) = self.settings_path.parent() {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
         fs::create_dir_all(&self.backup_root).map_err(|error| error.to_string())?;
@@ -137,6 +146,11 @@ pub struct DesktopSource {
     pub last_checked_at: Option<String>,
     pub trusted: bool,
     pub auto_update: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSettings {
+    pub custom_scan_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -249,18 +263,25 @@ pub struct DesktopScanResponse {
     pub warnings: Vec<DesktopScanWarning>,
 }
 
-pub fn list_agents_for_state(_state: &DesktopAppState) -> Result<Vec<DesktopAgentStatus>, String> {
-    Ok(core_list_agents(ListAgentsOptions::default())
-        .into_iter()
-        .map(desktop_agent_status)
-        .collect())
+pub fn list_agents_for_state(state: &DesktopAppState) -> Result<Vec<DesktopAgentStatus>, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    Ok(core_list_agents(ListAgentsOptions {
+        enabled_agent_ids: None,
+        custom_paths: settings.custom_scan_paths,
+    })
+    .into_iter()
+    .map(desktop_agent_status)
+    .collect())
 }
 
 pub fn scan_skills_for_state(
     state: &DesktopAppState,
-    request: DesktopScanRequest,
+    mut request: DesktopScanRequest,
 ) -> Result<DesktopScanResponse, String> {
     let store = state.open_store()?;
+    let settings = get_desktop_settings_for_state(state)?;
+    request.custom_paths.extend(settings.custom_scan_paths);
+    request.custom_paths = normalize_paths(request.custom_paths);
     let result = scan_and_index_skills(
         ScanOptions {
             agent_ids: request.agent_ids,
@@ -276,6 +297,29 @@ pub fn scan_skills_for_state(
 pub fn list_indexed_skills_for_state(state: &DesktopAppState) -> Result<Vec<DesktopSkill>, String> {
     let store = state.open_store()?;
     list_indexed_skills_from_store(&store)
+}
+
+pub fn get_desktop_settings_for_state(state: &DesktopAppState) -> Result<DesktopSettings, String> {
+    state.ensure_dirs()?;
+    if !state.settings_path().exists() {
+        return Ok(DesktopSettings::default());
+    }
+
+    let contents = fs::read_to_string(state.settings_path()).map_err(|error| error.to_string())?;
+    serde_json::from_str(&contents).map_err(|error| error.to_string())
+}
+
+pub fn save_desktop_settings_for_state(
+    state: &DesktopAppState,
+    settings: DesktopSettings,
+) -> Result<DesktopSettings, String> {
+    state.ensure_dirs()?;
+    let normalized = DesktopSettings {
+        custom_scan_paths: normalize_paths(settings.custom_scan_paths),
+    };
+    let contents = serde_json::to_string_pretty(&normalized).map_err(|error| error.to_string())?;
+    fs::write(state.settings_path(), contents).map_err(|error| error.to_string())?;
+    Ok(normalized)
 }
 
 pub fn bind_skill_source_for_state(
@@ -406,6 +450,21 @@ fn list_indexed_skills(
 }
 
 #[tauri::command]
+fn get_desktop_settings(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopSettings, String> {
+    get_desktop_settings_for_state(&state)
+}
+
+#[tauri::command]
+fn save_desktop_settings(
+    state: tauri::State<'_, DesktopAppState>,
+    settings: DesktopSettings,
+) -> Result<DesktopSettings, String> {
+    save_desktop_settings_for_state(&state, settings)
+}
+
+#[tauri::command]
 fn bind_skill_source(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopBindSourceRequest,
@@ -482,6 +541,18 @@ fn desktop_scan_response(
             })
             .collect(),
     })
+}
+
+fn normalize_paths(paths: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for path in paths {
+        let trimmed = path.trim();
+        if trimmed.is_empty() || normalized.iter().any(|item| item == trimmed) {
+            continue;
+        }
+        normalized.push(trimmed.to_string());
+    }
+    normalized
 }
 
 fn list_indexed_skills_from_store(store: &SkillIndexStore) -> Result<Vec<DesktopSkill>, String> {
@@ -697,6 +768,8 @@ pub fn run() {
             list_agents,
             scan_skills,
             list_indexed_skills,
+            get_desktop_settings,
+            save_desktop_settings,
             bind_skill_source,
             unbind_skill_source,
             check_skill_updates,
@@ -881,6 +954,90 @@ description: {description}
             ]
         );
         assert!(agents.iter().all(|agent| !agent.paths.is_empty()));
+    }
+
+    #[test]
+    fn list_agents_for_state_includes_saved_custom_scan_paths() {
+        let workspace = temp_dir("agents-custom-state");
+        let custom_root = workspace.join("custom-skills");
+        fs::create_dir_all(&custom_root).expect("custom root should be created");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: vec![custom_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("settings should save");
+
+        let agents = list_agents_for_state(&state).expect("agents should load");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        let generic = agents
+            .iter()
+            .find(|agent| agent.agent_id == "generic")
+            .expect("generic agent should exist");
+        assert!(generic
+            .paths
+            .iter()
+            .any(|path| path.path == custom_root.to_string_lossy() && path.exists));
+    }
+
+    #[test]
+    fn desktop_settings_default_when_file_is_missing_and_save_normalizes_paths() {
+        let workspace = temp_dir("settings-state");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+
+        let default_settings =
+            get_desktop_settings_for_state(&state).expect("default settings should load");
+        let saved = save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: vec![
+                    "  /tmp/metis/custom  ".to_string(),
+                    "".to_string(),
+                    "/tmp/metis/custom".to_string(),
+                    "/tmp/metis/other".to_string(),
+                ],
+            },
+        )
+        .expect("settings should save");
+        let loaded = get_desktop_settings_for_state(&state).expect("settings should reload");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(default_settings.custom_scan_paths.is_empty());
+        assert_eq!(
+            saved.custom_scan_paths,
+            vec!["/tmp/metis/custom", "/tmp/metis/other"]
+        );
+        assert_eq!(loaded, saved);
+    }
+
+    #[test]
+    fn scan_skills_for_state_uses_saved_custom_scan_paths() {
+        let workspace = temp_dir("settings-scan");
+        let skill_root = workspace.join("custom-skills");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        let skill_dir = write_skill(&skill_root, "mapper", "mapper", "Maps custom paths");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("settings should save");
+
+        let response =
+            scan_skills_for_state(&state, DesktopScanRequest::default()).expect("scan should work");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(response.skills.iter().any(|skill| {
+            skill.name == "mapper" && skill.install_path == skill_dir.to_string_lossy()
+        }));
     }
 
     #[test]

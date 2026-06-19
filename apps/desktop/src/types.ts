@@ -44,6 +44,10 @@ export interface DesktopSource {
   auto_update: boolean;
 }
 
+export interface DesktopSettings {
+  custom_scan_paths: string[];
+}
+
 export interface DesktopBindSourceRequest {
   skill_id: string;
   url: string;

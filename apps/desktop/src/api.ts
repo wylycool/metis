@@ -8,6 +8,7 @@ import type {
   DesktopRestoreBackupRequest,
   DesktopRestoreBackupResult,
   DesktopScanResponse,
+  DesktopSettings,
   DesktopSkill,
   DesktopSource,
   DesktopUpdateCheckRequest,
@@ -24,6 +25,14 @@ export function listIndexedSkills(): Promise<DesktopSkill[]> {
 
 export function scanSkills(): Promise<DesktopScanResponse> {
   return invoke("scan_skills");
+}
+
+export function getDesktopSettings(): Promise<DesktopSettings> {
+  return invoke("get_desktop_settings");
+}
+
+export function saveDesktopSettings(settings: DesktopSettings): Promise<DesktopSettings> {
+  return invoke("save_desktop_settings", { settings });
 }
 
 export function bindSkillSource(

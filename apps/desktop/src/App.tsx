@@ -4,10 +4,12 @@ import {
   bindSkillSource,
   checkSkillUpdates,
   getSkillDiff,
+  getDesktopSettings,
   listSkillBackups,
   listAgents,
   listIndexedSkills,
   restoreSkillBackup,
+  saveDesktopSettings,
   scanSkills,
   unbindSkillSource,
 } from "./api";
@@ -16,6 +18,7 @@ import type {
   DesktopBackupSummary,
   DesktopDiffDetail,
   DesktopScanWarning,
+  DesktopSettings,
   DesktopSkill,
   DesktopUpdateCheckResult,
   LoadState,
@@ -40,6 +43,9 @@ function App() {
   const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
   const [backupError, setBackupError] = useState<Record<string, string>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [settings, setSettings] = useState<DesktopSettings>({ custom_scan_paths: [] });
+  const [settingsDraft, setSettingsDraft] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -79,7 +85,10 @@ function App() {
         listAgents(),
         listIndexedSkills(),
       ]);
+      const settingsResult = await getDesktopSettings();
       setAgents(agentResult);
+      setSettings(settingsResult);
+      setSettingsDraft(settingsResult.custom_scan_paths.join("\n"));
 
       if (indexedResult.length > 0) {
         setSkills(indexedResult);
@@ -120,6 +129,37 @@ function App() {
       setError(errorMessage(caught));
       setState("error");
     }
+  }
+
+  async function handleSaveSettings(scanAfterSave: boolean) {
+    setActionBusy("settings");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const saved = await saveDesktopSettings({
+        custom_scan_paths: settingsDraft.split("\n"),
+      });
+      setSettings(saved);
+      setSettingsDraft(saved.custom_scan_paths.join("\n"));
+      setActionMessage("扫描路径已保存");
+      if (scanAfterSave) {
+        await handleScan();
+      } else {
+        setAgents(await listAgents());
+      }
+    } catch (caught) {
+      setActionError(errorMessage(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  function removeCustomPath(path: string) {
+    const nextPaths = settings.custom_scan_paths.filter((item) => item !== path);
+    const nextDraft = nextPaths.join("\n");
+    setSettings({ custom_scan_paths: nextPaths });
+    setSettingsDraft(nextDraft);
   }
 
   function openBindForm(skill: DesktopSkill) {
@@ -401,6 +441,62 @@ function App() {
         <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
         <SummaryMetric label="存在的路径" value={totalExistingPaths.toString()} />
         <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
+      </section>
+
+      <section className="settings-panel" aria-label="扫描路径设置">
+        <button
+          className="ghost-button settings-toggle"
+          onClick={() => setSettingsOpen((current) => !current)}
+        >
+          {settingsOpen ? "收起扫描路径" : "扫描路径"}
+        </button>
+        <div className="custom-path-chips">
+          {settings.custom_scan_paths.length === 0 ? (
+            <span>默认路径</span>
+          ) : (
+            settings.custom_scan_paths.map((path) => (
+              <code key={path}>{path}</code>
+            ))
+          )}
+        </div>
+        {settingsOpen && (
+          <div className="settings-editor">
+            <textarea
+              value={settingsDraft}
+              placeholder="/Users/me/.agent-skills-extra"
+              onChange={(event) => setSettingsDraft(event.target.value)}
+            />
+            {settings.custom_scan_paths.length > 0 && (
+              <div className="path-remove-list">
+                {settings.custom_scan_paths.map((path) => (
+                  <button
+                    className="ghost-button compact"
+                    key={path}
+                    onClick={() => removeCustomPath(path)}
+                  >
+                    移除 {shortPath(path)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="form-actions">
+              <button
+                className="ghost-button compact"
+                disabled={actionBusy === "settings"}
+                onClick={() => handleSaveSettings(false)}
+              >
+                {actionBusy === "settings" ? "保存中" : "保存"}
+              </button>
+              <button
+                className="compact"
+                disabled={actionBusy === "settings" || state === "loading"}
+                onClick={() => handleSaveSettings(true)}
+              >
+                保存并扫描
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <main className="workspace">
@@ -929,6 +1025,14 @@ function emptyBindDraft(): BindDraft {
 
 function shortCommit(commit: string) {
   return commit.length > 10 ? commit.slice(0, 10) : commit;
+}
+
+function shortPath(path: string) {
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length <= 2) {
+    return path;
+  }
+  return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
 }
 
 function formatBytes(value: number) {
