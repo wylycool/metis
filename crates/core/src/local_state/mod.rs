@@ -94,7 +94,7 @@ pub fn check_local_modification(
     })
 }
 
-fn manifest_records(
+pub(crate) fn manifest_records(
     skill_id: &str,
     snapshot_type: &str,
     snapshot_ref: &str,

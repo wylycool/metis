@@ -57,6 +57,19 @@ pub struct FileManifestRecord {
     pub is_executable: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupRecord {
+    pub id: String,
+    pub skill_id: String,
+    pub source_commit: Option<String>,
+    pub backup_path: String,
+    pub file_count: u64,
+    pub total_size_bytes: u64,
+    pub reason: String,
+    pub restore_status: Option<String>,
+    pub created_at: Option<String>,
+}
+
 pub struct SkillIndexStore {
     connection: Connection,
 }
@@ -530,6 +543,88 @@ impl SkillIndexStore {
         Ok(())
     }
 
+    pub fn insert_backup(&self, backup: &BackupRecord) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            INSERT INTO backups (
+                id,
+                skill_id,
+                source_commit,
+                backup_path,
+                file_count,
+                total_size_bytes,
+                reason,
+                restore_status,
+                created_at
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, COALESCE(?9, datetime('now'))
+            )
+            ",
+            params![
+                backup.id,
+                backup.skill_id,
+                backup.source_commit,
+                backup.backup_path,
+                backup.file_count as i64,
+                backup.total_size_bytes as i64,
+                backup.reason,
+                backup.restore_status,
+                backup.created_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_backup(&self, backup_id: &str) -> Result<Option<BackupRecord>, StorageError> {
+        self.connection
+            .query_row(
+                "
+                SELECT
+                    id,
+                    skill_id,
+                    source_commit,
+                    backup_path,
+                    file_count,
+                    total_size_bytes,
+                    reason,
+                    restore_status,
+                    created_at
+                FROM backups
+                WHERE id = ?1
+                ",
+                params![backup_id],
+                row_to_backup_record,
+            )
+            .optional()
+            .map_err(StorageError::from)
+    }
+
+    pub fn list_backups(&self, skill_id: &str) -> Result<Vec<BackupRecord>, StorageError> {
+        let mut statement = self.connection.prepare(
+            "
+            SELECT
+                id,
+                skill_id,
+                source_commit,
+                backup_path,
+                file_count,
+                total_size_bytes,
+                reason,
+                restore_status,
+                created_at
+            FROM backups
+            WHERE skill_id = ?1
+            ORDER BY created_at DESC, id DESC
+            ",
+        )?;
+
+        let records = statement
+            .query_map(params![skill_id], row_to_backup_record)?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(records)
+    }
+
     pub fn applied_migration_versions(&self) -> Result<Vec<i64>, StorageError> {
         let mut statement = self
             .connection
@@ -623,6 +718,20 @@ fn row_to_file_manifest_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<File
     })
 }
 
+fn row_to_backup_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<BackupRecord> {
+    Ok(BackupRecord {
+        id: row.get(0)?,
+        skill_id: row.get(1)?,
+        source_commit: row.get(2)?,
+        backup_path: row.get(3)?,
+        file_count: row.get::<_, i64>(4)? as u64,
+        total_size_bytes: row.get::<_, i64>(5)? as u64,
+        reason: row.get(6)?,
+        restore_status: row.get(7)?,
+        created_at: row.get(8)?,
+    })
+}
+
 const INITIAL_SCHEMA_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS _migrations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -680,6 +789,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_skills_agent_install_path
     ON skills(agent_id, install_path);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_sources_url_path_ref
     ON sources(url, repo_path, ref_);
+
+CREATE TABLE IF NOT EXISTS backups (
+    id                  TEXT PRIMARY KEY,
+    skill_id            TEXT NOT NULL,
+    source_commit       TEXT,
+    backup_path         TEXT NOT NULL,
+    file_count          INTEGER NOT NULL DEFAULT 0,
+    total_size_bytes    INTEGER NOT NULL DEFAULT 0,
+    reason              TEXT NOT NULL DEFAULT 'manual',
+    restore_status      TEXT,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+
+    FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_backups_skill_id ON backups(skill_id);
+CREATE INDEX IF NOT EXISTS idx_backups_created_at ON backups(created_at);
 
 CREATE TABLE IF NOT EXISTS file_manifests (
     id                  TEXT PRIMARY KEY,
@@ -773,6 +899,20 @@ mod tests {
             modified_at: "2026-06-19T10:00:00Z".to_string(),
             content_hash: content_hash.to_string(),
             is_executable: false,
+        }
+    }
+
+    fn sample_backup(id: &str, skill_id: &str, reason: &str) -> BackupRecord {
+        BackupRecord {
+            id: id.to_string(),
+            skill_id: skill_id.to_string(),
+            source_commit: Some("abc123".to_string()),
+            backup_path: format!("/tmp/metis/backups/{skill_id}/{id}"),
+            file_count: 2,
+            total_size_bytes: 42,
+            reason: reason.to_string(),
+            restore_status: None,
+            created_at: Some("2026-06-19T12:00:00Z".to_string()),
         }
     }
 
@@ -1010,6 +1150,45 @@ mod tests {
             .expect("manifest should list");
 
         assert_eq!(stored, second);
+    }
+
+    #[test]
+    fn insert_and_get_backup_by_id() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        let backup = sample_backup("backup-1", "skill-1", "manual");
+        store.upsert_skill(&skill).expect("skill should upsert");
+
+        store.insert_backup(&backup).expect("backup should insert");
+
+        let stored = store
+            .get_backup("backup-1")
+            .expect("backup lookup should succeed")
+            .expect("backup should exist");
+
+        assert_eq!(stored, backup);
+    }
+
+    #[test]
+    fn list_backups_returns_records_for_skill_newest_first() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        let older = sample_backup("backup-older", "skill-1", "manual");
+        let mut newer = sample_backup("backup-newer", "skill-1", "pre-update");
+        newer.created_at = Some("2026-06-19T13:00:00Z".to_string());
+        store.upsert_skill(&skill).expect("skill should upsert");
+        store
+            .insert_backup(&older)
+            .expect("older backup should insert");
+        store
+            .insert_backup(&newer)
+            .expect("newer backup should insert");
+
+        let backups = store
+            .list_backups("skill-1")
+            .expect("backup list should succeed");
+
+        assert_eq!(backups, vec![newer, older]);
     }
 
     #[test]
