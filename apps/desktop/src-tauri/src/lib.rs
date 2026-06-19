@@ -146,6 +146,7 @@ pub struct DesktopSource {
     pub last_checked_at: Option<String>,
     pub trusted: bool,
     pub auto_update: bool,
+    pub credential_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -159,6 +160,7 @@ pub struct DesktopBindSourceRequest {
     pub url: String,
     pub repo_path: String,
     pub ref_: String,
+    pub credential_ref: Option<String>,
     pub trusted: bool,
     pub auto_update: bool,
 }
@@ -334,7 +336,7 @@ pub fn bind_skill_source_for_state(
             url: request.url,
             repo_path: request.repo_path,
             ref_: request.ref_,
-            credential_ref: None,
+            credential_ref: normalize_optional_text(request.credential_ref),
             auto_update: request.auto_update,
             trusted: request.trusted,
         },
@@ -381,7 +383,7 @@ pub fn get_skill_diff_for_state_with_checker<C: RemoteCommitChecker>(
     let store = state.open_store()?;
     core_get_diff(&skill_id, &store, checker)
         .map(desktop_diff_detail)
-        .map_err(|error| error.to_string())
+        .map_err(|error| friendly_desktop_error(&error.to_string()))
 }
 
 pub fn apply_skill_update_for_state_with_checker<C: RemoteCommitChecker>(
@@ -400,7 +402,7 @@ pub fn apply_skill_update_for_state_with_checker<C: RemoteCommitChecker>(
         checker,
     )
     .map(desktop_apply_update_result)
-    .map_err(|error| error.to_string())
+    .map_err(|error| friendly_desktop_error(&error.to_string()))
 }
 
 pub fn list_skill_backups_for_state(
@@ -604,6 +606,7 @@ fn desktop_source_from_core(source: Source) -> DesktopSource {
         last_checked_at: source.last_checked_at,
         trusted: source.trusted,
         auto_update: source.auto_update,
+        credential_ref: source.credential_ref,
     }
 }
 
@@ -619,6 +622,7 @@ fn desktop_source_from_record(source: SourceRecord) -> DesktopSource {
         last_checked_at: source.last_checked_at,
         trusted: source.trusted,
         auto_update: source.auto_update,
+        credential_ref: source.credential_ref,
     }
 }
 
@@ -627,7 +631,10 @@ fn desktop_update_check_result(result: UpdateCheckResult) -> DesktopUpdateCheckR
         UpdateStatus::UpToDate => ("UpToDate".to_string(), None),
         UpdateStatus::UpdateAvailable => ("UpdateAvailable".to_string(), None),
         UpdateStatus::NoSource => ("NoSource".to_string(), None),
-        UpdateStatus::CheckFailed { reason } => ("CheckFailed".to_string(), Some(reason)),
+        UpdateStatus::CheckFailed { reason } => (
+            "CheckFailed".to_string(),
+            Some(friendly_desktop_error(&reason)),
+        ),
     };
 
     DesktopUpdateCheckResult {
@@ -745,6 +752,32 @@ fn desktop_agent_status(status: AgentStatus) -> DesktopAgentStatus {
     }
 }
 
+fn normalize_optional_text(value: Option<String>) -> Option<String> {
+    value.and_then(|text| {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn friendly_desktop_error(message: &str) -> String {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("auth")
+        || lower.contains("authentication")
+        || lower.contains("permission denied")
+        || lower.contains("could not read username")
+        || lower.contains("repository not found")
+        || lower.contains("access denied")
+    {
+        return "认证失败：请检查该 source 的凭据引用、SSH agent 或 Git 访问权限。".to_string();
+    }
+
+    message.to_string()
+}
+
 fn agent_name(agent_id: &str) -> &str {
     match agent_id {
         "codex" => "Codex",
@@ -851,6 +884,50 @@ mod tests {
             self.checkout
                 .clone()
                 .ok_or_else(|| "missing fake checkout".to_string())
+        }
+    }
+
+    struct AuthFailureChecker;
+
+    impl RemoteCommitChecker for AuthFailureChecker {
+        fn remote_commit(&self, _source: &SourceRecord) -> Result<String, String> {
+            Err("authentication failed: could not read Username".to_string())
+        }
+
+        fn diff_summary(
+            &self,
+            _source: &SourceRecord,
+            _current_commit: &str,
+            _target_commit: &str,
+        ) -> Result<DiffSummary, String> {
+            unreachable!("auth failure should stop before diff summary")
+        }
+
+        fn commits_behind(
+            &self,
+            _source: &SourceRecord,
+            _current_commit: &str,
+            _target_commit: &str,
+        ) -> Result<u32, String> {
+            unreachable!("auth failure should stop before commits behind")
+        }
+
+        fn diff_detail(
+            &self,
+            _source: &SourceRecord,
+            _current_commit: &str,
+            _target_commit: &str,
+        ) -> Result<DiffDetail, String> {
+            unreachable!("auth failure should stop before diff detail")
+        }
+
+        fn checkout_to_cache(
+            &self,
+            _source: &SourceRecord,
+            _target_commit: &str,
+            _cache_dir: &str,
+        ) -> Result<CheckoutResult, String> {
+            unreachable!("auth failure should stop before checkout")
         }
     }
 
@@ -1066,6 +1143,7 @@ description: {description}
                 url: "https://github.com/example/metis-skills.git".to_string(),
                 repo_path: "skills/writer".to_string(),
                 ref_: "main".to_string(),
+                credential_ref: Some(" github-main ".to_string()),
                 trusted: true,
                 auto_update: false,
             },
@@ -1078,11 +1156,19 @@ description: {description}
         assert_eq!(source.source_type, "git");
         assert_eq!(source.url, "https://github.com/example/metis-skills.git");
         assert_eq!(source.repo_path, "skills/writer");
+        assert_eq!(source.credential_ref.as_deref(), Some("github-main"));
         assert!(source.trusted);
         assert_eq!(indexed[0].source_id.as_deref(), Some(source.id.as_str()));
         assert_eq!(
             indexed[0].source.as_ref().map(|item| item.id.as_str()),
             Some(source.id.as_str())
+        );
+        assert_eq!(
+            indexed[0]
+                .source
+                .as_ref()
+                .and_then(|item| item.credential_ref.as_deref()),
+            Some("github-main")
         );
     }
 
@@ -1109,6 +1195,7 @@ description: {description}
                 url: "https://github.com/example/metis-skills.git".to_string(),
                 repo_path: "skills/reviewer".to_string(),
                 ref_: "main".to_string(),
+                credential_ref: None,
                 trusted: false,
                 auto_update: false,
             },
@@ -1147,6 +1234,7 @@ description: {description}
                 url: "https://github.com/example/metis-skills.git".to_string(),
                 repo_path: "skills/updater".to_string(),
                 ref_: "main".to_string(),
+                credential_ref: Some("".to_string()),
                 trusted: true,
                 auto_update: false,
             },
@@ -1208,6 +1296,64 @@ description: {description}
     }
 
     #[test]
+    fn check_skill_updates_for_state_returns_friendly_auth_failure_message() {
+        let workspace = temp_dir("auth-failure");
+        let skill_root = workspace.join("skills");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        write_skill(&skill_root, "private", "private", "Checks private sources");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let skill_id = scanned.skills[0].id.clone();
+        let source = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: skill_id.clone(),
+                url: "https://github.com/example/private-skills.git".to_string(),
+                repo_path: "skills/private".to_string(),
+                ref_: "main".to_string(),
+                credential_ref: Some("work-github".to_string()),
+                trusted: true,
+                auto_update: false,
+            },
+        )
+        .expect("source should bind");
+        let store = state.open_store().expect("store should open");
+        store
+            .update_source_check_result(
+                &source.id,
+                Some("aaa111"),
+                Some("aaa111"),
+                "2026-06-19T00:00:00Z",
+            )
+            .expect("source current commit should update");
+        let checker = AuthFailureChecker;
+
+        let results = check_skill_updates_for_state_with_checker(
+            &state,
+            DesktopUpdateCheckRequest {
+                skill_ids: vec![skill_id],
+            },
+            &checker,
+        )
+        .expect("update check should return status results");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(results[0].status, "CheckFailed");
+        assert_eq!(
+            results[0].failure_reason.as_deref(),
+            Some("认证失败：请检查该 source 的凭据引用、SSH agent 或 Git 访问权限。")
+        );
+    }
+
+    #[test]
     fn get_skill_diff_for_state_returns_file_statuses_and_patch_text() {
         let workspace = temp_dir("get-diff");
         let skill_root = workspace.join("skills");
@@ -1230,6 +1376,7 @@ description: {description}
                 url: "https://github.com/example/metis-skills.git".to_string(),
                 repo_path: "skills/differ".to_string(),
                 ref_: "main".to_string(),
+                credential_ref: None,
                 trusted: true,
                 auto_update: false,
             },
@@ -1328,6 +1475,7 @@ description: {description}
                 url: "https://github.com/example/metis-skills.git".to_string(),
                 repo_path: "skills/updater".to_string(),
                 ref_: "main".to_string(),
+                credential_ref: None,
                 trusted: true,
                 auto_update: false,
             },

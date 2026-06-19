@@ -42,6 +42,7 @@ export interface DesktopSource {
   last_checked_at?: string | null;
   trusted: boolean;
   auto_update: boolean;
+  credential_ref?: string | null;
 }
 
 export interface DesktopSettings {
@@ -53,6 +54,7 @@ export interface DesktopBindSourceRequest {
   url: string;
   repo_path: string;
   ref_: string;
+  credential_ref?: string | null;
   trusted: boolean;
   auto_update: boolean;
 }

@@ -28,6 +28,7 @@ interface BindDraft {
   url: string;
   repo_path: string;
   ref_: string;
+  credential_ref: string;
   trusted: boolean;
   auto_update: boolean;
 }
@@ -169,6 +170,7 @@ function App() {
       url: skill.source?.url ?? "",
       repo_path: skill.source?.repo_path ?? "",
       ref_: skill.source?.ref_ ?? "main",
+      credential_ref: skill.source?.credential_ref ?? "",
       trusted: skill.source?.trusted ?? false,
       auto_update: skill.source?.auto_update ?? false,
     });
@@ -190,6 +192,7 @@ function App() {
         url: bindDraft.url.trim(),
         repo_path: bindDraft.repo_path.trim(),
         ref_: bindDraft.ref_.trim() || "main",
+        credential_ref: bindDraft.credential_ref.trim() || null,
         trusted: bindDraft.trusted,
         auto_update: bindDraft.auto_update,
       });
@@ -443,57 +446,75 @@ function App() {
         <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
       </section>
 
-      <section className="settings-panel" aria-label="扫描路径设置">
+      <section className="settings-panel" aria-label="设置">
         <button
           className="ghost-button settings-toggle"
           onClick={() => setSettingsOpen((current) => !current)}
         >
-          {settingsOpen ? "收起扫描路径" : "扫描路径"}
+          {settingsOpen ? "收起设置" : "设置"}
         </button>
-        <div className="custom-path-chips">
-          {settings.custom_scan_paths.length === 0 ? (
-            <span>默认路径</span>
-          ) : (
-            settings.custom_scan_paths.map((path) => (
-              <code key={path}>{path}</code>
-            ))
-          )}
+        <div className="settings-summary">
+          <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
+          <span>凭据使用本机 Git / SSH 配置</span>
         </div>
         {settingsOpen && (
           <div className="settings-editor">
-            <textarea
-              value={settingsDraft}
-              placeholder="/Users/me/.agent-skills-extra"
-              onChange={(event) => setSettingsDraft(event.target.value)}
-            />
-            {settings.custom_scan_paths.length > 0 && (
-              <div className="path-remove-list">
-                {settings.custom_scan_paths.map((path) => (
-                  <button
-                    className="ghost-button compact"
-                    key={path}
-                    onClick={() => removeCustomPath(path)}
-                  >
-                    移除 {shortPath(path)}
-                  </button>
-                ))}
+            <div className="settings-section">
+              <div>
+                <h3>扫描路径</h3>
+                <p>每行一个额外 Generic Agent Skills 根目录。</p>
               </div>
-            )}
-            <div className="form-actions">
-              <button
-                className="ghost-button compact"
-                disabled={actionBusy === "settings"}
-                onClick={() => handleSaveSettings(false)}
-              >
-                {actionBusy === "settings" ? "保存中" : "保存"}
-              </button>
-              <button
-                className="compact"
-                disabled={actionBusy === "settings" || state === "loading"}
-                onClick={() => handleSaveSettings(true)}
-              >
-                保存并扫描
-              </button>
+              <div className="custom-path-chips">
+                {settings.custom_scan_paths.length === 0 ? (
+                  <span>默认路径</span>
+                ) : (
+                  settings.custom_scan_paths.map((path) => <code key={path}>{path}</code>)
+                )}
+              </div>
+              <textarea
+                value={settingsDraft}
+                placeholder="/Users/me/.agent-skills-extra"
+                onChange={(event) => setSettingsDraft(event.target.value)}
+              />
+              {settings.custom_scan_paths.length > 0 && (
+                <div className="path-remove-list">
+                  {settings.custom_scan_paths.map((path) => (
+                    <button
+                      className="ghost-button compact"
+                      key={path}
+                      onClick={() => removeCustomPath(path)}
+                    >
+                      移除 {shortPath(path)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="form-actions">
+                <button
+                  className="ghost-button compact"
+                  disabled={actionBusy === "settings"}
+                  onClick={() => handleSaveSettings(false)}
+                >
+                  {actionBusy === "settings" ? "保存中" : "保存"}
+                </button>
+                <button
+                  className="compact"
+                  disabled={actionBusy === "settings" || state === "loading"}
+                  onClick={() => handleSaveSettings(true)}
+                >
+                  保存并扫描
+                </button>
+              </div>
+            </div>
+            <div className="settings-section credential-section">
+              <div>
+                <h3>凭据引用</h3>
+                <p>在来源绑定中填写引用名，Metis 只保存名称；真实 token 仍交给本机 Git、SSH agent 或后续 Keychain 接入。</p>
+              </div>
+              <div className="credential-note">
+                <code>github-main</code>
+                <code>work-gitlab-token</code>
+              </div>
             </div>
           </div>
         )}
@@ -658,6 +679,7 @@ function SkillRow({
               <strong>{skill.source.ref_}</strong>
               <span>{skill.source.url}</span>
               <em>{skill.source.repo_path}</em>
+              {skill.source.credential_ref && <small>{skill.source.credential_ref}</small>}
             </div>
           )}
         </div>
@@ -871,6 +893,14 @@ function BindSourceForm({
           onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
         />
       </label>
+      <label>
+        <span>Credential Ref</span>
+        <input
+          value={draft.credential_ref}
+          placeholder="github-main"
+          onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
+        />
+      </label>
       <label className="check-label">
         <input
           checked={draft.trusted}
@@ -1018,6 +1048,7 @@ function emptyBindDraft(): BindDraft {
     url: "",
     repo_path: "",
     ref_: "main",
+    credential_ref: "",
     trusted: false,
     auto_update: false,
   };

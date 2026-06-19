@@ -212,6 +212,23 @@ h1 {
   white-space: nowrap;
 }
 
+.settings-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-summary span {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: rgba(16, 18, 22, 0.68);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .custom-path-chips {
   display: flex;
   flex-wrap: wrap;
@@ -238,9 +255,39 @@ h1 {
 .settings-editor {
   grid-column: 1 / -1;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   border-top: 1px solid #323b45;
   padding-top: 12px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #303843;
+  border-radius: 8px;
+  background: rgba(16, 18, 22, 0.48);
+  padding: 12px;
+}
+
+.settings-section h3 {
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.settings-section p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.credential-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.credential-note code {
+  width: auto;
 }
 
 .path-remove-list {
@@ -501,14 +548,21 @@ h1 {
 }
 
 .source-line span,
-.source-line em {
+.source-line em,
+.source-line small {
   overflow-wrap: anywhere;
 }
 
-.source-line em {
+.source-line em,
+.source-line small {
   grid-column: 2;
   color: var(--subtle);
   font-style: normal;
+}
+
+.source-line small::before {
+  content: "credential: ";
+  color: var(--muted);
 }
 
 .update-summary {
@@ -534,7 +588,7 @@ h1 {
 
 .source-form {
   display: grid;
-  grid-template-columns: minmax(160px, 1.5fr) minmax(140px, 1fr) minmax(90px, 0.5fr);
+  grid-template-columns: minmax(160px, 1.5fr) minmax(140px, 1fr) minmax(90px, 0.5fr) minmax(130px, 0.8fr);
   gap: 10px;
   border-top: 1px solid #323b45;
   padding-top: 12px;

@@ -10,7 +10,7 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 当前阶段
 
-项目处于 **Phase 0 → Phase 1 过渡期**：项目蓝图和架构设计已完成，正在进行 Core Engine API 和 Adapter 接口的详细设计，即将进入 MVP Core 开发。
+项目处于 **Phase 2 Desktop MVP 收口阶段**：Phase 1 的 Core Engine 本地管理闭环已经完成，桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板和凭据引用入口，正在收口 GUI 实机验证与跨平台预览包打包流程。
 
 ## 技术栈
 
@@ -44,7 +44,7 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 
 ## MVP 范围
 
-第一阶段只聚焦本地 skill 管理闭环：
+当前 MVP 聚焦本地 skill 管理闭环：
 
 - 自动识别本机 Codex skills 路径。
 - 自动识别本机 Claude Code skills 路径。
@@ -61,8 +61,19 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 - 更新前自动备份。
 - 更新失败自动回滚。
 - 支持查看更新 diff。
-- 支持私有仓库基础认证，敏感凭据存入系统 keychain。
+- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称，真实凭据仍由本机 Git / SSH agent 或后续 Keychain 接入管理。
 - 支持导出和导入团队 skill 清单。
+
+## 本地验证
+
+```bash
+cargo test
+cargo clippy
+cd apps/desktop && pnpm build
+cd apps/desktop && pnpm tauri build
+```
+
+跨平台预览包通过 GitHub Actions workflow `Desktop Preview Packages` 构建，支持 macOS、Windows 和 Linux artifact。当前不做代码签名、公证或自动发布 GitHub Release。
 
 ## 暂不进入 MVP
 
