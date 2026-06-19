@@ -1,5 +1,6 @@
 use crate::local_state::check_local_modification;
 use chrono::Utc;
+use metis_git_provider::diff::{GitDiffRequest, GitDiffSummary};
 use metis_git_provider::fetch::{GitCliProvider, GitCommandRunner, GitRemoteRef};
 use metis_storage::db::{SkillIndexStore, SourceRecord};
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,13 @@ pub struct DiffSummary {
 
 pub trait RemoteCommitChecker {
     fn remote_commit(&self, source: &SourceRecord) -> Result<String, String>;
+
+    fn diff_summary(
+        &self,
+        source: &SourceRecord,
+        current_commit: &str,
+        target_commit: &str,
+    ) -> Result<DiffSummary, String>;
 }
 
 impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
@@ -47,6 +55,24 @@ impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
             ref_: source.ref_.clone(),
         })
         .map(|commit| commit.commit)
+        .map_err(|error| error.to_string())
+    }
+
+    fn diff_summary(
+        &self,
+        source: &SourceRecord,
+        current_commit: &str,
+        target_commit: &str,
+    ) -> Result<DiffSummary, String> {
+        GitCliProvider::diff_summary(
+            self,
+            &GitDiffRequest {
+                repo_path: source.repo_path.clone(),
+                current_commit: current_commit.to_string(),
+                target_commit: target_commit.to_string(),
+            },
+        )
+        .map(diff_summary_from_git)
         .map_err(|error| error.to_string())
     }
 }
@@ -147,6 +173,16 @@ fn check_one_update<C: RemoteCommitChecker>(
     } else {
         UpdateStatus::UpdateAvailable
     };
+    let diff_summary = if matches!(status, UpdateStatus::UpdateAvailable) {
+        match checker.diff_summary(&source, &current_commit, &remote_commit) {
+            Ok(summary) => Some(summary),
+            Err(reason) => {
+                return failed_result(&skill.id, &skill.name, Some(source), local_modified, reason)
+            }
+        }
+    } else {
+        None
+    };
     let last_checked_at = Utc::now().to_rfc3339();
 
     if let Err(error) = store.update_source_check_result(
@@ -176,7 +212,16 @@ fn check_one_update<C: RemoteCommitChecker>(
         status,
         local_modified,
         commits_behind: None,
-        diff_summary: None,
+        diff_summary,
+    }
+}
+
+fn diff_summary_from_git(summary: GitDiffSummary) -> DiffSummary {
+    DiffSummary {
+        files_added: summary.files_added,
+        files_modified: summary.files_modified,
+        files_deleted: summary.files_deleted,
+        total_changes: summary.total_changes,
     }
 }
 
@@ -211,6 +256,7 @@ mod tests {
 
     struct FakeRemoteChecker {
         commits: HashMap<String, Result<String, String>>,
+        diffs: HashMap<String, Result<DiffSummary, String>>,
         checked_urls: RefCell<Vec<String>>,
     }
 
@@ -218,6 +264,18 @@ mod tests {
         fn new(commits: HashMap<String, Result<String, String>>) -> Self {
             Self {
                 commits,
+                diffs: HashMap::new(),
+                checked_urls: RefCell::new(Vec::new()),
+            }
+        }
+
+        fn with_diffs(
+            commits: HashMap<String, Result<String, String>>,
+            diffs: HashMap<String, Result<DiffSummary, String>>,
+        ) -> Self {
+            Self {
+                commits,
+                diffs,
                 checked_urls: RefCell::new(Vec::new()),
             }
         }
@@ -230,6 +288,18 @@ mod tests {
                 .get(&source.id)
                 .cloned()
                 .unwrap_or_else(|| Err("missing fake source".to_string()))
+        }
+
+        fn diff_summary(
+            &self,
+            source: &SourceRecord,
+            _current_commit: &str,
+            _target_commit: &str,
+        ) -> Result<DiffSummary, String> {
+            self.diffs
+                .get(&source.id)
+                .cloned()
+                .unwrap_or_else(|| Err("missing fake diff".to_string()))
         }
     }
 
@@ -368,10 +438,18 @@ mod tests {
         write_file(&skill_dir.join("SKILL.md"), "# Example\n");
         let mut store = store_with_skill_and_optional_source(&skill_dir, Some("abc123"));
         capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
-        let checker = FakeRemoteChecker::new(HashMap::from([(
-            "source-1".to_string(),
-            Ok("def456".to_string()),
-        )]));
+        let checker = FakeRemoteChecker::with_diffs(
+            HashMap::from([("source-1".to_string(), Ok("def456".to_string()))]),
+            HashMap::from([(
+                "source-1".to_string(),
+                Ok(DiffSummary {
+                    files_added: 0,
+                    files_modified: 1,
+                    files_deleted: 0,
+                    total_changes: 1,
+                }),
+            )]),
+        );
 
         let results = check_updates(
             UpdateCheckOptions {
@@ -391,6 +469,86 @@ mod tests {
                 .and_then(|source| source.remote_commit.as_deref()),
             Some("def456")
         );
+        assert_eq!(
+            results[0].diff_summary,
+            Some(DiffSummary {
+                files_added: 0,
+                files_modified: 1,
+                files_deleted: 0,
+                total_changes: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn check_updates_returns_diff_summary_when_remote_differs() {
+        let root = temp_dir("diff-summary");
+        let skill_dir = root.join("skill");
+        write_file(&skill_dir.join("SKILL.md"), "# Example\n");
+        let mut store = store_with_skill_and_optional_source(&skill_dir, Some("abc123"));
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        let checker = FakeRemoteChecker::with_diffs(
+            HashMap::from([("source-1".to_string(), Ok("def456".to_string()))]),
+            HashMap::from([(
+                "source-1".to_string(),
+                Ok(DiffSummary {
+                    files_added: 1,
+                    files_modified: 2,
+                    files_deleted: 1,
+                    total_changes: 4,
+                }),
+            )]),
+        );
+
+        let results = check_updates(
+            UpdateCheckOptions {
+                skill_ids: vec!["skill-1".to_string()],
+            },
+            &mut store,
+            &checker,
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(results.len(), 1);
+        assert!(matches!(results[0].status, UpdateStatus::UpdateAvailable));
+        assert_eq!(
+            results[0].diff_summary,
+            Some(DiffSummary {
+                files_added: 1,
+                files_modified: 2,
+                files_deleted: 1,
+                total_changes: 4,
+            })
+        );
+    }
+
+    #[test]
+    fn check_updates_returns_check_failed_when_diff_summary_fails() {
+        let root = temp_dir("diff-failure");
+        let skill_dir = root.join("skill");
+        write_file(&skill_dir.join("SKILL.md"), "# Example\n");
+        let mut store = store_with_skill_and_optional_source(&skill_dir, Some("abc123"));
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        let checker = FakeRemoteChecker::with_diffs(
+            HashMap::from([("source-1".to_string(), Ok("def456".to_string()))]),
+            HashMap::from([("source-1".to_string(), Err("diff failed".to_string()))]),
+        );
+
+        let results = check_updates(
+            UpdateCheckOptions {
+                skill_ids: vec!["skill-1".to_string()],
+            },
+            &mut store,
+            &checker,
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(results.len(), 1);
+        assert!(matches!(
+            results[0].status,
+            UpdateStatus::CheckFailed { .. }
+        ));
+        assert_eq!(results[0].diff_summary, None);
     }
 
     #[test]
