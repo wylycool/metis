@@ -27,6 +27,23 @@ pub struct SkillRecord {
     pub last_scanned_at: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceRecord {
+    pub id: String,
+    pub source_type: String,
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+    pub current_commit: Option<String>,
+    pub remote_commit: Option<String>,
+    pub last_checked_at: Option<String>,
+    pub trusted: bool,
+    pub auto_update: bool,
+    pub credential_ref: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
 pub struct SkillIndexStore {
     connection: Connection,
 }
@@ -195,6 +212,169 @@ impl SkillIndexStore {
             .map_err(StorageError::from)
     }
 
+    pub fn get_skill(&self, skill_id: &str) -> Result<Option<SkillRecord>, StorageError> {
+        self.connection
+            .query_row(
+                "
+                SELECT
+                    id,
+                    agent_id,
+                    name,
+                    description,
+                    version,
+                    author,
+                    license,
+                    tags,
+                    category,
+                    install_path,
+                    scope,
+                    metadata_path,
+                    metadata_status,
+                    metadata_error,
+                    source_id,
+                    local_fingerprint,
+                    local_modified,
+                    last_scanned_at
+                FROM skills
+                WHERE id = ?1
+                ",
+                params![skill_id],
+                row_to_skill_record,
+            )
+            .optional()
+            .map_err(StorageError::from)
+    }
+
+    pub fn upsert_source(&self, source: &SourceRecord) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            INSERT INTO sources (
+                id,
+                source_type,
+                url,
+                repo_path,
+                ref_,
+                current_commit,
+                remote_commit,
+                last_checked_at,
+                trusted,
+                auto_update,
+                credential_ref,
+                updated_at
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+                datetime('now')
+            )
+            ON CONFLICT(url, repo_path, ref_) DO UPDATE SET
+                current_commit = excluded.current_commit,
+                remote_commit = excluded.remote_commit,
+                last_checked_at = excluded.last_checked_at,
+                trusted = excluded.trusted,
+                auto_update = excluded.auto_update,
+                credential_ref = excluded.credential_ref,
+                updated_at = datetime('now')
+            ",
+            params![
+                source.id,
+                source.source_type,
+                source.url,
+                source.repo_path,
+                source.ref_,
+                source.current_commit,
+                source.remote_commit,
+                source.last_checked_at,
+                i64::from(source.trusted),
+                i64::from(source.auto_update),
+                source.credential_ref,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn get_source(&self, source_id: &str) -> Result<Option<SourceRecord>, StorageError> {
+        self.connection
+            .query_row(
+                "
+                SELECT
+                    id,
+                    source_type,
+                    url,
+                    repo_path,
+                    ref_,
+                    current_commit,
+                    remote_commit,
+                    last_checked_at,
+                    trusted,
+                    auto_update,
+                    credential_ref,
+                    created_at,
+                    updated_at
+                FROM sources
+                WHERE id = ?1
+                ",
+                params![source_id],
+                row_to_source_record,
+            )
+            .optional()
+            .map_err(StorageError::from)
+    }
+
+    pub fn list_sources(&self) -> Result<Vec<SourceRecord>, StorageError> {
+        let mut statement = self.connection.prepare(
+            "
+            SELECT
+                id,
+                source_type,
+                url,
+                repo_path,
+                ref_,
+                current_commit,
+                remote_commit,
+                last_checked_at,
+                trusted,
+                auto_update,
+                credential_ref,
+                created_at,
+                updated_at
+            FROM sources
+            ORDER BY url, repo_path, ref_
+            ",
+        )?;
+
+        let records = statement
+            .query_map([], row_to_source_record)?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(records)
+    }
+
+    pub fn bind_skill_source(&self, skill_id: &str, source_id: &str) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            UPDATE skills
+            SET source_id = ?1,
+                updated_at = datetime('now')
+            WHERE id = ?2
+            ",
+            params![source_id, skill_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn unbind_skill_source(&self, skill_id: &str) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            UPDATE skills
+            SET source_id = NULL,
+                updated_at = datetime('now')
+            WHERE id = ?1
+            ",
+            params![skill_id],
+        )?;
+        Ok(())
+    }
+
     pub fn applied_migration_versions(&self) -> Result<Vec<i64>, StorageError> {
         let mut statement = self
             .connection
@@ -253,6 +433,24 @@ fn row_to_skill_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<SkillRecord>
         local_fingerprint: row.get(15)?,
         local_modified,
         last_scanned_at: row.get(17)?,
+    })
+}
+
+fn row_to_source_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<SourceRecord> {
+    Ok(SourceRecord {
+        id: row.get(0)?,
+        source_type: row.get(1)?,
+        url: row.get(2)?,
+        repo_path: row.get(3)?,
+        ref_: row.get(4)?,
+        current_commit: row.get(5)?,
+        remote_commit: row.get(6)?,
+        last_checked_at: row.get(7)?,
+        trusted: row.get::<_, i64>(8)? != 0,
+        auto_update: row.get::<_, i64>(9)? != 0,
+        credential_ref: row.get(10)?,
+        created_at: row.get(11)?,
+        updated_at: row.get(12)?,
     })
 }
 
@@ -351,6 +549,40 @@ mod tests {
         }
     }
 
+    fn sample_source(id: &str, trusted: bool, auto_update: bool) -> SourceRecord {
+        SourceRecord {
+            id: id.to_string(),
+            source_type: "git".to_string(),
+            url: "https://github.com/example/metis-skills.git".to_string(),
+            repo_path: "skills/example".to_string(),
+            ref_: "main".to_string(),
+            current_commit: Some("abc123".to_string()),
+            remote_commit: Some("def456".to_string()),
+            last_checked_at: Some("2026-06-19T11:00:00Z".to_string()),
+            trusted,
+            auto_update,
+            credential_ref: Some("github-main".to_string()),
+            created_at: None,
+            updated_at: None,
+        }
+    }
+
+    fn assert_source_business_fields_eq(actual: &SourceRecord, expected: &SourceRecord) {
+        assert_eq!(actual.id, expected.id);
+        assert_eq!(actual.source_type, expected.source_type);
+        assert_eq!(actual.url, expected.url);
+        assert_eq!(actual.repo_path, expected.repo_path);
+        assert_eq!(actual.ref_, expected.ref_);
+        assert_eq!(actual.current_commit, expected.current_commit);
+        assert_eq!(actual.remote_commit, expected.remote_commit);
+        assert_eq!(actual.last_checked_at, expected.last_checked_at);
+        assert_eq!(actual.trusted, expected.trusted);
+        assert_eq!(actual.auto_update, expected.auto_update);
+        assert_eq!(actual.credential_ref, expected.credential_ref);
+        assert!(actual.created_at.is_some());
+        assert!(actual.updated_at.is_some());
+    }
+
     #[test]
     fn open_in_memory_applies_initial_schema_migration() {
         let store = SkillIndexStore::open_in_memory().expect("store should open");
@@ -393,5 +625,100 @@ mod tests {
         let skills = store.list_skills().expect("skills should list");
 
         assert_eq!(skills, vec![updated]);
+    }
+
+    #[test]
+    fn upsert_and_get_source_by_id() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let source = sample_source("source-1", true, false);
+
+        store.upsert_source(&source).expect("source should upsert");
+
+        let stored = store
+            .get_source("source-1")
+            .expect("source lookup should succeed")
+            .expect("source should exist");
+
+        assert_source_business_fields_eq(&stored, &source);
+    }
+
+    #[test]
+    fn upsert_replaces_existing_source_for_same_url_path_and_ref() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let first = sample_source("source-1", false, false);
+        let mut updated = sample_source("source-2", true, true);
+        updated.credential_ref = Some("github-updated".to_string());
+        let mut expected = updated.clone();
+        expected.id = "source-1".to_string();
+
+        store
+            .upsert_source(&first)
+            .expect("first source should upsert");
+        store
+            .upsert_source(&updated)
+            .expect("updated source should upsert");
+
+        let sources = store.list_sources().expect("sources should list");
+
+        assert_eq!(sources.len(), 1);
+        assert_source_business_fields_eq(&sources[0], &expected);
+    }
+
+    #[test]
+    fn bind_and_unbind_skill_source_updates_skill_record() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        let source = sample_source("source-1", true, false);
+        store.upsert_skill(&skill).expect("skill should upsert");
+        store.upsert_source(&source).expect("source should upsert");
+
+        store
+            .bind_skill_source("skill-1", "source-1")
+            .expect("skill source should bind");
+
+        let bound = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        assert_eq!(bound.source_id.as_deref(), Some("source-1"));
+
+        store
+            .unbind_skill_source("skill-1")
+            .expect("skill source should unbind");
+
+        let unbound = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        assert_eq!(unbound.source_id, None);
+    }
+
+    #[test]
+    fn upsert_source_preserves_existing_id_when_bound_skill_references_it() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let skill = sample_skill("skill-1", "Example Skill", Some("First description"));
+        let source = sample_source("source-1", false, false);
+        let updated = sample_source("source-2", true, true);
+        store.upsert_skill(&skill).expect("skill should upsert");
+        store.upsert_source(&source).expect("source should upsert");
+        store
+            .bind_skill_source("skill-1", "source-1")
+            .expect("skill source should bind");
+
+        store
+            .upsert_source(&updated)
+            .expect("source should update without changing its primary key");
+
+        let bound = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        let sources = store.list_sources().expect("sources should list");
+
+        assert_eq!(bound.source_id.as_deref(), Some("source-1"));
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].id, "source-1");
+        assert!(sources[0].trusted);
+        assert!(sources[0].auto_update);
     }
 }
