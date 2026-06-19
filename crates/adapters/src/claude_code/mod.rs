@@ -1,3 +1,4 @@
+use crate::standard::{discover_standard_skill_dirs, parse_standard_skill_metadata};
 use crate::traits::{
     AdapterError, AgentAdapter, DirectoryFormat, SkillMetadata, SkillScope, SkillSearchPath,
 };
@@ -39,14 +40,12 @@ impl AgentAdapter for ClaudeCodeAdapter {
         path.contains(".claude/skills") || path.contains("claude/skills")
     }
 
-    fn discover_skill_dirs(&self, _search_root: &str) -> Result<Vec<String>, AdapterError> {
-        // TODO: Phase 1 — 实现目录扫描
-        Ok(vec![])
+    fn discover_skill_dirs(&self, search_root: &str) -> Result<Vec<String>, AdapterError> {
+        discover_standard_skill_dirs(search_root)
     }
 
-    fn parse_metadata(&self, _skill_dir: &str) -> Result<SkillMetadata, AdapterError> {
-        // TODO: Phase 1 — 实现 SKILL.md 解析
-        Err(AdapterError::Internal("not implemented".into()))
+    fn parse_metadata(&self, skill_dir: &str) -> Result<SkillMetadata, AdapterError> {
+        parse_standard_skill_metadata(skill_dir)
     }
 
     fn directory_format(&self) -> DirectoryFormat {

@@ -1,7 +1,10 @@
-use crate::traits::AgentAdapter;
 use crate::claude_code::ClaudeCodeAdapter;
 use crate::codex::CodexAdapter;
 use crate::generic::GenericAgentSkillsAdapter;
+use crate::hermes::HermesAdapter;
+use crate::openclaw::OpenClawAdapter;
+use crate::opencode::OpencodeAdapter;
+use crate::traits::AgentAdapter;
 
 /// 管理所有已注册的 Adapter
 pub struct AdapterRegistry {
@@ -25,7 +28,10 @@ impl AdapterRegistry {
 
     /// 按 agent_id 查找
     pub fn get(&self, agent_id: &str) -> Option<&dyn AgentAdapter> {
-        self.adapters.iter().find(|a| a.agent_id() == agent_id).map(|a| a.as_ref())
+        self.adapters
+            .iter()
+            .find(|a| a.agent_id() == agent_id)
+            .map(|a| a.as_ref())
     }
 
     /// 获取已启用的 adapter 列表（按 enabled_agents 过滤）
@@ -42,6 +48,9 @@ impl AdapterRegistry {
         let mut registry = Self::new();
         registry.register(Box::new(CodexAdapter::new()));
         registry.register(Box::new(ClaudeCodeAdapter::new()));
+        registry.register(Box::new(OpenClawAdapter::new()));
+        registry.register(Box::new(HermesAdapter::new()));
+        registry.register(Box::new(OpencodeAdapter::new()));
         registry.register(Box::new(GenericAgentSkillsAdapter::new(vec![])));
         registry
     }
@@ -50,5 +59,32 @@ impl AdapterRegistry {
 impl Default for AdapterRegistry {
     fn default() -> Self {
         Self::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_registry_contains_all_mvp_adapters() {
+        let registry = AdapterRegistry::default();
+        let agent_ids = registry
+            .all()
+            .iter()
+            .map(|adapter| adapter.agent_id())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            agent_ids,
+            vec![
+                "codex",
+                "claude-code",
+                "openclaw",
+                "hermes",
+                "opencode",
+                "generic"
+            ]
+        );
     }
 }

@@ -6,9 +6,16 @@
 pub mod claude_code;
 pub mod codex;
 pub mod generic;
+pub mod hermes;
+pub mod openclaw;
+pub mod opencode;
 pub mod registry;
+pub mod standard;
 pub mod traits;
 
 // Re-export
 pub use registry::AdapterRegistry;
-pub use traits::{AdapterError, AgentAdapter, DirectoryFormat, MetadataSource, SkillMetadata, SkillScope, SkillSearchPath,};
+pub use traits::{
+    AdapterError, AgentAdapter, DirectoryFormat, MetadataSource, SkillMetadata, SkillScope,
+    SkillSearchPath,
+};

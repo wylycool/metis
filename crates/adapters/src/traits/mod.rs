@@ -124,10 +124,7 @@ pub enum AdapterError {
     NotInstalled { agent_name: String },
 
     #[error("Agent 版本不支持: 当前 {current}, 需要 {required}")]
-    UnsupportedVersion {
-        current: String,
-        required: String,
-    },
+    UnsupportedVersion { current: String, required: String },
 
     #[error("内部错误: {0}")]
     Internal(String),
