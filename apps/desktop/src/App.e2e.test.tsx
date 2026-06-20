@@ -92,6 +92,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
+    await user.click(await screen.findByTestId("workspace-tab-governance"));
     expect(await screen.findByText("Beta 稳定化")).toBeTruthy();
     await user.click(screen.getByTestId("export-environment-report"));
 
@@ -130,6 +131,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
+    await user.click(await screen.findByTestId("workspace-tab-governance"));
     expect(await screen.findByText("团队清单合规")).toBeTruthy();
     fireEvent.change(screen.getByTestId("team-manifest-input"), {
       target: { value: JSON.stringify(manifest) },
@@ -154,6 +156,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
+    await user.click(await screen.findByTestId("workspace-tab-governance"));
     expect(await screen.findByText("团队清单合规")).toBeTruthy();
     await user.type(screen.getByTestId("team-manifest-file-path"), "/tmp/team-manifest.json");
     await user.click(screen.getByTestId("load-team-manifest-from-file"));
@@ -197,7 +200,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByText("设置"));
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
     await user.type(screen.getByTestId("team-policy-path"), "/tmp/team-policy.json");
     await user.click(screen.getByText("保存"));
     expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
@@ -207,6 +210,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByText("可信来源 1 个")).toBeTruthy();
     expect(screen.getByText("自动更新要求 trusted source")).toBeTruthy();
 
+    await user.click(screen.getByTestId("workspace-tab-skills"));
     const skillRow = await screen.findByTestId("skill-row-e2e-skill");
     await user.click(within(skillRow).getByTestId("open-bind-source-e2e-skill"));
     await user.type(
@@ -234,7 +238,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByText("设置"));
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
     await user.type(screen.getByTestId("team-policy-path"), "/tmp/team-policy.json");
     await user.click(screen.getByText("保存"));
     expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
@@ -257,7 +261,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByText("设置"));
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
     await user.type(
       screen.getByTestId("enterprise-proxy-url"),
       "http://proxy.corp.example:8080",
@@ -284,6 +288,36 @@ describe("Metis desktop GUI main flow", () => {
         },
       }),
     });
+  });
+
+  test("phase5 organizes features into skills governance and settings workspaces", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Skills/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Governance/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Settings/ })).toBeTruthy();
+    expect(screen.getByTestId("workspace-tab-skills").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Skill 索引")).toBeTruthy();
+    expect(screen.queryByText("团队清单合规")).toBeNull();
+
+    await user.click(screen.getByTestId("workspace-tab-governance"));
+    expect(await screen.findByTestId("workspace-governance")).toBeTruthy();
+    expect(screen.getByTestId("workspace-tab-governance").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByText("团队清单合规")).toBeTruthy();
+    expect(screen.getByText("本地审计导出")).toBeTruthy();
+    expect(screen.queryByText("Skill 索引")).toBeNull();
+
+    await user.click(screen.getByTestId("workspace-tab-settings"));
+    expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
+    expect(screen.getByTestId("workspace-tab-settings").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("扫描路径")).toBeTruthy();
+    expect(screen.getByText("企业网络")).toBeTruthy();
+    expect(screen.queryByText("团队清单合规")).toBeNull();
   });
 });
 

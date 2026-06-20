@@ -196,6 +196,63 @@ h1 {
   margin-bottom: 14px;
 }
 
+.workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(16, 18, 22, 0.78);
+}
+
+.workspace-tab {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+.workspace-tab strong {
+  min-width: 22px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #d8e3de;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.workspace-tab.active {
+  color: var(--text);
+  border-color: rgba(208, 168, 79, 0.52);
+  background: rgba(208, 168, 79, 0.12);
+}
+
+.workspace-tab.active strong {
+  color: #151515;
+  background: var(--gold);
+}
+
+.workspace-pane {
+  animation: pane-in 140ms ease-out;
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .beta-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

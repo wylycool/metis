@@ -48,6 +48,8 @@ interface BindDraft {
   auto_update: boolean;
 }
 
+type WorkspaceKey = "skills" | "governance" | "settings";
+
 function App() {
   const [agents, setAgents] = useState<DesktopAgentStatus[]>([]);
   const [skills, setSkills] = useState<DesktopSkill[]>([]);
@@ -74,13 +76,13 @@ function App() {
   );
   const [teamPolicyAuditReport, setTeamPolicyAuditReport] =
     useState<DesktopTeamPolicyAuditReport | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<DesktopError | null>(null);
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
   const didBootstrap = useRef(false);
 
   const groupedSkills = useMemo(() => {
@@ -721,6 +723,29 @@ function App() {
         </div>
       </header>
 
+      <nav className="workspace-tabs" aria-label="工作区导航">
+        <WorkspaceTab
+          active={activeWorkspace === "skills"}
+          count={skills.length}
+          label="Skills"
+          testId="workspace-tab-skills"
+          onClick={() => setActiveWorkspace("skills")}
+        />
+        <WorkspaceTab
+          active={activeWorkspace === "governance"}
+          count={boundCount}
+          label="Governance"
+          testId="workspace-tab-governance"
+          onClick={() => setActiveWorkspace("governance")}
+        />
+        <WorkspaceTab
+          active={activeWorkspace === "settings"}
+          label="Settings"
+          testId="workspace-tab-settings"
+          onClick={() => setActiveWorkspace("settings")}
+        />
+      </nav>
+
       <section className="summary-strip" aria-label="扫描摘要">
         <SummaryMetric label="已发现 skills" value={skills.length.toString()} />
         <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
@@ -728,199 +753,200 @@ function App() {
         <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
       </section>
 
-      <section className="beta-panel" aria-label="Beta 稳定化">
-        <div>
-          <h2>Beta 稳定化</h2>
-          <p>
-            Trusted source {trustedSourceCount} 个，Auto update {autoUpdateCount} 个，候选{" "}
-            {trustedAutoUpdateSkills.length} 个。
-          </p>
-        </div>
-        <div className="beta-actions">
-          <button
-            className="ghost-button compact"
-            data-testid="export-environment-report"
-            disabled={actionBusy === "environment-report"}
-            onClick={handleExportEnvironmentReport}
-          >
-            {actionBusy === "environment-report" ? "生成中" : "导出环境报告"}
-          </button>
-          <button
-            className="compact"
-            data-testid="run-auto-update"
-            disabled={actionBusy === "auto-update" || skills.length === 0}
-            onClick={handleRunAutoUpdate}
-          >
-            {actionBusy === "auto-update" ? "更新中" : "受控自动更新"}
-          </button>
-        </div>
-        <div className="file-action-row">
-          <input
-            data-testid="environment-report-export-path"
-            value={environmentReportExportPath}
-            placeholder="/tmp/metis-environment-report.json"
-            onChange={(event) => setEnvironmentReportExportPath(event.target.value)}
-          />
-          <button
-            className="ghost-button compact"
-            data-testid="export-environment-report-to-file"
-            disabled={
-              actionBusy === "environment-report-file" ||
-              environmentReportExportPath.trim().length === 0
-            }
-            onClick={handleExportEnvironmentReportToFile}
-          >
-            {actionBusy === "environment-report-file" ? "写出中" : "写出环境报告"}
-          </button>
-        </div>
-        {environmentReport && (
-          <pre className="environment-report-preview">
-            {JSON.stringify(environmentReport, null, 2)}
-          </pre>
-        )}
-      </section>
+      {actionError && <InlineError error={actionError} />}
+      {actionMessage && <div className="inline-success">{actionMessage}</div>}
 
-      <section className="team-compliance-panel" aria-label="团队清单合规">
-        <div className="team-compliance-header">
-          <div>
-            <h2>团队清单合规</h2>
-            <p>版本锁定、来源绑定和本地修改状态。</p>
-          </div>
-          <button
-            className="compact"
-            data-testid="check-team-compliance"
-            disabled={actionBusy === "team-compliance" || teamManifestDraft.trim().length === 0}
-            onClick={handleCheckTeamCompliance}
-          >
-            {actionBusy === "team-compliance" ? "校验中" : "校验清单"}
-          </button>
-        </div>
-        <div className="file-action-row">
-          <input
-            data-testid="team-manifest-file-path"
-            value={teamManifestFilePath}
-            placeholder="/tmp/team-manifest.json"
-            onChange={(event) => setTeamManifestFilePath(event.target.value)}
-          />
-          <button
-            className="ghost-button compact"
-            data-testid="load-team-manifest-from-file"
-            disabled={
-              actionBusy === "team-manifest-file" || teamManifestFilePath.trim().length === 0
-            }
-            onClick={handleLoadTeamManifestFromFile}
-          >
-            {actionBusy === "team-manifest-file" ? "载入中" : "从文件载入"}
-          </button>
-        </div>
-        <textarea
-          className="team-manifest-input"
-          data-testid="team-manifest-input"
-          value={teamManifestDraft}
-          placeholder='{"version":"1","skills":[]}'
-          onChange={(event) => setTeamManifestDraft(event.target.value)}
-        />
-        {teamComplianceReport && (
-          <div className="team-compliance-result">
-            <div className="team-compliance-summary">
-              <SummaryMetric
-                label="清单 skills"
-                value={teamComplianceReport.summary.total.toString()}
-              />
-              <SummaryMetric
-                label="符合版本"
-                value={teamComplianceReport.summary.installed.toString()}
-              />
-              <SummaryMetric
-                label="缺失"
-                value={teamComplianceReport.summary.missing.toString()}
-              />
-              <SummaryMetric
-                label="版本不一致"
-                value={teamComplianceReport.summary.version_mismatch.toString()}
-              />
-              <SummaryMetric
-                label="本地修改"
-                value={teamComplianceReport.summary.local_modified.toString()}
-              />
-              <SummaryMetric
-                label="来源不一致"
-                value={teamComplianceReport.summary.source_mismatch.toString()}
-              />
+      {activeWorkspace === "governance" && (
+        <section className="workspace-pane" data-testid="workspace-governance">
+          <section className="beta-panel" aria-label="Beta 稳定化">
+            <div>
+              <h2>Beta 稳定化</h2>
+              <p>
+                Trusted source {trustedSourceCount} 个，Auto update {autoUpdateCount} 个，候选{" "}
+                {trustedAutoUpdateSkills.length} 个。
+              </p>
             </div>
-            <div className="team-compliance-list">
-              {teamComplianceReport.items.map((item) => (
-                <TeamComplianceRow key={`${item.agent_id}:${item.name}`} item={item} />
-              ))}
+            <div className="beta-actions">
+              <button
+                className="ghost-button compact"
+                data-testid="export-environment-report"
+                disabled={actionBusy === "environment-report"}
+                onClick={handleExportEnvironmentReport}
+              >
+                {actionBusy === "environment-report" ? "生成中" : "导出环境报告"}
+              </button>
+              <button
+                className="compact"
+                data-testid="run-auto-update"
+                disabled={actionBusy === "auto-update" || skills.length === 0}
+                onClick={handleRunAutoUpdate}
+              >
+                {actionBusy === "auto-update" ? "更新中" : "受控自动更新"}
+              </button>
             </div>
-            <pre className="environment-report-preview">
-              {JSON.stringify(teamComplianceReport, null, 2)}
-            </pre>
             <div className="file-action-row">
               <input
-                data-testid="team-compliance-export-path"
-                value={teamComplianceExportPath}
-                placeholder="/tmp/metis-team-compliance-report.json"
-                onChange={(event) => setTeamComplianceExportPath(event.target.value)}
+                data-testid="environment-report-export-path"
+                value={environmentReportExportPath}
+                placeholder="/tmp/metis-environment-report.json"
+                onChange={(event) => setEnvironmentReportExportPath(event.target.value)}
               />
               <button
                 className="ghost-button compact"
-                data-testid="export-team-compliance-report"
+                data-testid="export-environment-report-to-file"
                 disabled={
-                  actionBusy === "team-compliance-export" ||
-                  teamComplianceExportPath.trim().length === 0
+                  actionBusy === "environment-report-file" ||
+                  environmentReportExportPath.trim().length === 0
                 }
-                onClick={handleExportTeamComplianceReport}
+                onClick={handleExportEnvironmentReportToFile}
               >
-                {actionBusy === "team-compliance-export" ? "写出中" : "写出合规报告"}
+                {actionBusy === "environment-report-file" ? "写出中" : "写出环境报告"}
               </button>
             </div>
+            {environmentReport && (
+              <pre className="environment-report-preview">
+                {JSON.stringify(environmentReport, null, 2)}
+              </pre>
+            )}
+          </section>
+
+          <section className="team-compliance-panel" aria-label="团队清单合规">
+            <div className="team-compliance-header">
+              <div>
+                <h2>团队清单合规</h2>
+                <p>版本锁定、来源绑定和本地修改状态。</p>
+              </div>
+              <button
+                className="compact"
+                data-testid="check-team-compliance"
+                disabled={actionBusy === "team-compliance" || teamManifestDraft.trim().length === 0}
+                onClick={handleCheckTeamCompliance}
+              >
+                {actionBusy === "team-compliance" ? "校验中" : "校验清单"}
+              </button>
+            </div>
+            <div className="file-action-row">
+              <input
+                data-testid="team-manifest-file-path"
+                value={teamManifestFilePath}
+                placeholder="/tmp/team-manifest.json"
+                onChange={(event) => setTeamManifestFilePath(event.target.value)}
+              />
+              <button
+                className="ghost-button compact"
+                data-testid="load-team-manifest-from-file"
+                disabled={
+                  actionBusy === "team-manifest-file" || teamManifestFilePath.trim().length === 0
+                }
+                onClick={handleLoadTeamManifestFromFile}
+              >
+                {actionBusy === "team-manifest-file" ? "载入中" : "从文件载入"}
+              </button>
+            </div>
+            <textarea
+              className="team-manifest-input"
+              data-testid="team-manifest-input"
+              value={teamManifestDraft}
+              placeholder='{"version":"1","skills":[]}'
+              onChange={(event) => setTeamManifestDraft(event.target.value)}
+            />
+            {teamComplianceReport && (
+              <div className="team-compliance-result">
+                <div className="team-compliance-summary">
+                  <SummaryMetric
+                    label="清单 skills"
+                    value={teamComplianceReport.summary.total.toString()}
+                  />
+                  <SummaryMetric
+                    label="符合版本"
+                    value={teamComplianceReport.summary.installed.toString()}
+                  />
+                  <SummaryMetric
+                    label="缺失"
+                    value={teamComplianceReport.summary.missing.toString()}
+                  />
+                  <SummaryMetric
+                    label="版本不一致"
+                    value={teamComplianceReport.summary.version_mismatch.toString()}
+                  />
+                  <SummaryMetric
+                    label="本地修改"
+                    value={teamComplianceReport.summary.local_modified.toString()}
+                  />
+                  <SummaryMetric
+                    label="来源不一致"
+                    value={teamComplianceReport.summary.source_mismatch.toString()}
+                  />
+                </div>
+                <div className="team-compliance-list">
+                  {teamComplianceReport.items.map((item) => (
+                    <TeamComplianceRow key={`${item.agent_id}:${item.name}`} item={item} />
+                  ))}
+                </div>
+                <pre className="environment-report-preview">
+                  {JSON.stringify(teamComplianceReport, null, 2)}
+                </pre>
+                <div className="file-action-row">
+                  <input
+                    data-testid="team-compliance-export-path"
+                    value={teamComplianceExportPath}
+                    placeholder="/tmp/metis-team-compliance-report.json"
+                    onChange={(event) => setTeamComplianceExportPath(event.target.value)}
+                  />
+                  <button
+                    className="ghost-button compact"
+                    data-testid="export-team-compliance-report"
+                    disabled={
+                      actionBusy === "team-compliance-export" ||
+                      teamComplianceExportPath.trim().length === 0
+                    }
+                    onClick={handleExportTeamComplianceReport}
+                  >
+                    {actionBusy === "team-compliance-export" ? "写出中" : "写出合规报告"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="governance-audit-panel" aria-label="本地审计导出">
+            <div>
+              <h2>本地审计导出</h2>
+              <p>导出最近 200 条本机审计事件，用于团队只读审计和问题追溯。</p>
+            </div>
+            <div className="file-action-row">
+              <input
+                data-testid="audit-log-export-path"
+                value={auditLogExportPath}
+                placeholder="/tmp/metis-audit-log-report.json"
+                onChange={(event) => setAuditLogExportPath(event.target.value)}
+              />
+              <button
+                className="ghost-button compact"
+                data-testid="export-audit-log-report"
+                disabled={actionBusy === "audit-log-export" || auditLogExportPath.trim().length === 0}
+                onClick={handleExportAuditLogReport}
+              >
+                {actionBusy === "audit-log-export" ? "写出中" : "写出审计日志"}
+              </button>
+            </div>
+          </section>
+        </section>
+      )}
+
+      {activeWorkspace === "settings" && (
+        <section className="settings-panel workspace-pane" aria-label="配置" data-testid="workspace-settings">
+          <div className="settings-summary">
+            <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
+            <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
+            <span>{settings.enterprise_network?.proxy_url ? "已配置企业代理" : "未配置企业代理"}</span>
+            <span>
+              {settings.enterprise_network?.certificate_authority_bundle_path
+                ? "已配置企业 CA bundle"
+                : "未配置企业 CA bundle"}
+            </span>
+            <span>凭据使用本机 Git / SSH 配置</span>
           </div>
-        )}
-      </section>
-
-      <section className="governance-audit-panel" aria-label="本地审计导出">
-        <div>
-          <h2>本地审计导出</h2>
-          <p>导出最近 200 条本机审计事件，用于团队只读审计和问题追溯。</p>
-        </div>
-        <div className="file-action-row">
-          <input
-            data-testid="audit-log-export-path"
-            value={auditLogExportPath}
-            placeholder="/tmp/metis-audit-log-report.json"
-            onChange={(event) => setAuditLogExportPath(event.target.value)}
-          />
-          <button
-            className="ghost-button compact"
-            data-testid="export-audit-log-report"
-            disabled={actionBusy === "audit-log-export" || auditLogExportPath.trim().length === 0}
-            onClick={handleExportAuditLogReport}
-          >
-            {actionBusy === "audit-log-export" ? "写出中" : "写出审计日志"}
-          </button>
-        </div>
-      </section>
-
-      <section className="settings-panel" aria-label="设置">
-        <button
-          className="ghost-button settings-toggle"
-          onClick={() => setSettingsOpen((current) => !current)}
-        >
-          {settingsOpen ? "收起设置" : "设置"}
-        </button>
-        <div className="settings-summary">
-          <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
-          <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
-          <span>{settings.enterprise_network?.proxy_url ? "已配置企业代理" : "未配置企业代理"}</span>
-          <span>
-            {settings.enterprise_network?.certificate_authority_bundle_path
-              ? "已配置企业 CA bundle"
-              : "未配置企业 CA bundle"}
-          </span>
-          <span>凭据使用本机 Git / SSH 配置</span>
-        </div>
-        {settingsOpen && (
           <div className="settings-editor">
             <div className="settings-section">
               <div>
@@ -1080,76 +1106,75 @@ function App() {
               </div>
             </div>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      <main className="workspace">
-        <aside className="agent-rail" aria-label="Agent 分组">
-          <div className="rail-heading">
-            <span>Agent</span>
-            <strong>{agents.length}</strong>
-          </div>
-          <div className="agent-list">
-            {groupedSkills.map((agent) => (
-              <div className="agent-row" key={agent.agent_id}>
-                <div>
-                  <strong>{agent.agent_name}</strong>
-                  <span>{agent.agent_id}</span>
-                </div>
-                <b>{agent.skills.length}</b>
-              </div>
-            ))}
-          </div>
-        </aside>
-
-        <section className="skill-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Skill 索引</h2>
-              <p>{statusText(state, skills.length)}</p>
+      {activeWorkspace === "skills" && (
+        <main className="workspace workspace-pane" data-testid="workspace-skills">
+          <aside className="agent-rail" aria-label="Agent 分组">
+            <div className="rail-heading">
+              <span>Agent</span>
+              <strong>{agents.length}</strong>
             </div>
-            {warnings.length > 0 && (
-              <span className="warning-pill">{warnings.length} 条 warning</span>
-            )}
-          </div>
-
-          {actionError && <InlineError error={actionError} />}
-          {actionMessage && <div className="inline-success">{actionMessage}</div>}
-
-          {state === "loading" && <LoadingState />}
-          {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
-          {state === "loaded" && skills.length === 0 && <EmptyState onScan={handleScan} />}
-          {state === "loaded" && skills.length > 0 && (
-            <div className="skill-list">
-              {skills.map((skill) => (
-                <SkillRow
-                  key={skill.id}
-                  skill={skill}
-                  updateResult={updateResults[skill.id]}
-                  diffDetail={diffDetails[skill.id]}
-                  diffError={diffError[skill.id]}
-                  backups={backups[skill.id] ?? []}
-                  backupOpen={backupPanels[skill.id] ?? false}
-                  backupError={backupError[skill.id]}
-                  isBinding={bindingSkillId === skill.id}
-                  bindDraft={bindDraft}
-                  busyKey={actionBusy}
-                  onOpenBind={() => openBindForm(skill)}
-                  onCancelBind={() => setBindingSkillId(null)}
-                  onDraftChange={setBindDraft}
-                  onBind={() => handleBindSource(skill.id)}
-                  onUnbind={() => handleUnbindSource(skill.id)}
-                  onCheck={() => handleCheckUpdates([skill.id])}
-                  onToggleDiff={() => handleToggleDiff(skill.id)}
-                  onApplyUpdate={() => handleApplyUpdate(skill.id)}
-                  onToggleBackups={() => handleToggleBackups(skill.id)}
-                  onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
-                />
+            <div className="agent-list">
+              {groupedSkills.map((agent) => (
+                <div className="agent-row" key={agent.agent_id}>
+                  <div>
+                    <strong>{agent.agent_name}</strong>
+                    <span>{agent.agent_id}</span>
+                  </div>
+                  <b>{agent.skills.length}</b>
+                </div>
               ))}
             </div>
-          )}
-        </section>
-      </main>
+          </aside>
+
+          <section className="skill-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Skill 索引</h2>
+                <p>{statusText(state, skills.length)}</p>
+              </div>
+              {warnings.length > 0 && (
+                <span className="warning-pill">{warnings.length} 条 warning</span>
+              )}
+            </div>
+
+            {state === "loading" && <LoadingState />}
+            {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
+            {state === "loaded" && skills.length === 0 && <EmptyState onScan={handleScan} />}
+            {state === "loaded" && skills.length > 0 && (
+              <div className="skill-list">
+                {skills.map((skill) => (
+                  <SkillRow
+                    key={skill.id}
+                    skill={skill}
+                    updateResult={updateResults[skill.id]}
+                    diffDetail={diffDetails[skill.id]}
+                    diffError={diffError[skill.id]}
+                    backups={backups[skill.id] ?? []}
+                    backupOpen={backupPanels[skill.id] ?? false}
+                    backupError={backupError[skill.id]}
+                    isBinding={bindingSkillId === skill.id}
+                    bindDraft={bindDraft}
+                    busyKey={actionBusy}
+                    onOpenBind={() => openBindForm(skill)}
+                    onCancelBind={() => setBindingSkillId(null)}
+                    onDraftChange={setBindDraft}
+                    onBind={() => handleBindSource(skill.id)}
+                    onUnbind={() => handleUnbindSource(skill.id)}
+                    onCheck={() => handleCheckUpdates([skill.id])}
+                    onToggleDiff={() => handleToggleDiff(skill.id)}
+                    onApplyUpdate={() => handleApplyUpdate(skill.id)}
+                    onToggleBackups={() => handleToggleBackups(skill.id)}
+                    onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+      )}
 
       {warnings.length > 0 && (
         <section className="warning-panel" aria-label="扫描警告">
@@ -1172,6 +1197,32 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function WorkspaceTab({
+  active,
+  count,
+  label,
+  testId,
+  onClick,
+}: {
+  active: boolean;
+  count?: number;
+  label: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`workspace-tab ${active ? "active" : ""}`}
+      data-testid={testId}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      {count !== undefined && <strong>{count}</strong>}
+    </button>
   );
 }
 
