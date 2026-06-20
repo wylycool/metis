@@ -6,6 +6,9 @@ on:
     tags:
       - "desktop-v*"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build ${{ matrix.platform.name }}
@@ -81,3 +84,74 @@ jobs:
           name: ${{ matrix.platform.artifact }}
           path: ${{ matrix.platform.bundle }}
           if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download preview bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: release-downloads
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          find release-downloads -type f \( \
+            -name "*.dmg" -o \
+            -name "*.exe" -o \
+            -name "*.msi" -o \
+            -name "*.deb" -o \
+            -name "*.AppImage" \
+          \) -print0 | while IFS= read -r -d '' file; do
+            artifact_dir="$(basename "$(dirname "$(dirname "$file")")")"
+            parent_dir="$(basename "$(dirname "$file")")"
+            base_name="$(basename "$file")"
+            target_name="$base_name"
+            if [[ -e "release-assets/$target_name" ]]; then
+              target_name="${artifact_dir}-${parent_dir}-${base_name}"
+            fi
+            cp "$file" "release-assets/$target_name"
+          done
+
+          asset_count="$(find release-assets -maxdepth 1 -type f | wc -l | tr -d ' ')"
+          if [[ "$asset_count" -eq 0 ]]; then
+            echo "No release assets were collected from workflow artifacts."
+            exit 1
+          fi
+
+          (
+            cd release-assets
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 shasum -a 256 > SHA256SUMS
+          )
+
+          ls -la release-assets
+
+      - name: Create or update prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* \
+              --title "Metis ${GITHUB_REF_NAME}" \
+              --notes-file docs/release-notes/desktop-beta.md \
+              --prerelease \
+              --verify-tag
+          fi

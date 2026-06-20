@@ -78,6 +78,17 @@ cd apps/desktop && pnpm tauri:build:mac-universal
 
 macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已在 run `27862207405` 成功构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
 
+## 从 GitHub Releases 安装
+
+Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。首个 Beta tag 为 `desktop-v0.1.0-beta.1`。
+
+- macOS：下载 universal `.dmg`，挂载后拖拽或启动 Metis。当前包未签名和公证，首次启动可能需要右键打开，或到系统设置中允许打开。
+- Windows：下载 Windows installer。当前包未做 Authenticode 签名，SmartScreen 可能提示未知发布者，需要选择继续运行。
+- Linux：下载 `.deb` 或 `.AppImage`；AppImage 如无执行权限，可先执行 `chmod +x <file>.AppImage`。
+- 校验：Release 中的 `SHA256SUMS` 可用于核对下载文件完整性，macOS/Linux 可运行 `shasum -a 256 -c SHA256SUMS`。
+
+签名、公证和 Windows Authenticode 属于后续可选信任增强，不阻塞开源 Beta 通过 GitHub Releases 分发。
+
 ## 暂不进入 MVP
 
 以下方向重要，但不进入第一阶段：
