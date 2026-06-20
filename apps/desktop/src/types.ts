@@ -67,6 +67,20 @@ export interface DesktopBindSourceRequest {
   auto_update: boolean;
 }
 
+export interface DesktopPreviewRemoteSkillSourceRequest {
+  url: string;
+  repo_path: string;
+  ref_: string;
+}
+
+export interface DesktopRemoteSkillPreview {
+  name: string;
+  description?: string | null;
+  install_name: string;
+  commit: string;
+  repo_path: string;
+}
+
 export interface DesktopUpdateCheckRequest {
   skill_ids: string[];
 }

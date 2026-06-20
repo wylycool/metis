@@ -7,6 +7,8 @@ import type {
   DesktopDiffDetail,
   DesktopEnvironmentReport,
   DesktopFileExportResult,
+  DesktopPreviewRemoteSkillSourceRequest,
+  DesktopRemoteSkillPreview,
   DesktopRestoreBackupRequest,
   DesktopRestoreBackupResult,
   DesktopScanResponse,
@@ -59,6 +61,12 @@ export function bindSkillSource(
 
 export function unbindSkillSource(skillId: string): Promise<void> {
   return invoke("unbind_skill_source", { skillId });
+}
+
+export function previewRemoteSkillSource(
+  request: DesktopPreviewRemoteSkillSourceRequest,
+): Promise<DesktopRemoteSkillPreview> {
+  return invoke("preview_remote_skill_source", { request });
 }
 
 export function checkSkillUpdates(

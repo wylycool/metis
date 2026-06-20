@@ -17,6 +17,10 @@ use metis_core::lockfile::{
     TeamManifestComplianceReport as CoreTeamManifestComplianceReport,
     TeamManifestComplianceSummary as CoreTeamManifestComplianceSummary,
 };
+use metis_core::preview::{
+    preview_remote_skill_source as core_preview_remote_skill_source,
+    PreviewRemoteSkillSourceOptions, RemoteSkillPreview as CoreRemoteSkillPreview,
+};
 use metis_core::rollback::{
     list_backups as core_list_backups, restore_backup as core_restore_backup,
     BackupSummary as CoreBackupSummary, RestoreBackupOptions, RestoreResult as CoreRestoreResult,
@@ -188,6 +192,22 @@ pub struct DesktopBindSourceRequest {
     pub credential_ref: Option<String>,
     pub trusted: bool,
     pub auto_update: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopPreviewRemoteSkillSourceRequest {
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopRemoteSkillPreview {
+    pub name: String,
+    pub description: Option<String>,
+    pub install_name: String,
+    pub commit: String,
+    pub repo_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -637,6 +657,25 @@ pub fn unbind_skill_source_for_state(
     core_unbind_source(&skill_id, &store).map_err(|error| error.to_string())
 }
 
+pub fn preview_remote_skill_source_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    request: DesktopPreviewRemoteSkillSourceRequest,
+    checker: &C,
+) -> Result<DesktopRemoteSkillPreview, String> {
+    state.ensure_dirs()?;
+    core_preview_remote_skill_source(
+        PreviewRemoteSkillSourceOptions {
+            url: request.url,
+            repo_path: request.repo_path,
+            ref_: request.ref_,
+            cache_dir: state.cache_root().to_string_lossy().to_string(),
+        },
+        checker,
+    )
+    .map(desktop_remote_skill_preview)
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
 pub fn check_skill_updates_for_state_with_checker<C: RemoteCommitChecker>(
     state: &DesktopAppState,
     request: DesktopUpdateCheckRequest,
@@ -925,6 +964,15 @@ fn unbind_skill_source(
 }
 
 #[tauri::command]
+fn preview_remote_skill_source(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopPreviewRemoteSkillSourceRequest,
+) -> Result<DesktopRemoteSkillPreview, String> {
+    let checker = system_git_checker_for_state(&state)?;
+    preview_remote_skill_source_for_state_with_checker(&state, request, &checker)
+}
+
+#[tauri::command]
 fn check_skill_updates(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopUpdateCheckRequest,
@@ -1153,6 +1201,16 @@ fn desktop_source_from_record(source: SourceRecord) -> DesktopSource {
         trusted: source.trusted,
         auto_update: source.auto_update,
         credential_ref: source.credential_ref,
+    }
+}
+
+fn desktop_remote_skill_preview(preview: CoreRemoteSkillPreview) -> DesktopRemoteSkillPreview {
+    DesktopRemoteSkillPreview {
+        name: preview.name,
+        description: preview.description,
+        install_name: preview.install_name,
+        commit: preview.commit,
+        repo_path: preview.repo_path,
     }
 }
 
@@ -1470,6 +1528,19 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         );
     }
 
+    if lower.contains("repo_path")
+        || lower.contains("repo path")
+        || lower.contains("not a skill directory")
+    {
+        return desktop_error(
+            "git_source",
+            "Git source 错误",
+            "Metis 无法根据当前来源信息预览远端 skill。",
+            "检查 Git URL、ref、repo path，并确认目标目录包含 SKILL.md。",
+            message,
+        );
+    }
+
     if lower.contains("no such file or directory")
         || lower.contains("not a directory")
         || lower.contains("path")
@@ -1490,7 +1561,6 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         || lower.contains("missing current commit")
         || lower.contains("missing remote commit")
         || lower.contains("no source")
-        || lower.contains("repo_path")
     {
         return desktop_error(
             "git_source",
@@ -1555,6 +1625,7 @@ pub fn run() {
             get_team_policy_audit_report,
             bind_skill_source,
             unbind_skill_source,
+            preview_remote_skill_source,
             check_skill_updates,
             get_skill_diff,
             apply_skill_update,
@@ -1685,6 +1756,76 @@ mod tests {
         ) -> Result<CheckoutResult, String> {
             unreachable!("auth failure should stop before checkout")
         }
+    }
+
+    #[test]
+    fn preview_remote_skill_source_for_state_returns_desktop_dto() {
+        let workspace = temp_dir("preview-remote");
+        let data_root = workspace.join("data");
+        let cache_root = workspace.join("cache");
+        let state = DesktopAppState::new(&data_root, &cache_root);
+        let skill_dir = write_skill(
+            &workspace.join("checkout").join("skills"),
+            "example",
+            "example",
+            "Remote skill preview",
+        );
+        let checker = FakeUpdateChecker {
+            commits: HashMap::from([("remote-preview".to_string(), "abc123".to_string())]),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: Some(CheckoutResult {
+                checkout_dir: workspace.join("checkout").to_string_lossy().to_string(),
+                skill_dir: skill_dir.to_string_lossy().to_string(),
+            }),
+        };
+
+        let preview = preview_remote_skill_source_for_state_with_checker(
+            &state,
+            DesktopPreviewRemoteSkillSourceRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/example".to_string(),
+                ref_: "main".to_string(),
+            },
+            &checker,
+        )
+        .expect("remote preview should succeed");
+
+        assert_eq!(preview.name, "example");
+        assert_eq!(preview.description.as_deref(), Some("Remote skill preview"));
+        assert_eq!(preview.install_name, "example");
+        assert_eq!(preview.commit, "abc123");
+        assert_eq!(preview.repo_path, "skills/example");
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn preview_remote_skill_source_for_state_maps_authentication_error() {
+        let workspace = temp_dir("preview-auth");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+
+        let error = preview_remote_skill_source_for_state_with_checker(
+            &state,
+            DesktopPreviewRemoteSkillSourceRequest {
+                url: "https://github.com/private/metis-skills.git".to_string(),
+                repo_path: "skills/private".to_string(),
+                ref_: "main".to_string(),
+            },
+            &AuthFailureChecker,
+        )
+        .expect_err("auth failure should be mapped");
+
+        let desktop_error: DesktopError =
+            serde_json::from_str(&error).expect("desktop error should be JSON");
+        assert_eq!(desktop_error.category, "authentication");
+        assert_eq!(desktop_error.title, "认证失败");
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
 
     fn temp_dir(name: &str) -> PathBuf {
