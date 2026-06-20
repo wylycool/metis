@@ -83,6 +83,8 @@ function App() {
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const didBootstrap = useRef(false);
 
   const groupedSkills = useMemo(() => {
@@ -91,6 +93,25 @@ function App() {
       skills: skills.filter((skill) => skill.agent_id === agent.agent_id),
     }));
   }, [agents, skills]);
+  const selectedAgent = useMemo(
+    () => groupedSkills.find((agent) => agent.agent_id === selectedAgentId) ?? null,
+    [groupedSkills, selectedAgentId],
+  );
+  const normalizedSearchQuery = skillSearchQuery.trim().toLocaleLowerCase();
+  const visibleSkills = useMemo(() => {
+    if (normalizedSearchQuery) {
+      return skills.filter((skill) => skillMatchesSearch(skill, normalizedSearchQuery));
+    }
+    if (selectedAgent) {
+      return selectedAgent.skills;
+    }
+    return skills;
+  }, [normalizedSearchQuery, selectedAgent, skills]);
+  const visibleBoundCount = visibleSkills.filter((skill) => skill.source).length;
+  const visibleModifiedCount = visibleSkills.filter((skill) => skill.local_modified).length;
+  const visibleUpdateAvailableCount = visibleSkills.filter(
+    (skill) => updateResults[skill.id]?.status === "UpdateAvailable",
+  ).length;
 
   const totalExistingPaths = agents.reduce(
     (count, agent) => count + agent.paths.filter((path) => path.exists).length,
@@ -392,12 +413,12 @@ function App() {
     }
   }
 
-  async function handleCheckUpdates(skillIds: string[]) {
+  async function handleCheckUpdates(skillIds: string[], busyKey = "check-updates") {
     if (skillIds.length === 0) {
       return;
     }
 
-    setActionBusy("check-updates");
+    setActionBusy(busyKey);
     setActionError(null);
     setActionMessage(null);
 
@@ -417,6 +438,13 @@ function App() {
     } finally {
       setActionBusy(null);
     }
+  }
+
+  async function handleCheckAgentUpdates(agentId: string) {
+    const agentSkillIds = skills
+      .filter((skill) => skill.agent_id === agentId)
+      .map((skill) => skill.id);
+    await handleCheckUpdates(agentSkillIds, `agent-check:${agentId}`);
   }
 
   async function handleExportEnvironmentReport() {
@@ -1130,13 +1158,20 @@ function App() {
             </div>
             <div className="agent-list">
               {groupedSkills.map((agent) => (
-                <div className="agent-row" key={agent.agent_id}>
+                <button
+                  aria-label={`查看 Agent ${agent.agent_id}`}
+                  aria-pressed={selectedAgentId === agent.agent_id}
+                  className={`agent-row ${selectedAgentId === agent.agent_id ? "active" : ""}`}
+                  data-testid={`agent-row-${agent.agent_id}`}
+                  key={agent.agent_id}
+                  onClick={() => setSelectedAgentId(agent.agent_id)}
+                >
                   <div>
                     <strong>{agent.agent_name}</strong>
                     <span>{agent.agent_id}</span>
                   </div>
                   <b>{agent.skills.length}</b>
-                </div>
+                </button>
               ))}
             </div>
           </aside>
@@ -1144,22 +1179,58 @@ function App() {
           <section className="skill-panel">
             <div className="panel-heading">
               <div>
-                <h2>Skill 索引</h2>
-                <p>{statusText(state, skills.length)}</p>
+                <h2>{panelTitle(selectedAgent, normalizedSearchQuery)}</h2>
+                <p>{panelSubtitle(state, visibleSkills.length, normalizedSearchQuery)}</p>
               </div>
+              {selectedAgent && !normalizedSearchQuery && (
+                <button
+                  className="ghost-button compact"
+                  data-testid={`check-agent-updates-${selectedAgent.agent_id}`}
+                  disabled={actionBusy === `agent-check:${selectedAgent.agent_id}`}
+                  onClick={() => handleCheckAgentUpdates(selectedAgent.agent_id)}
+                >
+                  {actionBusy === `agent-check:${selectedAgent.agent_id}`
+                    ? "检查中"
+                    : "检查此 Agent"}
+                </button>
+              )}
               {warnings.length > 0 && (
                 <span className="warning-pill">{warnings.length} 条 warning</span>
               )}
             </div>
+            <div className="skill-search-bar">
+              <input
+                data-testid="skill-search-input"
+                placeholder="搜索本机 skill、Agent、路径或来源"
+                value={skillSearchQuery}
+                onChange={(event) => setSkillSearchQuery(event.target.value)}
+              />
+              {skillSearchQuery && (
+                <button className="ghost-button compact" onClick={() => setSkillSearchQuery("")}>
+                  清空
+                </button>
+              )}
+            </div>
+            {selectedAgent && !normalizedSearchQuery && (
+              <div
+                className="agent-detail-summary"
+                data-testid={`agent-detail-${selectedAgent.agent_id}`}
+              >
+                <SummaryMetric label="此 Agent skills" value={visibleSkills.length.toString()} />
+                <SummaryMetric label="已绑定来源" value={visibleBoundCount.toString()} />
+                <SummaryMetric label="本地修改" value={visibleModifiedCount.toString()} />
+                <SummaryMetric label="待更新" value={visibleUpdateAvailableCount.toString()} />
+              </div>
+            )}
 
             {state === "loading" && <LoadingState />}
             {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
-            {state === "loaded" && skills.length === 0 && (
+            {state === "loaded" && visibleSkills.length === 0 && (
               <EmptyState onOpenSettings={() => setActiveWorkspace("settings")} onScan={handleScan} />
             )}
-            {state === "loaded" && skills.length > 0 && (
+            {state === "loaded" && visibleSkills.length > 0 && (
               <div className="skill-list">
-                {skills.map((skill) => (
+                {visibleSkills.map((skill) => (
                   <SkillRow
                     key={skill.id}
                     skill={skill}
@@ -1746,17 +1817,47 @@ function EmptyState({
   );
 }
 
-function statusText(state: LoadState, count: number) {
+function panelTitle(
+  selectedAgent: (DesktopAgentStatus & { skills: DesktopSkill[] }) | null,
+  searchQuery: string,
+) {
+  if (searchQuery) {
+    return "搜索结果";
+  }
+  if (selectedAgent) {
+    return `${selectedAgent.agent_name} 工作区`;
+  }
+  return "Skill 索引";
+}
+
+function panelSubtitle(state: LoadState, count: number, searchQuery: string) {
   if (state === "loading") {
     return "正在同步 Core discovery 与 SQLite 索引";
   }
   if (state === "error") {
     return "请查看错误信息后重试";
   }
+  if (searchQuery) {
+    return `全局匹配 ${count} 个本机 skill，结果保留所属 Agent。`;
+  }
   if (count === 0) {
     return "默认目录暂无已发现 skill";
   }
   return "来自本机 SQLite 索引和最新扫描结果";
+}
+
+function skillMatchesSearch(skill: DesktopSkill, query: string) {
+  return [
+    skill.name,
+    skill.description,
+    skill.agent_name,
+    skill.agent_id,
+    skill.install_path,
+    skill.source?.url,
+    skill.source?.repo_path,
+  ]
+    .filter(Boolean)
+    .some((value) => value?.toLocaleLowerCase().includes(query));
 }
 
 function metadataTone(status: string) {

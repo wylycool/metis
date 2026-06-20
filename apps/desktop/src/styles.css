@@ -683,10 +683,23 @@ h1 {
   grid-template-columns: minmax(0, 1fr) 32px;
   gap: 10px;
   align-items: center;
+  width: 100%;
   border: 1px solid #2a323b;
   border-radius: 8px;
   background: #15191f;
   padding: 11px 10px;
+  color: var(--text);
+  text-align: left;
+}
+
+.agent-row:hover:not(:disabled) {
+  border-color: rgba(208, 168, 79, 0.6);
+  background: #1a2027;
+}
+
+.agent-row.active {
+  border-color: rgba(208, 168, 79, 0.86);
+  background: rgba(208, 168, 79, 0.1);
 }
 
 .agent-row strong,
@@ -724,6 +737,20 @@ h1 {
 .panel-heading h2 {
   margin-bottom: 4px;
   font-size: 20px;
+}
+
+.skill-search-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.agent-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .warning-pill {

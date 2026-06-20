@@ -344,6 +344,49 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("team-compliance-empty")).toBeTruthy();
     expect(screen.getByText("粘贴或载入团队清单后再校验合规状态。")).toBeTruthy();
   });
+
+  test("agent detail filters skills and checks only the selected agent", async () => {
+    const user = userEvent.setup();
+    const scenario = createAgentDetailScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("agent-row-codex"));
+
+    expect(await screen.findByTestId("agent-detail-codex")).toBeTruthy();
+    expect(screen.getByText("Codex 工作区")).toBeTruthy();
+    expect(screen.getByText("codex-planner")).toBeTruthy();
+    expect(screen.queryByText("claude-writer")).toBeNull();
+
+    await user.click(screen.getByTestId("check-agent-updates-codex"));
+
+    expect(await screen.findByText("有更新")).toBeTruthy();
+    expect(scenario.checkedSkillIds()).toEqual([["codex-planner"]]);
+  });
+
+  test("local search stays global while showing each result agent", async () => {
+    const user = userEvent.setup();
+    const scenario = createAgentDetailScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("agent-row-codex"));
+    expect(screen.queryByText("claude-writer")).toBeNull();
+
+    await user.type(screen.getByTestId("skill-search-input"), "claude");
+
+    expect(await screen.findByText("搜索结果")).toBeTruthy();
+    const resultRow = await screen.findByTestId("skill-row-claude-writer");
+    expect(within(resultRow).getByText("claude-writer")).toBeTruthy();
+    expect(within(resultRow).getByText("Claude Code")).toBeTruthy();
+    expect(screen.queryByText("codex-planner")).toBeNull();
+  });
 });
 
 describe("Metis desktop GUI error paths", () => {
@@ -988,6 +1031,116 @@ function createEmptyWorkspaceScenario() {
           throw new Error(`Unexpected invoke command: ${command}`);
       }
     },
+  };
+}
+
+function createAgentDetailScenario() {
+  const codexSource: DesktopSource = {
+    id: "source-codex-planner",
+    source_type: "git",
+    url: "file:///tmp/metis-agent-detail",
+    repo_path: "skills/codex-planner",
+    ref_: "main",
+    current_commit: "aaa111",
+    remote_commit: "bbb222",
+    last_checked_at: null,
+    trusted: true,
+    auto_update: false,
+    credential_ref: null,
+  };
+  const claudeSource: DesktopSource = {
+    id: "source-claude-writer",
+    source_type: "git",
+    url: "file:///tmp/metis-agent-detail",
+    repo_path: "skills/claude-writer",
+    ref_: "main",
+    current_commit: "ccc333",
+    remote_commit: "ddd444",
+    last_checked_at: null,
+    trusted: true,
+    auto_update: false,
+    credential_ref: null,
+  };
+  const skills: DesktopSkill[] = [
+    agentDetailSkill("codex-planner", "codex", "Codex", codexSource),
+    agentDetailSkill("claude-writer", "claude-code", "Claude Code", claudeSource),
+  ];
+  const agents: DesktopAgentStatus[] = [
+    {
+      agent_id: "codex",
+      agent_name: "Codex",
+      enabled: true,
+      paths: [
+        {
+          path: "/Users/me/.codex/skills",
+          scope: "user",
+          exists: true,
+          readable: true,
+          writable: true,
+        },
+      ],
+    },
+    {
+      agent_id: "claude-code",
+      agent_name: "Claude Code",
+      enabled: true,
+      paths: [
+        {
+          path: "/Users/me/.claude/skills",
+          scope: "user",
+          exists: true,
+          readable: true,
+          writable: true,
+        },
+      ],
+    },
+  ];
+  const checked: string[][] = [];
+
+  return {
+    checkedSkillIds: () => checked,
+    async invoke(command: string, args?: unknown) {
+      switch (command) {
+        case "list_agents":
+          return agents;
+        case "list_indexed_skills":
+          return skills;
+        case "get_desktop_settings":
+          return { custom_scan_paths: [] };
+        case "check_skill_updates": {
+          const request = args as { request: { skill_ids: string[] } };
+          checked.push(request.request.skill_ids);
+          return skills
+            .filter((skill) => request.request.skill_ids.includes(skill.id))
+            .map((skill) => updateResult(skill, skill.source as DesktopSource));
+        }
+        default:
+          throw new Error(`Unexpected invoke command: ${command}`);
+      }
+    },
+  };
+}
+
+function agentDetailSkill(
+  id: string,
+  agentId: string,
+  agentName: string,
+  source: DesktopSource,
+): DesktopSkill {
+  return {
+    id,
+    agent_id: agentId,
+    agent_name: agentName,
+    name: id,
+    description: `${agentName} managed skill`,
+    install_path: `/Users/me/.${agentId}/skills/${id}`,
+    metadata_path: `/Users/me/.${agentId}/skills/${id}/SKILL.md`,
+    metadata_status: "found",
+    metadata_error: null,
+    source_id: source.id,
+    source,
+    local_modified: false,
+    last_scanned_at: "2026-06-20T10:00:00Z",
   };
 }
 
