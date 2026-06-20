@@ -47,6 +47,7 @@ export interface DesktopSource {
 
 export interface DesktopSettings {
   custom_scan_paths: string[];
+  team_policy_path?: string | null;
 }
 
 export interface DesktopBindSourceRequest {
@@ -182,6 +183,13 @@ export interface DesktopEnvironmentSource {
 export interface DesktopFileExportResult {
   output_path: string;
   bytes_written: number;
+}
+
+export interface DesktopTeamPolicySummary {
+  version: string;
+  trusted_sources: number;
+  allow_auto_update: boolean;
+  require_trusted_source: boolean;
 }
 
 export interface DesktopTeamManifestComplianceRequest {

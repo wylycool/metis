@@ -191,6 +191,43 @@ describe("Metis desktop GUI main flow", () => {
       "/tmp/reports/audit.json",
     ]);
   });
+
+  test("phase4 team policy previews trusted sources and applies binding defaults", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByText("设置"));
+    await user.type(screen.getByTestId("team-policy-path"), "/tmp/team-policy.json");
+    await user.click(screen.getByText("保存"));
+    expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
+    await user.click(screen.getByTestId("preview-team-policy"));
+
+    expect(await screen.findByText("策略版本 1")).toBeTruthy();
+    expect(screen.getByText("可信来源 1 个")).toBeTruthy();
+    expect(screen.getByText("自动更新要求 trusted source")).toBeTruthy();
+
+    const skillRow = await screen.findByTestId("skill-row-e2e-skill");
+    await user.click(within(skillRow).getByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "https://github.com/example/team-skills.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.clear(screen.getByTestId("bind-ref-e2e-skill"));
+    await user.type(screen.getByTestId("bind-ref-e2e-skill"), "main");
+    await user.click(screen.getByTestId("bind-auto-update-e2e-skill"));
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+
+    const boundRow = await screen.findByTestId("skill-row-e2e-skill");
+    expect(within(boundRow).getByText("trusted source")).toBeTruthy();
+    expect(within(boundRow).getByText("auto update on")).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith("save_desktop_settings", {
+      settings: expect.objectContaining({
+        team_policy_path: "/tmp/team-policy.json",
+      }),
+    });
+  });
 });
 
 describe("Metis desktop GUI error paths", () => {
@@ -270,7 +307,7 @@ describe("Metis desktop GUI error paths", () => {
 });
 
 function createMainFlowScenario() {
-  const source: DesktopSource = {
+  let source: DesktopSource = {
     id: "source-e2e-skill",
     source_type: "git",
     url: "file:///tmp/metis-e2e-repo",
@@ -317,7 +354,7 @@ function createMainFlowScenario() {
       ],
     },
   ];
-  const settings: DesktopSettings = { custom_scan_paths: [] };
+  let settings: DesktopSettings = { custom_scan_paths: [], team_policy_path: null };
 
   return {
     async invoke(command: string, args?: unknown) {
@@ -328,13 +365,50 @@ function createMainFlowScenario() {
           return indexedSkills;
         case "get_desktop_settings":
           return settings;
+        case "save_desktop_settings": {
+          const request = args as { settings: DesktopSettings };
+          settings = request.settings;
+          return settings;
+        }
+        case "get_team_policy_summary":
+          return settings.team_policy_path
+            ? {
+                version: "1",
+                trusted_sources: 1,
+                allow_auto_update: true,
+                require_trusted_source: true,
+              }
+            : null;
         case "scan_skills":
           indexedSkills = [skill];
           return { skills: [skill], warnings: [] };
-        case "bind_skill_source":
+        case "bind_skill_source": {
+          const request = args as {
+            request: {
+              url: string;
+              repo_path: string;
+              ref_: string;
+              auto_update: boolean;
+              trusted: boolean;
+            };
+          };
+          const policyTrusted =
+            settings.team_policy_path &&
+            request.request.url === "https://github.com/example/team-skills.git" &&
+            request.request.repo_path === "skills/e2e-skill" &&
+            request.request.ref_ === "main";
+          source = {
+            ...source,
+            url: request.request.url,
+            repo_path: request.request.repo_path,
+            ref_: request.request.ref_,
+            trusted: Boolean(request.request.trusted || policyTrusted),
+            auto_update: request.request.auto_update && Boolean(policyTrusted),
+          };
           skill = { ...skill, source_id: source.id, source };
           indexedSkills = [skill];
           return source;
+        }
         case "check_skill_updates":
           return [updateResult(skill, source)];
         case "get_skill_diff":

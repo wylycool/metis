@@ -4,6 +4,9 @@
 //! 核心逻辑全部在 metis-core 中实现。
 
 use metis_core::audit::{query_audit_log as core_query_audit_log, AuditQuery};
+use metis_core::config::{
+    evaluate_source_policy, parse_team_policy_from_str, TeamPolicy as CoreTeamPolicy,
+};
 use metis_core::discovery::{
     list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
     ScanOptions, ScanResult,
@@ -160,6 +163,8 @@ pub struct DesktopSource {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopSettings {
     pub custom_scan_paths: Vec<String>,
+    #[serde(default)]
+    pub team_policy_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -345,6 +350,14 @@ pub struct DesktopTeamManifestComplianceItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamPolicySummary {
+    pub version: String,
+    pub trusted_sources: usize,
+    pub allow_auto_update: bool,
+    pub require_trusted_source: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopFileExportResult {
     pub output_path: String,
     pub bytes_written: u64,
@@ -457,6 +470,7 @@ pub fn save_desktop_settings_for_state(
     state.ensure_dirs()?;
     let normalized = DesktopSettings {
         custom_scan_paths: normalize_paths(settings.custom_scan_paths),
+        team_policy_path: normalize_optional_text(settings.team_policy_path),
     };
     let contents = serde_json::to_string_pretty(&normalized).map_err(|error| error.to_string())?;
     fs::write(state.settings_path(), contents).map_err(|error| error.to_string())?;
@@ -468,6 +482,7 @@ pub fn bind_skill_source_for_state(
     request: DesktopBindSourceRequest,
 ) -> Result<DesktopSource, String> {
     let store = state.open_store()?;
+    let request = apply_team_policy_to_bind_request(state, request)?;
     let source = core_bind_source(
         &request.skill_id,
         SourceInput {
@@ -484,6 +499,41 @@ pub fn bind_skill_source_for_state(
     .map_err(|error| error.to_string())?;
 
     Ok(desktop_source_from_core(source))
+}
+
+pub fn get_team_policy_summary_for_state(
+    state: &DesktopAppState,
+) -> Result<Option<DesktopTeamPolicySummary>, String> {
+    Ok(load_team_policy_for_state(state)?.map(desktop_team_policy_summary))
+}
+
+fn apply_team_policy_to_bind_request(
+    state: &DesktopAppState,
+    mut request: DesktopBindSourceRequest,
+) -> Result<DesktopBindSourceRequest, String> {
+    if let Some(policy) = load_team_policy_for_state(state)? {
+        let evaluation =
+            evaluate_source_policy(&policy, &request.url, &request.repo_path, &request.ref_);
+        if evaluation.trusted {
+            request.trusted = true;
+        }
+        if request.auto_update && !evaluation.auto_update_allowed {
+            request.auto_update = false;
+        }
+    }
+    Ok(request)
+}
+
+fn load_team_policy_for_state(state: &DesktopAppState) -> Result<Option<CoreTeamPolicy>, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    let Some(path) = settings.team_policy_path else {
+        return Ok(None);
+    };
+    let contents = fs::read_to_string(path)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    parse_team_policy_from_str(&contents)
+        .map(Some)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
 pub fn unbind_skill_source_for_state(
@@ -752,6 +802,13 @@ fn save_desktop_settings(
 }
 
 #[tauri::command]
+fn get_team_policy_summary(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<Option<DesktopTeamPolicySummary>, String> {
+    get_team_policy_summary_for_state(&state)
+}
+
+#[tauri::command]
 fn bind_skill_source(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopBindSourceRequest,
@@ -1012,6 +1069,15 @@ fn desktop_team_manifest_compliance_item(
         local_commit: item.local_commit,
         local_modified: item.local_modified,
         trusted_source: item.trusted_source,
+    }
+}
+
+fn desktop_team_policy_summary(policy: CoreTeamPolicy) -> DesktopTeamPolicySummary {
+    DesktopTeamPolicySummary {
+        version: policy.version,
+        trusted_sources: policy.trusted_sources.len(),
+        allow_auto_update: policy.update_policy.allow_auto_update,
+        require_trusted_source: policy.update_policy.require_trusted_source,
     }
 }
 
@@ -1316,6 +1382,7 @@ pub fn run() {
             list_indexed_skills,
             get_desktop_settings,
             save_desktop_settings,
+            get_team_policy_summary,
             bind_skill_source,
             unbind_skill_source,
             check_skill_updates,
@@ -1562,6 +1629,7 @@ description: {description}
             &state,
             DesktopSettings {
                 custom_scan_paths: vec![custom_root.to_string_lossy().to_string()],
+                team_policy_path: None,
             },
         )
         .expect("settings should save");
@@ -1596,6 +1664,7 @@ description: {description}
                     "/tmp/metis/custom".to_string(),
                     "/tmp/metis/other".to_string(),
                 ],
+                team_policy_path: Some("  /tmp/metis/team-policy.json  ".to_string()),
             },
         )
         .expect("settings should save");
@@ -1609,6 +1678,151 @@ description: {description}
             vec!["/tmp/metis/custom", "/tmp/metis/other"]
         );
         assert_eq!(loaded, saved);
+        assert_eq!(
+            loaded.team_policy_path.as_deref(),
+            Some("/tmp/metis/team-policy.json")
+        );
+    }
+
+    #[test]
+    fn team_policy_summary_loads_trusted_sources_from_settings_path() {
+        let workspace = temp_dir("team-policy-summary");
+        let policy_path = workspace.join("policy/team-policy.json");
+        fs::create_dir_all(policy_path.parent().expect("policy should have parent"))
+            .expect("policy parent should be created");
+        fs::write(
+            &policy_path,
+            r#"{
+                "version": "1",
+                "trusted_sources": [
+                    {
+                        "url": "https://github.com/example/team-skills.git",
+                        "repo_path": "skills/team",
+                        "ref": "main"
+                    }
+                ],
+                "update_policy": {
+                    "allow_auto_update": true,
+                    "require_trusted_source": true
+                }
+            }"#,
+        )
+        .expect("policy should write");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+            },
+        )
+        .expect("settings should save");
+
+        let summary = get_team_policy_summary_for_state(&state)
+            .expect("policy summary should load")
+            .expect("policy summary should exist");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(summary.version, "1");
+        assert_eq!(summary.trusted_sources, 1);
+        assert!(summary.allow_auto_update);
+        assert!(summary.require_trusted_source);
+    }
+
+    #[test]
+    fn bind_skill_source_for_state_applies_team_policy_defaults_and_auto_update_gate() {
+        let workspace = temp_dir("team-policy-bind-source");
+        let skill_root = workspace.join("skills");
+        let policy_path = workspace.join("policy/team-policy.json");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        fs::create_dir_all(policy_path.parent().expect("policy should have parent"))
+            .expect("policy parent should be created");
+        fs::write(
+            &policy_path,
+            r#"{
+                "version": "1",
+                "trusted_sources": [
+                    {
+                        "url": "https://github.com/example/team-skills.git",
+                        "repo_path": "skills/writer",
+                        "ref": "main"
+                    }
+                ],
+                "update_policy": {
+                    "allow_auto_update": true,
+                    "require_trusted_source": true
+                }
+            }"#,
+        )
+        .expect("policy should write");
+        write_skill(&skill_root, "writer", "writer", "Writes things");
+        write_skill(&skill_root, "personal", "personal", "Personal things");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+            },
+        )
+        .expect("settings should save");
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let writer_id = scanned
+            .skills
+            .iter()
+            .find(|skill| skill.name == "writer")
+            .expect("writer should exist")
+            .id
+            .clone();
+        let personal_id = scanned
+            .skills
+            .iter()
+            .find(|skill| skill.name == "personal")
+            .expect("personal should exist")
+            .id
+            .clone();
+
+        let trusted = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: writer_id,
+                url: "https://github.com/example/team-skills.git".to_string(),
+                repo_path: "skills/writer".to_string(),
+                ref_: "main".to_string(),
+                credential_ref: None,
+                trusted: false,
+                auto_update: true,
+            },
+        )
+        .expect("trusted source should bind");
+        let untrusted = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: personal_id,
+                url: "https://github.com/example/personal.git".to_string(),
+                repo_path: "skills/personal".to_string(),
+                ref_: "main".to_string(),
+                credential_ref: None,
+                trusted: false,
+                auto_update: true,
+            },
+        )
+        .expect("untrusted source should bind with auto update disabled");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(trusted.trusted);
+        assert!(trusted.auto_update);
+        assert!(!untrusted.trusted);
+        assert!(!untrusted.auto_update);
     }
 
     #[test]
@@ -1622,6 +1836,7 @@ description: {description}
             &state,
             DesktopSettings {
                 custom_scan_paths: vec![skill_root.to_string_lossy().to_string()],
+                team_policy_path: None,
             },
         )
         .expect("settings should save");

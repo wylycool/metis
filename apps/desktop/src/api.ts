@@ -17,6 +17,7 @@ import type {
   DesktopTeamComplianceReportExportRequest,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceRequest,
+  DesktopTeamPolicySummary,
   DesktopUpdateCheckRequest,
   DesktopUpdateCheckResult,
 } from "./types";
@@ -39,6 +40,10 @@ export function getDesktopSettings(): Promise<DesktopSettings> {
 
 export function saveDesktopSettings(settings: DesktopSettings): Promise<DesktopSettings> {
   return invoke("save_desktop_settings", { settings });
+}
+
+export function getTeamPolicySummary(): Promise<DesktopTeamPolicySummary | null> {
+  return invoke("get_team_policy_summary");
 }
 
 export function bindSkillSource(

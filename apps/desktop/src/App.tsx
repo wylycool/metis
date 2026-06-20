@@ -10,6 +10,7 @@ import {
   exportTeamComplianceReportToFile,
   getSkillDiff,
   getDesktopSettings,
+  getTeamPolicySummary,
   listSkillBackups,
   listAgents,
   listIndexedSkills,
@@ -30,6 +31,7 @@ import type {
   DesktopSkill,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceItem,
+  DesktopTeamPolicySummary,
   DesktopUpdateCheckResult,
   LoadState,
 } from "./types";
@@ -54,8 +56,15 @@ function App() {
   const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
   const [backupError, setBackupError] = useState<Record<string, DesktopError>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [settings, setSettings] = useState<DesktopSettings>({ custom_scan_paths: [] });
+  const [settings, setSettings] = useState<DesktopSettings>({
+    custom_scan_paths: [],
+    team_policy_path: null,
+  });
   const [settingsDraft, setSettingsDraft] = useState("");
+  const [teamPolicyPathDraft, setTeamPolicyPathDraft] = useState("");
+  const [teamPolicySummary, setTeamPolicySummary] = useState<DesktopTeamPolicySummary | null>(
+    null,
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
@@ -115,6 +124,7 @@ function App() {
       setAgents(agentResult);
       setSettings(settingsResult);
       setSettingsDraft(settingsResult.custom_scan_paths.join("\n"));
+      setTeamPolicyPathDraft(settingsResult.team_policy_path ?? "");
 
       if (indexedResult.length > 0) {
         setSkills(indexedResult);
@@ -165,9 +175,12 @@ function App() {
     try {
       const saved = await saveDesktopSettings({
         custom_scan_paths: settingsDraft.split("\n"),
+        team_policy_path: teamPolicyPathDraft.trim() || null,
       });
       setSettings(saved);
       setSettingsDraft(saved.custom_scan_paths.join("\n"));
+      setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+      setTeamPolicySummary(null);
       setActionMessage("扫描路径已保存");
       if (scanAfterSave) {
         await handleScan();
@@ -199,6 +212,31 @@ function App() {
       trusted: skill.source?.trusted ?? false,
       auto_update: skill.source?.auto_update ?? false,
     });
+  }
+
+  async function handlePreviewTeamPolicy() {
+    setActionBusy("team-policy");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      if (teamPolicyPathDraft.trim() !== (settings.team_policy_path ?? "")) {
+        const saved = await saveDesktopSettings({
+          custom_scan_paths: settingsDraft.split("\n"),
+          team_policy_path: teamPolicyPathDraft.trim() || null,
+        });
+        setSettings(saved);
+        setSettingsDraft(saved.custom_scan_paths.join("\n"));
+        setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+      }
+      const summary = await getTeamPolicySummary();
+      setTeamPolicySummary(summary);
+      setActionMessage(summary ? "团队策略已载入" : "未配置团队策略文件");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
   }
 
   async function refreshIndexedSkills() {
@@ -817,6 +855,7 @@ function App() {
         </button>
         <div className="settings-summary">
           <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
+          <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
           <span>凭据使用本机 Git / SSH 配置</span>
         </div>
         {settingsOpen && (
@@ -867,6 +906,42 @@ function App() {
                   保存并扫描
                 </button>
               </div>
+            </div>
+            <div className="settings-section">
+              <div>
+                <h3>团队策略</h3>
+                <p>本地 JSON 策略可预配置 trusted source，并限制未信任来源自动更新。</p>
+              </div>
+              <input
+                data-testid="team-policy-path"
+                value={teamPolicyPathDraft}
+                placeholder="/Users/me/team-policy.json"
+                onChange={(event) => setTeamPolicyPathDraft(event.target.value)}
+              />
+              <div className="form-actions">
+                <button
+                  className="ghost-button compact"
+                  data-testid="preview-team-policy"
+                  disabled={actionBusy === "team-policy" || teamPolicyPathDraft.trim().length === 0}
+                  onClick={handlePreviewTeamPolicy}
+                >
+                  {actionBusy === "team-policy" ? "读取中" : "预览策略"}
+                </button>
+              </div>
+              {teamPolicySummary && (
+                <div className="policy-summary">
+                  <span>策略版本 {teamPolicySummary.version}</span>
+                  <span>可信来源 {teamPolicySummary.trusted_sources} 个</span>
+                  <span>
+                    {teamPolicySummary.allow_auto_update ? "允许自动更新" : "禁止自动更新"}
+                  </span>
+                  <span>
+                    {teamPolicySummary.require_trusted_source
+                      ? "自动更新要求 trusted source"
+                      : "自动更新不要求 trusted source"}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="settings-section credential-section">
               <div>
@@ -1322,6 +1397,7 @@ function BindSourceForm({
       </label>
       <label className="check-label">
         <input
+          data-testid={`bind-trusted-${skillId}`}
           checked={draft.trusted}
           type="checkbox"
           onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
@@ -1330,6 +1406,7 @@ function BindSourceForm({
       </label>
       <label className="check-label">
         <input
+          data-testid={`bind-auto-update-${skillId}`}
           checked={draft.auto_update}
           type="checkbox"
           onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
