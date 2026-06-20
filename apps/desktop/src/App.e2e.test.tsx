@@ -38,7 +38,11 @@ describe("Metis desktop GUI main flow", () => {
     expect(within(skillRow).getByText("e2e-skill")).toBeTruthy();
     expect(within(skillRow).getByText("未绑定来源")).toBeTruthy();
 
-    await user.click(within(skillRow).getByTestId("open-bind-source-e2e-skill"));
+    await user.click(skillRow);
+    expect(await screen.findByTestId("skill-detail-e2e-skill")).toBeTruthy();
+    expect(screen.getByText("Skills / e2e-skill")).toBeTruthy();
+
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
     await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
     await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
     await user.clear(screen.getByTestId("bind-ref-e2e-skill"));
@@ -47,19 +51,14 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByText("file:///tmp/metis-e2e-repo")).toBeTruthy();
 
-    const boundRow = await screen.findByTestId("skill-row-e2e-skill");
-    await user.click(within(boundRow).getByTestId("check-updates-e2e-skill"));
+    await user.click(screen.getByTestId("check-updates-e2e-skill"));
 
     expect(await screen.findByText("有更新")).toBeTruthy();
     expect(screen.getByText("+1")).toBeTruthy();
     expect(screen.getByText("~1")).toBeTruthy();
     expect(screen.getByText("2 commits behind")).toBeTruthy();
 
-    await user.click(
-      within(await screen.findByTestId("skill-row-e2e-skill")).getByTestId(
-        "toggle-diff-e2e-skill",
-      ),
-    );
+    await user.click(screen.getByTestId("toggle-diff-e2e-skill"));
 
     expect(
       await screen.findByText((content) => content.includes("diff --git a/SKILL.md b/SKILL.md")),
@@ -68,11 +67,7 @@ describe("Metis desktop GUI main flow", () => {
       screen.getByText((content) => content.includes("+description: Updated skill")),
     ).toBeTruthy();
 
-    await user.click(
-      within(await screen.findByTestId("skill-row-e2e-skill")).getByTestId(
-        "apply-update-e2e-skill",
-      ),
-    );
+    await user.click(screen.getByTestId("apply-update-e2e-skill"));
 
     expect(await screen.findByText(/更新完成：aaa111 -> bbb222/)).toBeTruthy();
     expect(await screen.findByText("pre-update")).toBeTruthy();
@@ -89,19 +84,21 @@ describe("Metis desktop GUI main flow", () => {
     render(<App />);
 
     await screen.findByTestId("skill-row-e2e-skill");
+    await user.click(screen.getByTestId("open-add-skill"));
+    expect(await screen.findByTestId("add-skill-page")).toBeTruthy();
     await user.type(
-      screen.getByTestId("remote-sync-url"),
+      screen.getByTestId("add-skill-url"),
       "https://github.com/example/metis-skills.git",
     );
-    await user.type(screen.getByTestId("remote-sync-repo-path"), "skills/remote");
-    await user.clear(screen.getByTestId("remote-sync-ref"));
-    await user.type(screen.getByTestId("remote-sync-ref"), "main");
-    await user.click(screen.getByTestId("remote-sync-preview"));
+    await user.type(screen.getByTestId("add-skill-repo-path"), "skills/remote");
+    await user.clear(screen.getByTestId("add-skill-ref"));
+    await user.type(screen.getByTestId("add-skill-ref"), "main");
+    await user.click(screen.getByTestId("add-skill-preview"));
 
     expect(await screen.findByText("Remote Skill")).toBeTruthy();
-    expect(await screen.findByTestId("remote-target-codex")).toBeTruthy();
-    await user.click(screen.getByTestId("remote-target-checkbox-codex"));
-    await user.click(screen.getByTestId("remote-sync-install"));
+    expect(await screen.findByTestId("target-row-codex")).toBeTruthy();
+    await user.click(screen.getByTestId("target-checkbox-codex"));
+    await user.click(screen.getByTestId("install-selected-targets"));
 
     expect(await screen.findByText(/Codex：Installed/)).toBeTruthy();
   });
@@ -377,7 +374,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByTestId("agent-row-codex"));
+    await user.click(await screen.findByTestId("agent-filter-codex"));
 
     expect(await screen.findByTestId("agent-detail-codex")).toBeTruthy();
     expect(screen.getByText("Codex 工作区")).toBeTruthy();
@@ -399,7 +396,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByTestId("agent-row-codex"));
+    await user.click(await screen.findByTestId("agent-filter-codex"));
     expect(screen.queryByText("claude-writer")).toBeNull();
 
     await user.type(screen.getByTestId("skill-search-input"), "claude");
@@ -409,6 +406,31 @@ describe("Metis desktop GUI main flow", () => {
     expect(within(resultRow).getByText("claude-writer")).toBeTruthy();
     expect(within(resultRow).getByText("Claude Code")).toBeTruthy();
     expect(screen.queryByText("codex-planner")).toBeNull();
+
+    await user.clear(screen.getByTestId("skill-search-input"));
+
+    expect(await screen.findByTestId("skill-row-codex-planner")).toBeTruthy();
+    expect(screen.queryByText("claude-writer")).toBeNull();
+  });
+
+  test("phase6 shows a cross-agent matrix on a bound skill detail page", async () => {
+    const user = userEvent.setup();
+    const scenario = createAgentDetailScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-codex-planner"));
+    expect(await screen.findByTestId("skill-detail-codex-planner")).toBeTruthy();
+    expect(await screen.findByTestId("target-row-codex")).toBeTruthy();
+    expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText("当前查看")).toBeTruthy();
+    expect(await screen.findByTestId("target-row-claude-code")).toBeTruthy();
+    expect((screen.getByTestId("target-checkbox-claude-code") as HTMLInputElement).disabled).toBe(
+      false,
+    );
   });
 });
 
@@ -432,13 +454,9 @@ describe("Metis desktop GUI error paths", () => {
 
     render(<App />);
 
-    const skillRow = await screen.findByTestId("skill-row-e2e-skill");
-    await user.click(within(skillRow).getByTestId("check-updates-e2e-skill"));
-    await user.click(
-      within(await screen.findByTestId("skill-row-e2e-skill")).getByTestId(
-        "apply-update-e2e-skill",
-      ),
-    );
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+    await user.click(await screen.findByTestId("apply-update-e2e-skill"));
 
     expect(await screen.findByText("安全检查阻断")).toBeTruthy();
     expect(
@@ -468,16 +486,9 @@ describe("Metis desktop GUI error paths", () => {
 
     render(<App />);
 
-    await user.click(
-      within(await screen.findByTestId("skill-row-e2e-skill")).getByTestId(
-        "check-updates-e2e-skill",
-      ),
-    );
-    await user.click(
-      within(await screen.findByTestId("skill-row-e2e-skill")).getByTestId(
-        "apply-update-e2e-skill",
-      ),
-    );
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+    await user.click(await screen.findByTestId("apply-update-e2e-skill"));
 
     expect(await screen.findByText("更新失败，已自动回滚")).toBeTruthy();
     expect(screen.getByText("apply_rollback_succeeded")).toBeTruthy();
@@ -1185,6 +1196,41 @@ function createAgentDetailScenario() {
             .filter((skill) => request.request.skill_ids.includes(skill.id))
             .map((skill) => updateResult(skill, skill.source as DesktopSource));
         }
+        case "preview_remote_skill_source":
+          return {
+            name: "codex-planner",
+            description: "Codex managed skill",
+            install_name: "codex-planner",
+            commit: "bbb222",
+            repo_path: "skills/codex-planner",
+          };
+        case "get_skill_targets_for_source":
+          return [
+            {
+              agent_id: "codex",
+              agent_name: "Codex",
+              root_path: "/Users/me/.codex/skills",
+              install_path: "/Users/me/.codex/skills/codex-planner",
+              status: "UpToDate",
+              local_modified: false,
+              skill_id: "codex-planner",
+              source_id: "source-codex-planner",
+              root_available: true,
+              root_status: "available",
+            },
+            {
+              agent_id: "claude-code",
+              agent_name: "Claude Code",
+              root_path: "/Users/me/.claude/skills",
+              install_path: "/Users/me/.claude/skills/codex-planner",
+              status: "NotInstalled",
+              local_modified: false,
+              skill_id: null,
+              source_id: null,
+              root_available: true,
+              root_status: "available",
+            },
+          ];
         default:
           throw new Error(`Unexpected invoke command: ${command}`);
       }
