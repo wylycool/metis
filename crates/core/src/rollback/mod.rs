@@ -63,6 +63,15 @@ pub fn create_backup(
     options: CreateBackupOptions,
     store: &mut SkillIndexStore,
 ) -> Result<BackupSummary, BackupError> {
+    let backup = create_backup_snapshot(options, store)?;
+    prune_old_backups(&backup.skill_id, &backup.backup_id, store)?;
+    Ok(backup)
+}
+
+fn create_backup_snapshot(
+    options: CreateBackupOptions,
+    store: &mut SkillIndexStore,
+) -> Result<BackupSummary, BackupError> {
     let skill = store
         .get_skill(&options.skill_id)
         .map_err(BackupError::from)?
@@ -117,6 +126,19 @@ pub fn create_backup(
     })
 }
 
+fn prune_old_backups(
+    skill_id: &str,
+    keep_backup_id: &str,
+    store: &mut SkillIndexStore,
+) -> Result<(), BackupError> {
+    for backup in store.list_backups(skill_id).map_err(BackupError::from)? {
+        if backup.id != keep_backup_id {
+            delete_backup(&backup.id, store)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn list_backups(
     skill_id: &str,
     store: &SkillIndexStore,
@@ -150,7 +172,7 @@ pub fn restore_backup(
         )));
     }
 
-    let previous = create_backup(
+    let previous = create_backup_snapshot(
         CreateBackupOptions {
             skill_id: skill.id.clone(),
             backup_root: options.backup_root,
@@ -177,6 +199,7 @@ pub fn restore_backup(
             risk_summary: None,
         },
     );
+    prune_old_backups(&skill.id, &previous.backup_id, store)?;
 
     Ok(RestoreResult {
         skill_id: skill.id,
@@ -363,6 +386,52 @@ mod tests {
     }
 
     #[test]
+    fn create_backup_keeps_only_latest_backup_for_skill() {
+        let root = temp_dir("single-retention");
+        let skill_dir = root.join("skill");
+        let backup_root = root.join("backup-root");
+        write_file(&skill_dir.join("SKILL.md"), "# First\n");
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        store
+            .upsert_skill(&sample_skill("skill-1", &skill_dir, None))
+            .expect("skill should upsert");
+
+        let first = create_backup(
+            CreateBackupOptions {
+                skill_id: "skill-1".to_string(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+                reason: "pre-update".to_string(),
+            },
+            &mut store,
+        )
+        .expect("first backup should create");
+        fs::write(skill_dir.join("SKILL.md"), "# Second\n").expect("skill should change");
+        let second = create_backup(
+            CreateBackupOptions {
+                skill_id: "skill-1".to_string(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+                reason: "pre-update".to_string(),
+            },
+            &mut store,
+        )
+        .expect("second backup should create");
+
+        let backups = list_backups("skill-1", &store).expect("backups should list");
+        assert_eq!(backups.len(), 1);
+        assert_eq!(backups[0].backup_id, second.backup_id);
+        assert!(!Path::new(&first.backup_path).exists());
+        assert!(Path::new(&second.backup_path).exists());
+        assert_eq!(
+            store
+                .get_backup(&first.backup_id)
+                .expect("backup lookup should succeed"),
+            None
+        );
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
     fn restore_backup_replaces_skill_directory_and_creates_previous_state_backup() {
         let root = temp_dir("restore");
         let skill_dir = root.join("skill");
@@ -410,14 +479,16 @@ mod tests {
 
         let restored = store
             .get_backup(&result.restored_from_backup_id)
-            .expect("backup lookup should succeed")
-            .expect("backup should exist");
-        assert_eq!(restored.restore_status.as_deref(), Some("restored"));
+            .expect("backup lookup should succeed");
+        assert_eq!(restored, None);
         let previous = store
             .get_backup(&result.previous_state_backup_id)
             .expect("previous backup lookup should succeed")
             .expect("previous backup should exist");
         assert_eq!(previous.reason, "pre-rollback");
+        let backups = list_backups("skill-1", &store).expect("backups should list");
+        assert_eq!(backups.len(), 1);
+        assert_eq!(backups[0].backup_id, result.previous_state_backup_id);
         let skill = store
             .get_skill("skill-1")
             .expect("skill lookup should succeed")
