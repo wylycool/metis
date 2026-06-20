@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Agent 适配器统一接口
 pub trait AgentAdapter: Send + Sync {
@@ -29,6 +32,34 @@ pub trait AgentAdapter: Send + Sync {
     /// 安装 skill 的路径模板（用于导入 lock 文件时自动选择安装路径）
     fn install_path_template(&self, scope: SkillScope) -> Option<String>;
 
+    /// 用户级 skill 安装根目录及当前本机可用状态
+    fn user_skill_root(&self) -> Option<SkillInstallRoot> {
+        let path_template = self.install_path_template(SkillScope::User)?;
+        let root_template = install_root_template_from_skill_template(&path_template);
+        let path = expand_path_template(&root_template, None).ok()?;
+        let status = evaluate_install_root_status(Path::new(&path));
+
+        Some(SkillInstallRoot {
+            agent_id: self.agent_id().to_string(),
+            agent_name: self.agent_name().to_string(),
+            path_template: root_template,
+            path,
+            scope: SkillScope::User,
+            exists: matches!(
+                status,
+                SkillInstallRootStatus::Available
+                    | SkillInstallRootStatus::NotReadable
+                    | SkillInstallRootStatus::NotWritable
+            ),
+            readable: matches!(
+                status,
+                SkillInstallRootStatus::Available | SkillInstallRootStatus::NotWritable
+            ),
+            writable: matches!(status, SkillInstallRootStatus::Available),
+            status,
+        })
+    }
+
     /// Agent 是否已安装
     fn is_installed(&self) -> bool;
 
@@ -52,6 +83,28 @@ pub struct SkillSearchPath {
     pub scope: SkillScope,
     pub priority: u32,
     pub description: String,
+}
+
+/// 描述一个 Agent 的用户级 skill 安装根目录
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillInstallRoot {
+    pub agent_id: String,
+    pub agent_name: String,
+    pub path_template: String,
+    pub path: String,
+    pub scope: SkillScope,
+    pub exists: bool,
+    pub readable: bool,
+    pub writable: bool,
+    pub status: SkillInstallRootStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillInstallRootStatus {
+    Available,
+    Missing,
+    NotReadable,
+    NotWritable,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,4 +181,140 @@ pub enum AdapterError {
 
     #[error("内部错误: {0}")]
     Internal(String),
+}
+
+pub fn expand_path_template(template: &str, name: Option<&str>) -> Result<String, AdapterError> {
+    let mut expanded = template.to_string();
+    expanded = replace_path_variable(expanded, "$HOME", dirs::home_dir())?;
+    expanded = replace_path_variable(expanded, "$XDG_CONFIG_HOME", dirs::config_dir())?;
+    expanded = replace_path_variable(expanded, "$XDG_DATA_HOME", dirs::data_dir())?;
+    expanded = replace_env_variable(expanded, "$APPDATA", "APPDATA")?;
+    expanded = replace_env_variable(expanded, "$LOCALAPPDATA", "LOCALAPPDATA")?;
+
+    if let Some(name) = name {
+        expanded = expanded.replace("{name}", name);
+    }
+
+    Ok(expanded)
+}
+
+fn replace_path_variable(
+    input: String,
+    variable: &str,
+    value: Option<PathBuf>,
+) -> Result<String, AdapterError> {
+    if !input.contains(variable) {
+        return Ok(input);
+    }
+    let value =
+        value.ok_or_else(|| AdapterError::Internal(format!("无法展开路径变量 {}", variable)))?;
+    Ok(input.replace(variable, &value.to_string_lossy()))
+}
+
+fn replace_env_variable(
+    input: String,
+    variable: &str,
+    env_name: &str,
+) -> Result<String, AdapterError> {
+    if !input.contains(variable) {
+        return Ok(input);
+    }
+    let value = std::env::var(env_name)
+        .map_err(|_| AdapterError::Internal(format!("无法展开路径变量 {}", variable)))?;
+    Ok(input.replace(variable, &value))
+}
+
+fn install_root_template_from_skill_template(template: &str) -> String {
+    template
+        .strip_suffix("/{name}")
+        .or_else(|| template.strip_suffix("\\{name}"))
+        .unwrap_or(template)
+        .to_string()
+}
+
+fn evaluate_install_root_status(path: &Path) -> SkillInstallRootStatus {
+    if !path.exists() {
+        return SkillInstallRootStatus::Missing;
+    }
+    if fs::read_dir(path).is_err() {
+        return SkillInstallRootStatus::NotReadable;
+    }
+    if !can_write_directory(path) {
+        return SkillInstallRootStatus::NotWritable;
+    }
+    SkillInstallRootStatus::Available
+}
+
+fn can_write_directory(path: &Path) -> bool {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let probe = path.join(format!(".metis-write-check-{}", suffix));
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+    {
+        Ok(_) => fs::remove_file(probe).is_ok(),
+        Err(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::claude_code::ClaudeCodeAdapter;
+    use crate::codex::CodexAdapter;
+    use crate::hermes::HermesAdapter;
+    use crate::openclaw::OpenClawAdapter;
+    use crate::opencode::OpencodeAdapter;
+
+    #[test]
+    fn expands_install_path_template_variables_and_name() {
+        let expanded = expand_path_template("$HOME/.codex/skills/{name}", Some("example-skill"))
+            .expect("template should expand");
+
+        assert!(expanded.ends_with(".codex/skills/example-skill"));
+        assert!(!expanded.contains("$HOME"));
+        assert!(!expanded.contains("{name}"));
+    }
+
+    #[test]
+    fn builtin_adapters_expose_user_skill_roots_with_status() {
+        let adapters: Vec<Box<dyn AgentAdapter>> = vec![
+            Box::new(CodexAdapter::new()),
+            Box::new(ClaudeCodeAdapter::new()),
+            Box::new(OpenClawAdapter::new()),
+            Box::new(HermesAdapter::new()),
+            Box::new(OpencodeAdapter::new()),
+        ];
+
+        let roots = adapters
+            .iter()
+            .map(|adapter| {
+                adapter
+                    .user_skill_root()
+                    .expect("builtin sync adapters should expose a user root")
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(roots.len(), 5);
+        assert_eq!(roots[0].agent_id, "codex");
+        assert_eq!(roots[1].agent_id, "claude-code");
+        assert_eq!(roots[2].agent_id, "openclaw");
+        assert_eq!(roots[3].agent_id, "hermes");
+        assert_eq!(roots[4].agent_id, "opencode");
+        assert!(roots.iter().all(|root| root.scope == SkillScope::User));
+        assert!(roots
+            .iter()
+            .all(|root| !root.path.contains("{name}") && !root.path.contains("$HOME")));
+        assert!(roots.iter().all(|root| matches!(
+            root.status,
+            SkillInstallRootStatus::Available
+                | SkillInstallRootStatus::Missing
+                | SkillInstallRootStatus::NotReadable
+                | SkillInstallRootStatus::NotWritable
+        )));
+    }
 }

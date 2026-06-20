@@ -83,6 +83,29 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByText("pre-rollback")).toBeTruthy();
   });
 
+  test("previews a remote skill and syncs it to selected agents", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-e2e-skill");
+    await user.type(
+      screen.getByTestId("remote-sync-url"),
+      "https://github.com/example/metis-skills.git",
+    );
+    await user.type(screen.getByTestId("remote-sync-repo-path"), "skills/remote");
+    await user.clear(screen.getByTestId("remote-sync-ref"));
+    await user.type(screen.getByTestId("remote-sync-ref"), "main");
+    await user.click(screen.getByTestId("remote-sync-preview"));
+
+    expect(await screen.findByText("Remote Skill")).toBeTruthy();
+    expect(await screen.findByTestId("remote-target-codex")).toBeTruthy();
+    await user.click(screen.getByTestId("remote-target-checkbox-codex"));
+    await user.click(screen.getByTestId("remote-sync-install"));
+
+    expect(await screen.findByText(/Codex：Installed/)).toBeTruthy();
+  });
+
   test("exports environment report and runs trusted auto updates only", async () => {
     const user = userEvent.setup();
     const scenario = createBetaReadinessScenario();
@@ -620,6 +643,54 @@ function createMainFlowScenario() {
           indexedSkills = [skill];
           return source;
         }
+        case "preview_remote_skill_source":
+          return {
+            name: "Remote Skill",
+            description: "Remote sync candidate",
+            install_name: "remote",
+            commit: "abc123",
+            repo_path: "skills/remote",
+          };
+        case "get_skill_targets_for_source":
+          return [
+            {
+              agent_id: "codex",
+              agent_name: "Codex",
+              root_path: "/tmp/codex-skills",
+              install_path: "/tmp/codex-skills/remote",
+              status: "NotInstalled",
+              local_modified: false,
+              skill_id: null,
+              source_id: null,
+              root_available: true,
+              root_status: "available",
+            },
+            {
+              agent_id: "claude-code",
+              agent_name: "Claude Code",
+              root_path: "/tmp/claude-skills",
+              install_path: "/tmp/claude-skills/remote",
+              status: "AgentRootUnavailable",
+              local_modified: false,
+              skill_id: null,
+              source_id: null,
+              root_available: false,
+              root_status: "missing",
+            },
+          ];
+        case "install_remote_skill_to_targets":
+          return {
+            targets: [
+              {
+                agent_id: "codex",
+                install_path: "/tmp/codex-skills/remote",
+                status: "Installed",
+                reason: null,
+                skill_id: "codex-remote",
+                backup_id: null,
+              },
+            ],
+          };
         case "check_skill_updates":
           return [updateResult(skill, source)];
         case "get_skill_diff":

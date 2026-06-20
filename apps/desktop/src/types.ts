@@ -81,6 +81,55 @@ export interface DesktopRemoteSkillPreview {
   repo_path: string;
 }
 
+export interface DesktopSkillTargetsRequest {
+  url: string;
+  repo_path: string;
+  ref_: string;
+  commit: string;
+  install_name: string;
+}
+
+export interface DesktopSkillTarget {
+  agent_id: string;
+  agent_name: string;
+  root_path: string;
+  install_path: string;
+  status: string;
+  local_modified: boolean;
+  skill_id?: string | null;
+  source_id?: string | null;
+  root_available: boolean;
+  root_status: string;
+}
+
+export interface DesktopInstallRemoteSkillRequest {
+  url: string;
+  repo_path: string;
+  ref_: string;
+  commit: string;
+  install_name: string;
+  targets: DesktopInstallSkillTarget[];
+}
+
+export interface DesktopInstallSkillTarget {
+  agent_id: string;
+  agent_name: string;
+  install_path: string;
+}
+
+export interface DesktopInstallRemoteSkillResult {
+  targets: DesktopInstallTargetResult[];
+}
+
+export interface DesktopInstallTargetResult {
+  agent_id: string;
+  install_path: string;
+  status: string;
+  reason?: string | null;
+  skill_id?: string | null;
+  backup_id?: string | null;
+}
+
 export interface DesktopUpdateCheckRequest {
   skill_ids: string[];
 }

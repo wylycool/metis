@@ -7,6 +7,8 @@ import type {
   DesktopDiffDetail,
   DesktopEnvironmentReport,
   DesktopFileExportResult,
+  DesktopInstallRemoteSkillRequest,
+  DesktopInstallRemoteSkillResult,
   DesktopPreviewRemoteSkillSourceRequest,
   DesktopRemoteSkillPreview,
   DesktopRestoreBackupRequest,
@@ -14,6 +16,8 @@ import type {
   DesktopScanResponse,
   DesktopSettings,
   DesktopSkill,
+  DesktopSkillTarget,
+  DesktopSkillTargetsRequest,
   DesktopSource,
   DesktopAuditLogExportRequest,
   DesktopTeamComplianceReportExportRequest,
@@ -67,6 +71,18 @@ export function previewRemoteSkillSource(
   request: DesktopPreviewRemoteSkillSourceRequest,
 ): Promise<DesktopRemoteSkillPreview> {
   return invoke("preview_remote_skill_source", { request });
+}
+
+export function getSkillTargetsForSource(
+  request: DesktopSkillTargetsRequest,
+): Promise<DesktopSkillTarget[]> {
+  return invoke("get_skill_targets_for_source", { request });
+}
+
+export function installRemoteSkillToTargets(
+  request: DesktopInstallRemoteSkillRequest,
+): Promise<DesktopInstallRemoteSkillResult> {
+  return invoke("install_remote_skill_to_targets", { request });
 }
 
 export function checkSkillUpdates(

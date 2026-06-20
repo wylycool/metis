@@ -746,6 +746,102 @@ h1 {
   margin-bottom: 12px;
 }
 
+.remote-sync-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  border: 1px solid #2a323b;
+  border-radius: 8px;
+  padding: 12px;
+  background: #15191f;
+}
+
+.remote-sync-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.remote-sync-header h3 {
+  font-size: 15px;
+}
+
+.remote-sync-header p,
+.remote-preview-card span,
+.remote-target-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.remote-sync-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 120px;
+  gap: 8px;
+}
+
+.remote-preview-card,
+.remote-install-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #303843;
+  border-radius: 8px;
+  padding: 10px;
+  background: #101216;
+}
+
+.remote-preview-card strong,
+.remote-preview-card span {
+  display: block;
+}
+
+.remote-preview-card code {
+  width: auto;
+  min-width: 92px;
+}
+
+.remote-target-list {
+  display: grid;
+  gap: 8px;
+}
+
+.remote-target-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #2c333b;
+  border-radius: 7px;
+  padding: 8px;
+  background: rgba(16, 18, 22, 0.64);
+}
+
+.remote-target-row strong,
+.remote-target-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.remote-target-row b {
+  color: var(--blue);
+  font-size: 12px;
+}
+
+.remote-install-result {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.remote-install-result span {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--green);
+  font-size: 12px;
+}
+
 .agent-detail-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
