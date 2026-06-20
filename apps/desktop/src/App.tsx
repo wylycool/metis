@@ -2,13 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   applySkillUpdate,
   bindSkillSource,
+  checkTeamManifestCompliance,
   checkSkillUpdates,
+  exportAuditLogReportToFile,
   exportEnvironmentReport,
+  exportEnvironmentReportToFile,
+  exportTeamComplianceReportToFile,
   getSkillDiff,
   getDesktopSettings,
+  getTeamPolicyAuditReport,
+  getTeamPolicySummary,
   listSkillBackups,
   listAgents,
   listIndexedSkills,
+  loadTeamManifestFromFile,
   restoreSkillBackup,
   saveDesktopSettings,
   scanSkills,
@@ -23,6 +30,11 @@ import type {
   DesktopScanWarning,
   DesktopSettings,
   DesktopSkill,
+  DesktopTeamManifestComplianceReport,
+  DesktopTeamManifestComplianceItem,
+  DesktopTeamPolicyAuditReport,
+  DesktopTeamPolicyAuditItem,
+  DesktopTeamPolicySummary,
   DesktopUpdateCheckResult,
   LoadState,
 } from "./types";
@@ -36,6 +48,8 @@ interface BindDraft {
   auto_update: boolean;
 }
 
+type WorkspaceKey = "skills" | "governance" | "settings";
+
 function App() {
   const [agents, setAgents] = useState<DesktopAgentStatus[]>([]);
   const [skills, setSkills] = useState<DesktopSkill[]>([]);
@@ -47,15 +61,28 @@ function App() {
   const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
   const [backupError, setBackupError] = useState<Record<string, DesktopError>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [settings, setSettings] = useState<DesktopSettings>({ custom_scan_paths: [] });
+  const [settings, setSettings] = useState<DesktopSettings>({
+    custom_scan_paths: [],
+    team_policy_path: null,
+    enterprise_network: emptyEnterpriseNetworkSettings(),
+  });
   const [settingsDraft, setSettingsDraft] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [teamPolicyPathDraft, setTeamPolicyPathDraft] = useState("");
+  const [enterpriseProxyUrlDraft, setEnterpriseProxyUrlDraft] = useState("");
+  const [enterpriseNoProxyDraft, setEnterpriseNoProxyDraft] = useState("");
+  const [enterpriseCaBundlePathDraft, setEnterpriseCaBundlePathDraft] = useState("");
+  const [teamPolicySummary, setTeamPolicySummary] = useState<DesktopTeamPolicySummary | null>(
+    null,
+  );
+  const [teamPolicyAuditReport, setTeamPolicyAuditReport] =
+    useState<DesktopTeamPolicyAuditReport | null>(null);
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<DesktopError | null>(null);
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
   const didBootstrap = useRef(false);
 
   const groupedSkills = useMemo(() => {
@@ -79,6 +106,13 @@ function App() {
   const [environmentReport, setEnvironmentReport] = useState<DesktopEnvironmentReport | null>(
     null,
   );
+  const [teamManifestDraft, setTeamManifestDraft] = useState("");
+  const [teamManifestFilePath, setTeamManifestFilePath] = useState("");
+  const [teamComplianceExportPath, setTeamComplianceExportPath] = useState("");
+  const [environmentReportExportPath, setEnvironmentReportExportPath] = useState("");
+  const [auditLogExportPath, setAuditLogExportPath] = useState("");
+  const [teamComplianceReport, setTeamComplianceReport] =
+    useState<DesktopTeamManifestComplianceReport | null>(null);
 
   useEffect(() => {
     if (didBootstrap.current) {
@@ -101,6 +135,8 @@ function App() {
       setAgents(agentResult);
       setSettings(settingsResult);
       setSettingsDraft(settingsResult.custom_scan_paths.join("\n"));
+      setTeamPolicyPathDraft(settingsResult.team_policy_path ?? "");
+      syncEnterpriseNetworkDrafts(settingsResult);
 
       if (indexedResult.length > 0) {
         setSkills(indexedResult);
@@ -117,6 +153,25 @@ function App() {
       setError(desktopError(caught));
       setState("error");
     }
+  }
+
+  function settingsRequestFromDrafts(): DesktopSettings {
+    return {
+      custom_scan_paths: settingsDraft.split("\n"),
+      team_policy_path: teamPolicyPathDraft.trim() || null,
+      enterprise_network: {
+        proxy_url: enterpriseProxyUrlDraft.trim() || null,
+        no_proxy: enterpriseNoProxyDraft.trim() || null,
+        certificate_authority_bundle_path: enterpriseCaBundlePathDraft.trim() || null,
+      },
+    };
+  }
+
+  function syncEnterpriseNetworkDrafts(nextSettings: DesktopSettings) {
+    const network = nextSettings.enterprise_network ?? emptyEnterpriseNetworkSettings();
+    setEnterpriseProxyUrlDraft(network.proxy_url ?? "");
+    setEnterpriseNoProxyDraft(network.no_proxy ?? "");
+    setEnterpriseCaBundlePathDraft(network.certificate_authority_bundle_path ?? "");
   }
 
   async function handleScan() {
@@ -150,11 +205,15 @@ function App() {
 
     try {
       const saved = await saveDesktopSettings({
-        custom_scan_paths: settingsDraft.split("\n"),
+        ...settingsRequestFromDrafts(),
       });
       setSettings(saved);
       setSettingsDraft(saved.custom_scan_paths.join("\n"));
-      setActionMessage("扫描路径已保存");
+      setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+      syncEnterpriseNetworkDrafts(saved);
+      setTeamPolicySummary(null);
+      setTeamPolicyAuditReport(null);
+      setActionMessage("设置已保存");
       if (scanAfterSave) {
         await handleScan();
       } else {
@@ -170,7 +229,7 @@ function App() {
   function removeCustomPath(path: string) {
     const nextPaths = settings.custom_scan_paths.filter((item) => item !== path);
     const nextDraft = nextPaths.join("\n");
-    setSettings({ custom_scan_paths: nextPaths });
+    setSettings({ ...settings, custom_scan_paths: nextPaths });
     setSettingsDraft(nextDraft);
   }
 
@@ -185,6 +244,57 @@ function App() {
       trusted: skill.source?.trusted ?? false,
       auto_update: skill.source?.auto_update ?? false,
     });
+  }
+
+  async function handlePreviewTeamPolicy() {
+    setActionBusy("team-policy");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      if (teamPolicyPathDraft.trim() !== (settings.team_policy_path ?? "")) {
+        const saved = await saveDesktopSettings({
+          ...settingsRequestFromDrafts(),
+        });
+        setSettings(saved);
+        setSettingsDraft(saved.custom_scan_paths.join("\n"));
+        setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+        syncEnterpriseNetworkDrafts(saved);
+      }
+      const summary = await getTeamPolicySummary();
+      setTeamPolicySummary(summary);
+      setTeamPolicyAuditReport(null);
+      setActionMessage(summary ? "团队策略已载入" : "未配置团队策略文件");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleRunTeamPolicyAudit() {
+    setActionBusy("team-policy-audit");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      if (teamPolicyPathDraft.trim() !== (settings.team_policy_path ?? "")) {
+        const saved = await saveDesktopSettings({
+          ...settingsRequestFromDrafts(),
+        });
+        setSettings(saved);
+        setSettingsDraft(saved.custom_scan_paths.join("\n"));
+        setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+        syncEnterpriseNetworkDrafts(saved);
+      }
+      const report = await getTeamPolicyAuditReport();
+      setTeamPolicyAuditReport(report);
+      setActionMessage("策略审计已生成");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
   }
 
   async function refreshIndexedSkills() {
@@ -318,6 +428,97 @@ function App() {
       const report = await exportEnvironmentReport();
       setEnvironmentReport(report);
       setActionMessage("环境报告已生成");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleExportEnvironmentReportToFile() {
+    setActionBusy("environment-report-file");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await exportEnvironmentReportToFile(environmentReportExportPath.trim());
+      setActionMessage(`环境报告已写出：${result.output_path}`);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleLoadTeamManifestFromFile() {
+    setActionBusy("team-manifest-file");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const manifest = await loadTeamManifestFromFile(teamManifestFilePath.trim());
+      setTeamManifestDraft(manifest);
+      setTeamComplianceReport(null);
+      setActionMessage("团队清单文件已载入");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleCheckTeamCompliance() {
+    setActionBusy("team-compliance");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const report = await checkTeamManifestCompliance({
+        manifest_json: teamManifestDraft.trim(),
+      });
+      setTeamComplianceReport(report);
+      setActionMessage("团队合规报告已生成");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleExportTeamComplianceReport() {
+    if (!teamComplianceReport) {
+      return;
+    }
+
+    setActionBusy("team-compliance-export");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await exportTeamComplianceReportToFile({
+        output_path: teamComplianceExportPath.trim(),
+        report: teamComplianceReport,
+      });
+      setActionMessage(`团队合规报告已写出：${result.output_path}`);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleExportAuditLogReport() {
+    setActionBusy("audit-log-export");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await exportAuditLogReportToFile({
+        output_path: auditLogExportPath.trim(),
+        limit: 200,
+        offset: 0,
+      });
+      setActionMessage(`审计日志已写出：${result.output_path}`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -522,6 +723,29 @@ function App() {
         </div>
       </header>
 
+      <nav className="workspace-tabs" aria-label="工作区导航">
+        <WorkspaceTab
+          active={activeWorkspace === "skills"}
+          count={skills.length}
+          label="Skills"
+          testId="workspace-tab-skills"
+          onClick={() => setActiveWorkspace("skills")}
+        />
+        <WorkspaceTab
+          active={activeWorkspace === "governance"}
+          count={boundCount}
+          label="Governance"
+          testId="workspace-tab-governance"
+          onClick={() => setActiveWorkspace("governance")}
+        />
+        <WorkspaceTab
+          active={activeWorkspace === "settings"}
+          label="Settings"
+          testId="workspace-tab-settings"
+          onClick={() => setActiveWorkspace("settings")}
+        />
+      </nav>
+
       <section className="summary-strip" aria-label="扫描摘要">
         <SummaryMetric label="已发现 skills" value={skills.length.toString()} />
         <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
@@ -529,51 +753,212 @@ function App() {
         <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
       </section>
 
-      <section className="beta-panel" aria-label="Beta 稳定化">
-        <div>
-          <h2>Beta 稳定化</h2>
-          <p>
-            Trusted source {trustedSourceCount} 个，Auto update {autoUpdateCount} 个，候选{" "}
-            {trustedAutoUpdateSkills.length} 个。
-          </p>
-        </div>
-        <div className="beta-actions">
-          <button
-            className="ghost-button compact"
-            data-testid="export-environment-report"
-            disabled={actionBusy === "environment-report"}
-            onClick={handleExportEnvironmentReport}
-          >
-            {actionBusy === "environment-report" ? "生成中" : "导出环境报告"}
-          </button>
-          <button
-            className="compact"
-            data-testid="run-auto-update"
-            disabled={actionBusy === "auto-update" || skills.length === 0}
-            onClick={handleRunAutoUpdate}
-          >
-            {actionBusy === "auto-update" ? "更新中" : "受控自动更新"}
-          </button>
-        </div>
-        {environmentReport && (
-          <pre className="environment-report-preview">
-            {JSON.stringify(environmentReport, null, 2)}
-          </pre>
-        )}
-      </section>
+      {actionError && <InlineError error={actionError} />}
+      {actionMessage && <div className="inline-success">{actionMessage}</div>}
 
-      <section className="settings-panel" aria-label="设置">
-        <button
-          className="ghost-button settings-toggle"
-          onClick={() => setSettingsOpen((current) => !current)}
-        >
-          {settingsOpen ? "收起设置" : "设置"}
-        </button>
-        <div className="settings-summary">
-          <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
-          <span>凭据使用本机 Git / SSH 配置</span>
-        </div>
-        {settingsOpen && (
+      {activeWorkspace === "governance" && (
+        <section className="workspace-pane" data-testid="workspace-governance">
+          <section className="beta-panel" aria-label="Beta 稳定化">
+            <div>
+              <h2>Beta 稳定化</h2>
+              <p>
+                Trusted source {trustedSourceCount} 个，Auto update {autoUpdateCount} 个，候选{" "}
+                {trustedAutoUpdateSkills.length} 个。
+              </p>
+            </div>
+            <div className="beta-actions">
+              <button
+                className="ghost-button compact"
+                data-testid="export-environment-report"
+                disabled={actionBusy === "environment-report"}
+                onClick={handleExportEnvironmentReport}
+              >
+                {actionBusy === "environment-report" ? "生成中" : "导出环境报告"}
+              </button>
+              <button
+                className="compact"
+                data-testid="run-auto-update"
+                disabled={actionBusy === "auto-update" || skills.length === 0}
+                onClick={handleRunAutoUpdate}
+              >
+                {actionBusy === "auto-update" ? "更新中" : "受控自动更新"}
+              </button>
+            </div>
+            <div className="file-action-row">
+              <input
+                data-testid="environment-report-export-path"
+                value={environmentReportExportPath}
+                placeholder="/tmp/metis-environment-report.json"
+                onChange={(event) => setEnvironmentReportExportPath(event.target.value)}
+              />
+              <button
+                className="ghost-button compact"
+                data-testid="export-environment-report-to-file"
+                disabled={
+                  actionBusy === "environment-report-file" ||
+                  environmentReportExportPath.trim().length === 0
+                }
+                onClick={handleExportEnvironmentReportToFile}
+              >
+                {actionBusy === "environment-report-file" ? "写出中" : "写出环境报告"}
+              </button>
+            </div>
+            {environmentReport ? (
+              <ReportPreview title="环境报告预览" subtitle="不包含 token 或 credential_ref 值。">
+                {JSON.stringify(environmentReport, null, 2)}
+              </ReportPreview>
+            ) : (
+              <ReportEmptyState
+                testId="environment-report-empty"
+                title="暂无环境报告"
+                description="先生成环境报告，再决定是否写出到文件。"
+              />
+            )}
+          </section>
+
+          <section className="team-compliance-panel" aria-label="团队清单合规">
+            <div className="team-compliance-header">
+              <div>
+                <h2>团队清单合规</h2>
+                <p>版本锁定、来源绑定和本地修改状态。</p>
+              </div>
+              <button
+                className="compact"
+                data-testid="check-team-compliance"
+                disabled={actionBusy === "team-compliance" || teamManifestDraft.trim().length === 0}
+                onClick={handleCheckTeamCompliance}
+              >
+                {actionBusy === "team-compliance" ? "校验中" : "校验清单"}
+              </button>
+            </div>
+            <div className="file-action-row">
+              <input
+                data-testid="team-manifest-file-path"
+                value={teamManifestFilePath}
+                placeholder="/tmp/team-manifest.json"
+                onChange={(event) => setTeamManifestFilePath(event.target.value)}
+              />
+              <button
+                className="ghost-button compact"
+                data-testid="load-team-manifest-from-file"
+                disabled={
+                  actionBusy === "team-manifest-file" || teamManifestFilePath.trim().length === 0
+                }
+                onClick={handleLoadTeamManifestFromFile}
+              >
+                {actionBusy === "team-manifest-file" ? "载入中" : "从文件载入"}
+              </button>
+            </div>
+            <textarea
+              className="team-manifest-input"
+              data-testid="team-manifest-input"
+              value={teamManifestDraft}
+              placeholder='{"version":"1","skills":[]}'
+              onChange={(event) => setTeamManifestDraft(event.target.value)}
+            />
+            {teamComplianceReport ? (
+              <div className="team-compliance-result">
+                <div className="team-compliance-summary">
+                  <SummaryMetric
+                    label="清单 skills"
+                    value={teamComplianceReport.summary.total.toString()}
+                  />
+                  <SummaryMetric
+                    label="符合版本"
+                    value={teamComplianceReport.summary.installed.toString()}
+                  />
+                  <SummaryMetric
+                    label="缺失"
+                    value={teamComplianceReport.summary.missing.toString()}
+                  />
+                  <SummaryMetric
+                    label="版本不一致"
+                    value={teamComplianceReport.summary.version_mismatch.toString()}
+                  />
+                  <SummaryMetric
+                    label="本地修改"
+                    value={teamComplianceReport.summary.local_modified.toString()}
+                  />
+                  <SummaryMetric
+                    label="来源不一致"
+                    value={teamComplianceReport.summary.source_mismatch.toString()}
+                  />
+                </div>
+                <div className="team-compliance-list">
+                  {teamComplianceReport.items.map((item) => (
+                    <TeamComplianceRow key={`${item.agent_id}:${item.name}`} item={item} />
+                  ))}
+                </div>
+                <ReportPreview title="团队合规报告预览" subtitle="用于提交给团队或归档审计。">
+                  {JSON.stringify(teamComplianceReport, null, 2)}
+                </ReportPreview>
+                <div className="file-action-row">
+                  <input
+                    data-testid="team-compliance-export-path"
+                    value={teamComplianceExportPath}
+                    placeholder="/tmp/metis-team-compliance-report.json"
+                    onChange={(event) => setTeamComplianceExportPath(event.target.value)}
+                  />
+                  <button
+                    className="ghost-button compact"
+                    data-testid="export-team-compliance-report"
+                    disabled={
+                      actionBusy === "team-compliance-export" ||
+                      teamComplianceExportPath.trim().length === 0
+                    }
+                    onClick={handleExportTeamComplianceReport}
+                  >
+                    {actionBusy === "team-compliance-export" ? "写出中" : "写出合规报告"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <ReportEmptyState
+                testId="team-compliance-empty"
+                title="暂无团队合规报告"
+                description="粘贴或载入团队清单后再校验合规状态。"
+              />
+            )}
+          </section>
+
+          <section className="governance-audit-panel" aria-label="本地审计导出">
+            <div>
+              <h2>本地审计导出</h2>
+              <p>导出最近 200 条本机审计事件，用于团队只读审计和问题追溯。</p>
+            </div>
+            <div className="file-action-row">
+              <input
+                data-testid="audit-log-export-path"
+                value={auditLogExportPath}
+                placeholder="/tmp/metis-audit-log-report.json"
+                onChange={(event) => setAuditLogExportPath(event.target.value)}
+              />
+              <button
+                className="ghost-button compact"
+                data-testid="export-audit-log-report"
+                disabled={actionBusy === "audit-log-export" || auditLogExportPath.trim().length === 0}
+                onClick={handleExportAuditLogReport}
+              >
+                {actionBusy === "audit-log-export" ? "写出中" : "写出审计日志"}
+              </button>
+            </div>
+          </section>
+        </section>
+      )}
+
+      {activeWorkspace === "settings" && (
+        <section className="settings-panel workspace-pane" aria-label="配置" data-testid="workspace-settings">
+          <div className="settings-summary">
+            <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
+            <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
+            <span>{settings.enterprise_network?.proxy_url ? "已配置企业代理" : "未配置企业代理"}</span>
+            <span>
+              {settings.enterprise_network?.certificate_authority_bundle_path
+                ? "已配置企业 CA bundle"
+                : "未配置企业 CA bundle"}
+            </span>
+            <span>凭据使用本机 Git / SSH 配置</span>
+          </div>
           <div className="settings-editor">
             <div className="settings-section">
               <div>
@@ -622,6 +1007,106 @@ function App() {
                 </button>
               </div>
             </div>
+            <div className="settings-section">
+              <div>
+                <h3>团队策略</h3>
+                <p>本地 JSON 策略可预配置 trusted source，并限制未信任来源自动更新。</p>
+              </div>
+              <input
+                data-testid="team-policy-path"
+                value={teamPolicyPathDraft}
+                placeholder="/Users/me/team-policy.json"
+                onChange={(event) => setTeamPolicyPathDraft(event.target.value)}
+              />
+              <div className="form-actions">
+                <button
+                  className="ghost-button compact"
+                  data-testid="preview-team-policy"
+                  disabled={actionBusy === "team-policy" || teamPolicyPathDraft.trim().length === 0}
+                  onClick={handlePreviewTeamPolicy}
+                >
+                  {actionBusy === "team-policy" ? "读取中" : "预览策略"}
+                </button>
+                <button
+                  className="ghost-button compact"
+                  data-testid="run-team-policy-audit"
+                  disabled={
+                    actionBusy === "team-policy-audit" || teamPolicyPathDraft.trim().length === 0
+                  }
+                  onClick={handleRunTeamPolicyAudit}
+                >
+                  {actionBusy === "team-policy-audit" ? "审计中" : "审计现有来源"}
+                </button>
+              </div>
+              {teamPolicySummary && (
+                <div className="policy-summary">
+                  <span>策略版本 {teamPolicySummary.version}</span>
+                  <span>可信来源 {teamPolicySummary.trusted_sources} 个</span>
+                  <span>
+                    {teamPolicySummary.allow_auto_update ? "允许自动更新" : "禁止自动更新"}
+                  </span>
+                  <span>
+                    {teamPolicySummary.require_trusted_source
+                      ? "自动更新要求 trusted source"
+                      : "自动更新不要求 trusted source"}
+                  </span>
+                </div>
+              )}
+              {teamPolicyAuditReport && (
+                <div className="policy-audit-result">
+                  <div className="policy-summary">
+                    <span>已绑定来源 {teamPolicyAuditReport.total_bound_sources} 个</span>
+                    <span>合规 {teamPolicyAuditReport.compliant} 个</span>
+                    <span>建议标记 trusted {teamPolicyAuditReport.should_mark_trusted} 个</span>
+                    <span>需关闭 auto update {teamPolicyAuditReport.auto_update_disallowed} 个</span>
+                  </div>
+                  <div className="policy-audit-list">
+                    {teamPolicyAuditReport.items.map((item) => (
+                      <PolicyAuditRow key={`${item.skill_id}:${item.source_id}`} item={item} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="settings-section">
+              <div>
+                <h3>企业网络</h3>
+                <p>代理和企业 CA bundle 仅用于 Metis 发起的 Git 子进程。</p>
+              </div>
+              <div className="network-field-grid">
+                <input
+                  data-testid="enterprise-proxy-url"
+                  value={enterpriseProxyUrlDraft}
+                  placeholder="http://proxy.corp.example:8080"
+                  onChange={(event) => setEnterpriseProxyUrlDraft(event.target.value)}
+                />
+                <input
+                  data-testid="enterprise-no-proxy"
+                  value={enterpriseNoProxyDraft}
+                  placeholder="localhost,127.0.0.1,.corp.example"
+                  onChange={(event) => setEnterpriseNoProxyDraft(event.target.value)}
+                />
+                <input
+                  data-testid="enterprise-ca-bundle-path"
+                  value={enterpriseCaBundlePathDraft}
+                  placeholder="/Users/me/certs/corp-ca.pem"
+                  onChange={(event) => setEnterpriseCaBundlePathDraft(event.target.value)}
+                />
+              </div>
+              <div className="policy-summary">
+                <span>
+                  {settings.enterprise_network?.proxy_url ? "企业代理已配置" : "企业代理未配置"}
+                </span>
+                <span>
+                  {settings.enterprise_network?.no_proxy ? "NO_PROXY 已配置" : "NO_PROXY 未配置"}
+                </span>
+                <span>
+                  {settings.enterprise_network?.certificate_authority_bundle_path
+                    ? "企业 CA bundle 已配置"
+                    : "企业 CA bundle 未配置"}
+                </span>
+              </div>
+            </div>
             <div className="settings-section credential-section">
               <div>
                 <h3>凭据引用</h3>
@@ -633,76 +1118,77 @@ function App() {
               </div>
             </div>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      <main className="workspace">
-        <aside className="agent-rail" aria-label="Agent 分组">
-          <div className="rail-heading">
-            <span>Agent</span>
-            <strong>{agents.length}</strong>
-          </div>
-          <div className="agent-list">
-            {groupedSkills.map((agent) => (
-              <div className="agent-row" key={agent.agent_id}>
-                <div>
-                  <strong>{agent.agent_name}</strong>
-                  <span>{agent.agent_id}</span>
-                </div>
-                <b>{agent.skills.length}</b>
-              </div>
-            ))}
-          </div>
-        </aside>
-
-        <section className="skill-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Skill 索引</h2>
-              <p>{statusText(state, skills.length)}</p>
+      {activeWorkspace === "skills" && (
+        <main className="workspace workspace-pane" data-testid="workspace-skills">
+          <aside className="agent-rail" aria-label="Agent 分组">
+            <div className="rail-heading">
+              <span>Agent</span>
+              <strong>{agents.length}</strong>
             </div>
-            {warnings.length > 0 && (
-              <span className="warning-pill">{warnings.length} 条 warning</span>
-            )}
-          </div>
-
-          {actionError && <InlineError error={actionError} />}
-          {actionMessage && <div className="inline-success">{actionMessage}</div>}
-
-          {state === "loading" && <LoadingState />}
-          {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
-          {state === "loaded" && skills.length === 0 && <EmptyState onScan={handleScan} />}
-          {state === "loaded" && skills.length > 0 && (
-            <div className="skill-list">
-              {skills.map((skill) => (
-                <SkillRow
-                  key={skill.id}
-                  skill={skill}
-                  updateResult={updateResults[skill.id]}
-                  diffDetail={diffDetails[skill.id]}
-                  diffError={diffError[skill.id]}
-                  backups={backups[skill.id] ?? []}
-                  backupOpen={backupPanels[skill.id] ?? false}
-                  backupError={backupError[skill.id]}
-                  isBinding={bindingSkillId === skill.id}
-                  bindDraft={bindDraft}
-                  busyKey={actionBusy}
-                  onOpenBind={() => openBindForm(skill)}
-                  onCancelBind={() => setBindingSkillId(null)}
-                  onDraftChange={setBindDraft}
-                  onBind={() => handleBindSource(skill.id)}
-                  onUnbind={() => handleUnbindSource(skill.id)}
-                  onCheck={() => handleCheckUpdates([skill.id])}
-                  onToggleDiff={() => handleToggleDiff(skill.id)}
-                  onApplyUpdate={() => handleApplyUpdate(skill.id)}
-                  onToggleBackups={() => handleToggleBackups(skill.id)}
-                  onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
-                />
+            <div className="agent-list">
+              {groupedSkills.map((agent) => (
+                <div className="agent-row" key={agent.agent_id}>
+                  <div>
+                    <strong>{agent.agent_name}</strong>
+                    <span>{agent.agent_id}</span>
+                  </div>
+                  <b>{agent.skills.length}</b>
+                </div>
               ))}
             </div>
-          )}
-        </section>
-      </main>
+          </aside>
+
+          <section className="skill-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Skill 索引</h2>
+                <p>{statusText(state, skills.length)}</p>
+              </div>
+              {warnings.length > 0 && (
+                <span className="warning-pill">{warnings.length} 条 warning</span>
+              )}
+            </div>
+
+            {state === "loading" && <LoadingState />}
+            {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
+            {state === "loaded" && skills.length === 0 && (
+              <EmptyState onOpenSettings={() => setActiveWorkspace("settings")} onScan={handleScan} />
+            )}
+            {state === "loaded" && skills.length > 0 && (
+              <div className="skill-list">
+                {skills.map((skill) => (
+                  <SkillRow
+                    key={skill.id}
+                    skill={skill}
+                    updateResult={updateResults[skill.id]}
+                    diffDetail={diffDetails[skill.id]}
+                    diffError={diffError[skill.id]}
+                    backups={backups[skill.id] ?? []}
+                    backupOpen={backupPanels[skill.id] ?? false}
+                    backupError={backupError[skill.id]}
+                    isBinding={bindingSkillId === skill.id}
+                    bindDraft={bindDraft}
+                    busyKey={actionBusy}
+                    onOpenBind={() => openBindForm(skill)}
+                    onCancelBind={() => setBindingSkillId(null)}
+                    onDraftChange={setBindDraft}
+                    onBind={() => handleBindSource(skill.id)}
+                    onUnbind={() => handleUnbindSource(skill.id)}
+                    onCheck={() => handleCheckUpdates([skill.id])}
+                    onToggleDiff={() => handleToggleDiff(skill.id)}
+                    onApplyUpdate={() => handleApplyUpdate(skill.id)}
+                    onToggleBackups={() => handleToggleBackups(skill.id)}
+                    onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+      )}
 
       {warnings.length > 0 && (
         <section className="warning-panel" aria-label="扫描警告">
@@ -724,6 +1210,116 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
     <div className="metric">
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function WorkspaceTab({
+  active,
+  count,
+  label,
+  testId,
+  onClick,
+}: {
+  active: boolean;
+  count?: number;
+  label: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`workspace-tab ${active ? "active" : ""}`}
+      data-testid={testId}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      {count !== undefined && <strong>{count}</strong>}
+    </button>
+  );
+}
+
+function TeamComplianceRow({ item }: { item: DesktopTeamManifestComplianceItem }) {
+  return (
+    <article className="team-compliance-row">
+      <div>
+        <div className="skill-title compact-title">
+          <h3>{item.name}</h3>
+          <span>{item.agent_id}</span>
+        </div>
+        <div className="team-compliance-meta">
+          <span>expected {item.expected_commit ? shortCommit(item.expected_commit) : "unlocked"}</span>
+          <span>local {item.local_commit ? shortCommit(item.local_commit) : "none"}</span>
+          <span>{item.local_modified ? "local modified" : "local clean"}</span>
+        </div>
+        <div className="team-compliance-source">
+          <code>{item.expected_source_url ?? "no expected source"}</code>
+          <code>{item.local_source_url ?? "no local source"}</code>
+        </div>
+      </div>
+      <span className={`status-badge ${teamComplianceTone(item.status)}`}>{item.status}</span>
+    </article>
+  );
+}
+
+function PolicyAuditRow({ item }: { item: DesktopTeamPolicyAuditItem }) {
+  return (
+    <article className="policy-audit-row">
+      <div>
+        <div className="skill-title compact-title">
+          <h3>{item.skill_name}</h3>
+          <span>{item.source_ref}</span>
+        </div>
+        <div className="team-compliance-meta">
+          <span>{item.current_trusted ? "trusted" : "untrusted"}</span>
+          <span>{item.current_auto_update ? "auto update on" : "auto update off"}</span>
+          <span>{item.policy_trusted ? "policy trusted" : "policy untrusted"}</span>
+        </div>
+        <div className="team-compliance-source">
+          <code>{item.source_url}</code>
+          <code>{item.source_repo_path}</code>
+        </div>
+        <p className="policy-recommendation">{item.recommendation}</p>
+      </div>
+      <span className={`status-badge ${policyAuditTone(item.status)}`}>{item.status}</span>
+    </article>
+  );
+}
+
+function ReportPreview({
+  children,
+  subtitle,
+  title,
+}: {
+  children: string;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <div className="report-preview-shell">
+      <div className="report-preview-header">
+        <strong>{title}</strong>
+        <span>{subtitle}</span>
+      </div>
+      <pre className="environment-report-preview">{children}</pre>
+    </div>
+  );
+}
+
+function ReportEmptyState({
+  description,
+  testId,
+  title,
+}: {
+  description: string;
+  testId: string;
+  title: string;
+}) {
+  return (
+    <div className="report-empty-state" data-testid={testId}>
+      <strong>{title}</strong>
+      <span>{description}</span>
     </div>
   );
 }
@@ -1053,6 +1649,7 @@ function BindSourceForm({
       </label>
       <label className="check-label">
         <input
+          data-testid={`bind-trusted-${skillId}`}
           checked={draft.trusted}
           type="checkbox"
           onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
@@ -1061,6 +1658,7 @@ function BindSourceForm({
       </label>
       <label className="check-label">
         <input
+          data-testid={`bind-auto-update-${skillId}`}
           checked={draft.auto_update}
           type="checkbox"
           onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
@@ -1129,12 +1727,21 @@ function ErrorState({ message, onRetry }: { message: DesktopError | null; onRetr
   );
 }
 
-function EmptyState({ onScan }: { onScan: () => void }) {
+function EmptyState({
+  onOpenSettings,
+  onScan,
+}: {
+  onOpenSettings: () => void;
+  onScan: () => void;
+}) {
   return (
-    <div className="state-block">
+    <div className="state-block empty-state" data-testid="skills-empty-state">
       <h3>还没有发现 skills</h3>
-      <p>默认目录中暂时没有可索引的 `SKILL.md`。</p>
-      <button onClick={onScan}>重新扫描</button>
+      <p>默认目录中暂时没有可索引的 SKILL.md。可以重新扫描，或添加团队/个人的 Generic Agent Skills 根目录。</p>
+      <div className="empty-actions">
+        <button onClick={onScan}>重新扫描</button>
+        <button className="ghost-button" onClick={onOpenSettings}>添加扫描路径</button>
+      </div>
     </div>
   );
 }
@@ -1195,6 +1802,32 @@ function updateTone(
   return "muted";
 }
 
+function teamComplianceTone(status: string): "good" | "danger" | "warning" | "muted" {
+  if (status === "installed") {
+    return "good";
+  }
+  if (status === "missing" || status === "source_mismatch") {
+    return "danger";
+  }
+  if (status === "version_mismatch" || status === "local_modified") {
+    return "warning";
+  }
+  return "muted";
+}
+
+function policyAuditTone(status: string): "good" | "danger" | "warning" | "muted" {
+  if (status === "compliant") {
+    return "good";
+  }
+  if (status === "auto_update_disallowed") {
+    return "danger";
+  }
+  if (status === "should_mark_trusted") {
+    return "warning";
+  }
+  return "muted";
+}
+
 function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
   if (result?.local_modified) {
     return "本地修改，先处理";
@@ -1222,6 +1855,14 @@ function emptyBindDraft(): BindDraft {
     credential_ref: "",
     trusted: false,
     auto_update: false,
+  };
+}
+
+function emptyEnterpriseNetworkSettings() {
+  return {
+    proxy_url: null,
+    no_proxy: null,
+    certificate_authority_bundle_path: null,
   };
 }
 

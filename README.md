@@ -10,21 +10,23 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 下载 Beta
 
-最新 Beta：[`desktop-v0.1.0-beta.1`](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.1)
+最新 Beta：[`desktop-v0.1.0-beta.2`](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.2)
 
 | 系统 | 下载 |
 | --- | --- |
-| macOS | [`Metis_0.1.0_universal.dmg`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_universal.dmg) |
-| Windows | [`Metis_0.1.0_x64-setup.exe`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_x64-setup.exe) |
-| Linux deb | [`Metis_0.1.0_amd64.deb`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_amd64.deb) |
-| Linux AppImage | [`Metis_0.1.0_amd64.AppImage`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_amd64.AppImage) |
-| 校验文件 | [`SHA256SUMS`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/SHA256SUMS) |
+| macOS | [`Metis_0.1.0_universal.dmg`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.2/Metis_0.1.0_universal.dmg) |
+| Windows | [`Metis_0.1.0_x64-setup.exe`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.2/Metis_0.1.0_x64-setup.exe) |
+| Linux deb | [`Metis_0.1.0_amd64.deb`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.2/Metis_0.1.0_amd64.deb) |
+| Linux AppImage | [`Metis_0.1.0_amd64.AppImage`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.2/Metis_0.1.0_amd64.AppImage) |
+| 校验文件 | [`SHA256SUMS`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.2/SHA256SUMS) |
 
-当前 Beta 包未做系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。完整发布页见 [GitHub Releases](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.1)。
+当前 Beta 包未做系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。完整发布页见 [GitHub Releases](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.2)。
 
 ## 当前阶段
 
-项目处于 **Phase 3 Beta 稳定化完成点**：Phase 1 的 Core Engine 本地管理闭环、Phase 2 Desktop MVP 和 Phase 3 Beta 稳定化已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出和受控自动更新。macOS 本机 `.dmg` 预览包已验证；macOS/Windows/Linux 预览包已由 GitHub Actions workflow 实跑生成。
+项目处于 **Phase 5 产品化体验与稳定性收口完成点 / Beta 2 已发布**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地企业治理能力和 Phase 5 产品化收口均已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出、团队清单合规、团队策略审计、企业网络配置和受控自动更新。
+
+当前推荐下载版本是 `desktop-v0.1.0-beta.2`；该版本包含 Beta 2 体验打磨，包括 Skills / Governance / Settings 工作区、空状态、报告预览占位、设置保存反馈和本地验证清单。
 
 ## 技术栈
 
@@ -94,7 +96,7 @@ macOS 面向下载的首选预览包是 universal DMG，输出在 `target/univer
 
 ## 安装提示
 
-Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。首个 Beta tag 为 `desktop-v0.1.0-beta.1`。
+Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。当前推荐 Beta tag 为 `desktop-v0.1.0-beta.2`。
 
 - macOS：下载 universal `.dmg`，挂载后拖拽或启动 Metis。当前包未签名和公证，首次启动可能需要右键打开，或到系统设置中允许打开。
 - Windows：下载 Windows installer。当前包未做 Authenticode 签名，SmartScreen 可能提示未知发布者，需要选择继续运行。
@@ -103,9 +105,16 @@ Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 
 
 签名、公证和 Windows Authenticode 属于后续可选信任增强，不阻塞开源 Beta 通过 GitHub Releases 分发。
 
-## 暂不进入 MVP
+首次打开后的建议路径：
 
-以下方向重要，但不进入第一阶段：
+1. 在 `Skills` 工作区点击重新扫描，确认本机已安装 skills。
+2. 对需要治理的 skill 绑定 Git source，并按需标记 trusted source。
+3. 在 `Governance` 工作区导出环境报告，或粘贴团队清单检查合规状态。
+4. 在 `Settings` 工作区配置额外扫描路径、团队策略文件和企业代理/CA bundle。
+
+## 当前不做
+
+以下方向重要，但不进入当前 Beta 产品化收口：
 
 - skill marketplace
 - 云同步

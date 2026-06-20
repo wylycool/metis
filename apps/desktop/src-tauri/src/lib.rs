@@ -3,9 +3,19 @@
 //! Tauri command 是 UI 到 Core Engine 的薄封装层。
 //! 核心逻辑全部在 metis-core 中实现。
 
+use metis_core::audit::{query_audit_log as core_query_audit_log, AuditQuery};
+use metis_core::config::{
+    evaluate_source_policy, parse_team_policy_from_str, TeamPolicy as CoreTeamPolicy,
+};
 use metis_core::discovery::{
     list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
     ScanOptions, ScanResult,
+};
+use metis_core::lockfile::{
+    check_team_manifest_compliance_from_str as core_check_team_manifest_compliance_from_str,
+    TeamManifestComplianceItem as CoreTeamManifestComplianceItem,
+    TeamManifestComplianceReport as CoreTeamManifestComplianceReport,
+    TeamManifestComplianceSummary as CoreTeamManifestComplianceSummary,
 };
 use metis_core::rollback::{
     list_backups as core_list_backups, restore_backup as core_restore_backup,
@@ -21,7 +31,7 @@ use metis_core::update::{
     DiffDetail as CoreDiffDetail, DiffStatus as CoreDiffStatus, DiffSummary, RemoteCommitChecker,
     UpdateCheckOptions, UpdateCheckResult, UpdateStatus,
 };
-use metis_git_provider::fetch::SystemGitCliProvider;
+use metis_git_provider::fetch::{EnvironmentGitRunner, GitCliProvider};
 use metis_security::findings::{SecurityFinding, SecuritySeverity};
 use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
 use serde::{Deserialize, Serialize};
@@ -153,6 +163,20 @@ pub struct DesktopSource {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopSettings {
     pub custom_scan_paths: Vec<String>,
+    #[serde(default)]
+    pub team_policy_path: Option<String>,
+    #[serde(default)]
+    pub enterprise_network: DesktopEnterpriseNetworkSettings,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopEnterpriseNetworkSettings {
+    #[serde(default)]
+    pub proxy_url: Option<String>,
+    #[serde(default)]
+    pub no_proxy: Option<String>,
+    #[serde(default)]
+    pub certificate_authority_bundle_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -296,6 +320,121 @@ pub struct DesktopEnvironmentSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceRequest {
+    pub manifest_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceReport {
+    pub generated_at: String,
+    pub manifest_version: String,
+    pub summary: DesktopTeamManifestComplianceSummary,
+    pub items: Vec<DesktopTeamManifestComplianceItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceSummary {
+    pub total: usize,
+    pub installed: usize,
+    pub missing: usize,
+    pub version_mismatch: usize,
+    pub local_modified: usize,
+    pub source_mismatch: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceItem {
+    pub name: String,
+    pub agent_id: String,
+    pub status: String,
+    pub expected_source_url: Option<String>,
+    pub expected_source_repo_path: Option<String>,
+    pub expected_source_ref: Option<String>,
+    pub expected_commit: Option<String>,
+    pub local_skill_id: Option<String>,
+    pub local_install_path: Option<String>,
+    pub local_source_url: Option<String>,
+    pub local_source_repo_path: Option<String>,
+    pub local_source_ref: Option<String>,
+    pub local_commit: Option<String>,
+    pub local_modified: Option<bool>,
+    pub trusted_source: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamPolicySummary {
+    pub version: String,
+    pub trusted_sources: usize,
+    pub allow_auto_update: bool,
+    pub require_trusted_source: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamPolicyAuditReport {
+    pub generated_at: String,
+    pub total_bound_sources: usize,
+    pub compliant: usize,
+    pub should_mark_trusted: usize,
+    pub auto_update_disallowed: usize,
+    pub items: Vec<DesktopTeamPolicyAuditItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamPolicyAuditItem {
+    pub skill_id: String,
+    pub skill_name: String,
+    pub source_id: String,
+    pub source_url: String,
+    pub source_repo_path: String,
+    pub source_ref: String,
+    pub current_trusted: bool,
+    pub current_auto_update: bool,
+    pub policy_trusted: bool,
+    pub auto_update_allowed: bool,
+    pub status: String,
+    pub recommendation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopFileExportResult {
+    pub output_path: String,
+    pub bytes_written: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamComplianceReportExportRequest {
+    pub output_path: String,
+    pub report: DesktopTeamManifestComplianceReport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopAuditLogExportRequest {
+    pub output_path: String,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopAuditLogReport {
+    pub generated_at: String,
+    pub total: usize,
+    pub events: Vec<DesktopAuditEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopAuditEvent {
+    pub id: String,
+    pub skill_id: String,
+    pub action: String,
+    pub detail: Option<String>,
+    pub commit_before: Option<String>,
+    pub commit_after: Option<String>,
+    pub status: String,
+    pub risk_summary: Option<String>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopError {
     pub category: String,
     pub title: String,
@@ -369,6 +508,8 @@ pub fn save_desktop_settings_for_state(
     state.ensure_dirs()?;
     let normalized = DesktopSettings {
         custom_scan_paths: normalize_paths(settings.custom_scan_paths),
+        team_policy_path: normalize_optional_text(settings.team_policy_path),
+        enterprise_network: normalize_enterprise_network_settings(settings.enterprise_network),
     };
     let contents = serde_json::to_string_pretty(&normalized).map_err(|error| error.to_string())?;
     fs::write(state.settings_path(), contents).map_err(|error| error.to_string())?;
@@ -380,6 +521,7 @@ pub fn bind_skill_source_for_state(
     request: DesktopBindSourceRequest,
 ) -> Result<DesktopSource, String> {
     let store = state.open_store()?;
+    let request = apply_team_policy_to_bind_request(state, request)?;
     let source = core_bind_source(
         &request.skill_id,
         SourceInput {
@@ -396,6 +538,95 @@ pub fn bind_skill_source_for_state(
     .map_err(|error| error.to_string())?;
 
     Ok(desktop_source_from_core(source))
+}
+
+pub fn get_team_policy_summary_for_state(
+    state: &DesktopAppState,
+) -> Result<Option<DesktopTeamPolicySummary>, String> {
+    Ok(load_team_policy_for_state(state)?.map(desktop_team_policy_summary))
+}
+
+pub fn get_team_policy_audit_report_for_state(
+    state: &DesktopAppState,
+) -> Result<DesktopTeamPolicyAuditReport, String> {
+    let policy = load_team_policy_for_state(state)?;
+    let store = state.open_store()?;
+    let skills = store.list_skills().map_err(|error| error.to_string())?;
+    let mut items = Vec::new();
+
+    for skill in skills {
+        let Some(source_id) = skill.source_id.as_deref() else {
+            continue;
+        };
+        let Some(source) = store
+            .get_source(source_id)
+            .map_err(|error| error.to_string())?
+        else {
+            continue;
+        };
+        let evaluation = policy
+            .as_ref()
+            .map(|policy| {
+                evaluate_source_policy(policy, &source.url, &source.repo_path, &source.ref_)
+            })
+            .unwrap_or(metis_core::config::SourcePolicyEvaluation {
+                trusted: false,
+                auto_update_allowed: false,
+                matched_source_url: None,
+            });
+        items.push(desktop_team_policy_audit_item(skill, source, evaluation));
+    }
+
+    let compliant = items
+        .iter()
+        .filter(|item| item.status == "compliant")
+        .count();
+    let should_mark_trusted = items
+        .iter()
+        .filter(|item| item.status == "should_mark_trusted")
+        .count();
+    let auto_update_disallowed = items
+        .iter()
+        .filter(|item| item.status == "auto_update_disallowed")
+        .count();
+
+    Ok(DesktopTeamPolicyAuditReport {
+        generated_at: current_timestamp_string(),
+        total_bound_sources: items.len(),
+        compliant,
+        should_mark_trusted,
+        auto_update_disallowed,
+        items,
+    })
+}
+
+fn apply_team_policy_to_bind_request(
+    state: &DesktopAppState,
+    mut request: DesktopBindSourceRequest,
+) -> Result<DesktopBindSourceRequest, String> {
+    if let Some(policy) = load_team_policy_for_state(state)? {
+        let evaluation =
+            evaluate_source_policy(&policy, &request.url, &request.repo_path, &request.ref_);
+        if evaluation.trusted {
+            request.trusted = true;
+        }
+        if request.auto_update && !evaluation.auto_update_allowed {
+            request.auto_update = false;
+        }
+    }
+    Ok(request)
+}
+
+fn load_team_policy_for_state(state: &DesktopAppState) -> Result<Option<CoreTeamPolicy>, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    let Some(path) = settings.team_policy_path else {
+        return Ok(None);
+    };
+    let contents = fs::read_to_string(path)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    parse_team_policy_from_str(&contents)
+        .map(Some)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
 pub fn unbind_skill_source_for_state(
@@ -541,6 +772,86 @@ pub fn export_environment_report_for_state(
     })
 }
 
+pub fn check_team_manifest_compliance_for_state(
+    state: &DesktopAppState,
+    request: DesktopTeamManifestComplianceRequest,
+) -> Result<DesktopTeamManifestComplianceReport, String> {
+    let store = state.open_store()?;
+    core_check_team_manifest_compliance_from_str(&request.manifest_json, &store)
+        .map(desktop_team_manifest_compliance_report)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
+pub fn load_team_manifest_from_file_for_state(
+    state: &DesktopAppState,
+    path: String,
+) -> Result<String, String> {
+    state.ensure_dirs()?;
+    fs::read_to_string(path)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
+pub fn export_team_compliance_report_to_file_for_state(
+    state: &DesktopAppState,
+    request: DesktopTeamComplianceReportExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    state.ensure_dirs()?;
+    write_json_file(&request.output_path, &request.report)
+}
+
+pub fn export_environment_report_to_file_for_state(
+    state: &DesktopAppState,
+    output_path: String,
+) -> Result<DesktopFileExportResult, String> {
+    let report = export_environment_report_for_state(state)?;
+    write_json_file(&output_path, &report)
+}
+
+pub fn export_audit_log_report_to_file_for_state(
+    state: &DesktopAppState,
+    request: DesktopAuditLogExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    let store = state.open_store()?;
+    let events = core_query_audit_log(
+        AuditQuery {
+            skill_id: None,
+            action: None,
+            limit: request.limit,
+            offset: request.offset,
+        },
+        &store,
+    )
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    let report = DesktopAuditLogReport {
+        generated_at: current_timestamp_string(),
+        total: events.len(),
+        events: events.into_iter().map(desktop_audit_event).collect(),
+    };
+
+    write_json_file(&request.output_path, &report)
+}
+
+fn write_json_file<T: Serialize>(
+    output_path: &str,
+    value: &T,
+) -> Result<DesktopFileExportResult, String> {
+    let path = PathBuf::from(output_path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+        }
+    }
+    let contents = serde_json::to_string_pretty(value)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    fs::write(&path, contents.as_bytes())
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    Ok(DesktopFileExportResult {
+        output_path: output_path.to_string(),
+        bytes_written: contents.len() as u64,
+    })
+}
+
 fn current_timestamp_string() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -584,6 +895,20 @@ fn save_desktop_settings(
 }
 
 #[tauri::command]
+fn get_team_policy_summary(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<Option<DesktopTeamPolicySummary>, String> {
+    get_team_policy_summary_for_state(&state)
+}
+
+#[tauri::command]
+fn get_team_policy_audit_report(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopTeamPolicyAuditReport, String> {
+    get_team_policy_audit_report_for_state(&state)
+}
+
+#[tauri::command]
 fn bind_skill_source(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopBindSourceRequest,
@@ -604,7 +929,7 @@ fn check_skill_updates(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopUpdateCheckRequest,
 ) -> Result<Vec<DesktopUpdateCheckResult>, String> {
-    let checker = system_git_checker_for_state(&state);
+    let checker = system_git_checker_for_state(&state)?;
     check_skill_updates_for_state_with_checker(&state, request, &checker)
 }
 
@@ -613,7 +938,7 @@ fn get_skill_diff(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopDiffDetail, String> {
-    let checker = system_git_checker_for_state(&state);
+    let checker = system_git_checker_for_state(&state)?;
     get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -622,7 +947,7 @@ fn apply_skill_update(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopApplyUpdateResult, String> {
-    let checker = system_git_checker_for_state(&state);
+    let checker = system_git_checker_for_state(&state)?;
     apply_skill_update_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -649,6 +974,46 @@ fn export_environment_report(
     export_environment_report_for_state(&state)
 }
 
+#[tauri::command]
+fn check_team_manifest_compliance(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopTeamManifestComplianceRequest,
+) -> Result<DesktopTeamManifestComplianceReport, String> {
+    check_team_manifest_compliance_for_state(&state, request)
+}
+
+#[tauri::command]
+fn load_team_manifest_from_file(
+    state: tauri::State<'_, DesktopAppState>,
+    path: String,
+) -> Result<String, String> {
+    load_team_manifest_from_file_for_state(&state, path)
+}
+
+#[tauri::command]
+fn export_team_compliance_report_to_file(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopTeamComplianceReportExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    export_team_compliance_report_to_file_for_state(&state, request)
+}
+
+#[tauri::command]
+fn export_environment_report_to_file(
+    state: tauri::State<'_, DesktopAppState>,
+    output_path: String,
+) -> Result<DesktopFileExportResult, String> {
+    export_environment_report_to_file_for_state(&state, output_path)
+}
+
+#[tauri::command]
+fn export_audit_log_report_to_file(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopAuditLogExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    export_audit_log_report_to_file_for_state(&state, request)
+}
+
 fn desktop_scan_response(
     result: ScanResult,
     store: &SkillIndexStore,
@@ -669,11 +1034,14 @@ fn desktop_scan_response(
     })
 }
 
-fn system_git_checker_for_state(state: &DesktopAppState) -> SystemGitCliProvider {
-    SystemGitCliProvider::with_cache_root(
-        metis_git_provider::fetch::SystemGitRunner,
+fn system_git_checker_for_state(
+    state: &DesktopAppState,
+) -> Result<GitCliProvider<EnvironmentGitRunner>, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    Ok(GitCliProvider::with_cache_root(
+        EnvironmentGitRunner::new(git_environment_for_settings(&settings)),
         state.cache_root().to_string_lossy().to_string(),
-    )
+    ))
 }
 
 fn normalize_paths(paths: Vec<String>) -> Vec<String> {
@@ -686,6 +1054,37 @@ fn normalize_paths(paths: Vec<String>) -> Vec<String> {
         normalized.push(trimmed.to_string());
     }
     normalized
+}
+
+fn normalize_enterprise_network_settings(
+    settings: DesktopEnterpriseNetworkSettings,
+) -> DesktopEnterpriseNetworkSettings {
+    DesktopEnterpriseNetworkSettings {
+        proxy_url: normalize_optional_text(settings.proxy_url),
+        no_proxy: normalize_optional_text(settings.no_proxy),
+        certificate_authority_bundle_path: normalize_optional_text(
+            settings.certificate_authority_bundle_path,
+        ),
+    }
+}
+
+fn git_environment_for_settings(settings: &DesktopSettings) -> Vec<(String, String)> {
+    let mut environment = Vec::new();
+    if let Some(proxy_url) = settings.enterprise_network.proxy_url.as_ref() {
+        environment.push(("HTTPS_PROXY".to_string(), proxy_url.clone()));
+        environment.push(("HTTP_PROXY".to_string(), proxy_url.clone()));
+    }
+    if let Some(no_proxy) = settings.enterprise_network.no_proxy.as_ref() {
+        environment.push(("NO_PROXY".to_string(), no_proxy.clone()));
+    }
+    if let Some(ca_bundle_path) = settings
+        .enterprise_network
+        .certificate_authority_bundle_path
+        .as_ref()
+    {
+        environment.push(("GIT_SSL_CAINFO".to_string(), ca_bundle_path.clone()));
+    }
+    environment
 }
 
 fn list_indexed_skills_from_store(store: &SkillIndexStore) -> Result<Vec<DesktopSkill>, String> {
@@ -754,6 +1153,114 @@ fn desktop_source_from_record(source: SourceRecord) -> DesktopSource {
         trusted: source.trusted,
         auto_update: source.auto_update,
         credential_ref: source.credential_ref,
+    }
+}
+
+fn desktop_team_manifest_compliance_report(
+    report: CoreTeamManifestComplianceReport,
+) -> DesktopTeamManifestComplianceReport {
+    DesktopTeamManifestComplianceReport {
+        generated_at: report.generated_at,
+        manifest_version: report.manifest_version,
+        summary: desktop_team_manifest_compliance_summary(report.summary),
+        items: report
+            .items
+            .into_iter()
+            .map(desktop_team_manifest_compliance_item)
+            .collect(),
+    }
+}
+
+fn desktop_team_manifest_compliance_summary(
+    summary: CoreTeamManifestComplianceSummary,
+) -> DesktopTeamManifestComplianceSummary {
+    DesktopTeamManifestComplianceSummary {
+        total: summary.total,
+        installed: summary.installed,
+        missing: summary.missing,
+        version_mismatch: summary.version_mismatch,
+        local_modified: summary.local_modified,
+        source_mismatch: summary.source_mismatch,
+    }
+}
+
+fn desktop_team_manifest_compliance_item(
+    item: CoreTeamManifestComplianceItem,
+) -> DesktopTeamManifestComplianceItem {
+    DesktopTeamManifestComplianceItem {
+        name: item.name,
+        agent_id: item.agent_id,
+        status: item.status,
+        expected_source_url: item.expected_source_url,
+        expected_source_repo_path: item.expected_source_repo_path,
+        expected_source_ref: item.expected_source_ref,
+        expected_commit: item.expected_commit,
+        local_skill_id: item.local_skill_id,
+        local_install_path: item.local_install_path,
+        local_source_url: item.local_source_url,
+        local_source_repo_path: item.local_source_repo_path,
+        local_source_ref: item.local_source_ref,
+        local_commit: item.local_commit,
+        local_modified: item.local_modified,
+        trusted_source: item.trusted_source,
+    }
+}
+
+fn desktop_team_policy_summary(policy: CoreTeamPolicy) -> DesktopTeamPolicySummary {
+    DesktopTeamPolicySummary {
+        version: policy.version,
+        trusted_sources: policy.trusted_sources.len(),
+        allow_auto_update: policy.update_policy.allow_auto_update,
+        require_trusted_source: policy.update_policy.require_trusted_source,
+    }
+}
+
+fn desktop_team_policy_audit_item(
+    skill: SkillRecord,
+    source: SourceRecord,
+    evaluation: metis_core::config::SourcePolicyEvaluation,
+) -> DesktopTeamPolicyAuditItem {
+    let (status, recommendation) = if source.auto_update && !evaluation.auto_update_allowed {
+        (
+            "auto_update_disallowed",
+            "关闭 auto update，或将该 source 加入团队 trusted_sources。",
+        )
+    } else if evaluation.trusted && !source.trusted {
+        (
+            "should_mark_trusted",
+            "该 source 命中团队 trusted source，建议标记为 trusted。",
+        )
+    } else {
+        ("compliant", "当前 source 与团队策略一致。")
+    };
+
+    DesktopTeamPolicyAuditItem {
+        skill_id: skill.id,
+        skill_name: skill.name,
+        source_id: source.id,
+        source_url: source.url,
+        source_repo_path: source.repo_path,
+        source_ref: source.ref_,
+        current_trusted: source.trusted,
+        current_auto_update: source.auto_update,
+        policy_trusted: evaluation.trusted,
+        auto_update_allowed: evaluation.auto_update_allowed,
+        status: status.to_string(),
+        recommendation: recommendation.to_string(),
+    }
+}
+
+fn desktop_audit_event(event: metis_core::audit::AuditEvent) -> DesktopAuditEvent {
+    DesktopAuditEvent {
+        id: event.id,
+        skill_id: event.skill_id,
+        action: format!("{:?}", event.action),
+        detail: event.detail,
+        commit_before: event.commit_before,
+        commit_after: event.commit_after,
+        status: event.status,
+        risk_summary: event.risk_summary,
+        created_at: event.created_at,
     }
 }
 
@@ -1044,6 +1551,8 @@ pub fn run() {
             list_indexed_skills,
             get_desktop_settings,
             save_desktop_settings,
+            get_team_policy_summary,
+            get_team_policy_audit_report,
             bind_skill_source,
             unbind_skill_source,
             check_skill_updates,
@@ -1051,7 +1560,12 @@ pub fn run() {
             apply_skill_update,
             list_skill_backups,
             restore_skill_backup,
-            export_environment_report
+            export_environment_report,
+            check_team_manifest_compliance,
+            load_team_manifest_from_file,
+            export_team_compliance_report_to_file,
+            export_environment_report_to_file,
+            export_audit_log_report_to_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1285,6 +1799,8 @@ description: {description}
             &state,
             DesktopSettings {
                 custom_scan_paths: vec![custom_root.to_string_lossy().to_string()],
+                team_policy_path: None,
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");
@@ -1319,6 +1835,8 @@ description: {description}
                     "/tmp/metis/custom".to_string(),
                     "/tmp/metis/other".to_string(),
                 ],
+                team_policy_path: Some("  /tmp/metis/team-policy.json  ".to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");
@@ -1332,6 +1850,348 @@ description: {description}
             vec!["/tmp/metis/custom", "/tmp/metis/other"]
         );
         assert_eq!(loaded, saved);
+        assert_eq!(
+            loaded.team_policy_path.as_deref(),
+            Some("/tmp/metis/team-policy.json")
+        );
+    }
+
+    #[test]
+    fn enterprise_network_settings_normalize_and_build_git_environment() {
+        let workspace = temp_dir("enterprise-network-settings");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+
+        let saved = save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: None,
+                enterprise_network: DesktopEnterpriseNetworkSettings {
+                    proxy_url: Some("  http://proxy.corp.example:8080  ".to_string()),
+                    no_proxy: Some("  localhost,127.0.0.1,.corp.example  ".to_string()),
+                    certificate_authority_bundle_path: Some(
+                        "  /Users/me/certs/corp-ca.pem  ".to_string(),
+                    ),
+                },
+            },
+        )
+        .expect("settings should save");
+        let environment = git_environment_for_settings(&saved);
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(
+            saved.enterprise_network.proxy_url.as_deref(),
+            Some("http://proxy.corp.example:8080")
+        );
+        assert_eq!(
+            saved.enterprise_network.no_proxy.as_deref(),
+            Some("localhost,127.0.0.1,.corp.example")
+        );
+        assert_eq!(
+            saved
+                .enterprise_network
+                .certificate_authority_bundle_path
+                .as_deref(),
+            Some("/Users/me/certs/corp-ca.pem")
+        );
+        assert_eq!(
+            environment,
+            vec![
+                (
+                    "HTTPS_PROXY".to_string(),
+                    "http://proxy.corp.example:8080".to_string()
+                ),
+                (
+                    "HTTP_PROXY".to_string(),
+                    "http://proxy.corp.example:8080".to_string()
+                ),
+                (
+                    "NO_PROXY".to_string(),
+                    "localhost,127.0.0.1,.corp.example".to_string()
+                ),
+                (
+                    "GIT_SSL_CAINFO".to_string(),
+                    "/Users/me/certs/corp-ca.pem".to_string()
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn team_policy_summary_loads_trusted_sources_from_settings_path() {
+        let workspace = temp_dir("team-policy-summary");
+        let policy_path = workspace.join("policy/team-policy.json");
+        fs::create_dir_all(policy_path.parent().expect("policy should have parent"))
+            .expect("policy parent should be created");
+        fs::write(
+            &policy_path,
+            r#"{
+                "version": "1",
+                "trusted_sources": [
+                    {
+                        "url": "https://github.com/example/team-skills.git",
+                        "repo_path": "skills/team",
+                        "ref": "main"
+                    }
+                ],
+                "update_policy": {
+                    "allow_auto_update": true,
+                    "require_trusted_source": true
+                }
+            }"#,
+        )
+        .expect("policy should write");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+            },
+        )
+        .expect("settings should save");
+
+        let summary = get_team_policy_summary_for_state(&state)
+            .expect("policy summary should load")
+            .expect("policy summary should exist");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(summary.version, "1");
+        assert_eq!(summary.trusted_sources, 1);
+        assert!(summary.allow_auto_update);
+        assert!(summary.require_trusted_source);
+    }
+
+    #[test]
+    fn bind_skill_source_for_state_applies_team_policy_defaults_and_auto_update_gate() {
+        let workspace = temp_dir("team-policy-bind-source");
+        let skill_root = workspace.join("skills");
+        let policy_path = workspace.join("policy/team-policy.json");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        fs::create_dir_all(policy_path.parent().expect("policy should have parent"))
+            .expect("policy parent should be created");
+        fs::write(
+            &policy_path,
+            r#"{
+                "version": "1",
+                "trusted_sources": [
+                    {
+                        "url": "https://github.com/example/team-skills.git",
+                        "repo_path": "skills/writer",
+                        "ref": "main"
+                    }
+                ],
+                "update_policy": {
+                    "allow_auto_update": true,
+                    "require_trusted_source": true
+                }
+            }"#,
+        )
+        .expect("policy should write");
+        write_skill(&skill_root, "writer", "writer", "Writes things");
+        write_skill(&skill_root, "personal", "personal", "Personal things");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+            },
+        )
+        .expect("settings should save");
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should succeed");
+        let writer_id = scanned
+            .skills
+            .iter()
+            .find(|skill| skill.name == "writer")
+            .expect("writer should exist")
+            .id
+            .clone();
+        let personal_id = scanned
+            .skills
+            .iter()
+            .find(|skill| skill.name == "personal")
+            .expect("personal should exist")
+            .id
+            .clone();
+
+        let trusted = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: writer_id,
+                url: "https://github.com/example/team-skills.git".to_string(),
+                repo_path: "skills/writer".to_string(),
+                ref_: "main".to_string(),
+                credential_ref: None,
+                trusted: false,
+                auto_update: true,
+            },
+        )
+        .expect("trusted source should bind");
+        let untrusted = bind_skill_source_for_state(
+            &state,
+            DesktopBindSourceRequest {
+                skill_id: personal_id,
+                url: "https://github.com/example/personal.git".to_string(),
+                repo_path: "skills/personal".to_string(),
+                ref_: "main".to_string(),
+                credential_ref: None,
+                trusted: false,
+                auto_update: true,
+            },
+        )
+        .expect("untrusted source should bind with auto update disabled");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(trusted.trusted);
+        assert!(trusted.auto_update);
+        assert!(!untrusted.trusted);
+        assert!(!untrusted.auto_update);
+    }
+
+    #[test]
+    fn policy_audit_reports_existing_source_recommendations_without_mutating_sources() {
+        let workspace = temp_dir("policy-audit");
+        let policy_path = workspace.join("policy/team-policy.json");
+        fs::create_dir_all(policy_path.parent().expect("policy should have parent"))
+            .expect("policy parent should be created");
+        fs::write(
+            &policy_path,
+            r#"{
+                "version": "1",
+                "trusted_sources": [
+                    {"url": "https://github.com/example/team.git", "repo_path": "skills/compliant", "ref": "main"},
+                    {"url": "https://github.com/example/team.git", "repo_path": "skills/needs-trusted", "ref": "main"}
+                ],
+                "update_policy": {
+                    "allow_auto_update": true,
+                    "require_trusted_source": true
+                }
+            }"#,
+        )
+        .expect("policy should write");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+            },
+        )
+        .expect("settings should save");
+        let store = state.open_store().expect("store should open");
+        for (skill_id, name, source_id, repo_path, trusted, auto_update) in [
+            (
+                "skill-compliant",
+                "Compliant",
+                "source-compliant",
+                "skills/compliant",
+                true,
+                true,
+            ),
+            (
+                "skill-needs-trusted",
+                "Needs Trusted",
+                "source-needs-trusted",
+                "skills/needs-trusted",
+                false,
+                true,
+            ),
+            (
+                "skill-untrusted-auto",
+                "Untrusted Auto",
+                "source-untrusted-auto",
+                "skills/untrusted",
+                false,
+                true,
+            ),
+        ] {
+            store
+                .upsert_source(&SourceRecord {
+                    id: source_id.to_string(),
+                    source_type: "git".to_string(),
+                    url: if repo_path == "skills/untrusted" {
+                        "https://github.com/example/personal.git".to_string()
+                    } else {
+                        "https://github.com/example/team.git".to_string()
+                    },
+                    repo_path: repo_path.to_string(),
+                    ref_: "main".to_string(),
+                    current_commit: Some("aaa111".to_string()),
+                    remote_commit: Some("bbb222".to_string()),
+                    last_checked_at: Some("2026-06-20T10:00:00Z".to_string()),
+                    trusted,
+                    auto_update,
+                    credential_ref: Some("secret-token".to_string()),
+                    created_at: None,
+                    updated_at: None,
+                })
+                .expect("source should insert");
+            store
+                .upsert_skill(&SkillRecord {
+                    id: skill_id.to_string(),
+                    agent_id: "generic".to_string(),
+                    name: name.to_string(),
+                    description: Some("Policy audit skill".to_string()),
+                    version: None,
+                    author: None,
+                    license: None,
+                    tags: Vec::new(),
+                    category: None,
+                    install_path: workspace
+                        .join(format!("skills/{skill_id}"))
+                        .to_string_lossy()
+                        .to_string(),
+                    scope: "custom".to_string(),
+                    metadata_path: None,
+                    metadata_status: "found".to_string(),
+                    metadata_error: None,
+                    source_id: Some(source_id.to_string()),
+                    local_fingerprint: None,
+                    local_modified: Some(false),
+                    last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+                })
+                .expect("skill should insert");
+        }
+
+        let report =
+            get_team_policy_audit_report_for_state(&state).expect("policy audit should load");
+        let json = serde_json::to_string(&report).expect("report should serialize");
+        let sources = store.list_sources().expect("sources should remain");
+
+        drop(store);
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(report.total_bound_sources, 3);
+        assert_eq!(report.compliant, 1);
+        assert_eq!(report.should_mark_trusted, 1);
+        assert_eq!(report.auto_update_disallowed, 1);
+        assert!(report.items.iter().any(|item| item.status == "compliant"));
+        assert!(report
+            .items
+            .iter()
+            .any(|item| item.status == "should_mark_trusted"));
+        assert!(report
+            .items
+            .iter()
+            .any(|item| item.status == "auto_update_disallowed"));
+        assert!(sources.iter().any(|source| {
+            source.id == "source-needs-trusted" && !source.trusted && source.auto_update
+        }));
+        assert!(!json.contains("secret-token"));
     }
 
     #[test]
@@ -1345,6 +2205,8 @@ description: {description}
             &state,
             DesktopSettings {
                 custom_scan_paths: vec![skill_root.to_string_lossy().to_string()],
+                team_policy_path: None,
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");
@@ -1737,6 +2599,263 @@ description: {description}
                 .has_credential_ref
         );
         assert!(!json.contains("secret-token"));
+    }
+
+    #[test]
+    fn check_team_manifest_compliance_for_state_returns_read_only_report() {
+        let workspace = temp_dir("team-compliance");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let store = state.open_store().expect("store should open");
+        store
+            .upsert_source(&SourceRecord {
+                id: "source-installed".to_string(),
+                source_type: "git".to_string(),
+                url: "https://github.com/example/team-skills.git".to_string(),
+                repo_path: "skills/installed".to_string(),
+                ref_: "main".to_string(),
+                current_commit: Some("aaa111".to_string()),
+                remote_commit: None,
+                last_checked_at: None,
+                trusted: true,
+                auto_update: false,
+                credential_ref: Some("secret-token".to_string()),
+                created_at: None,
+                updated_at: None,
+            })
+            .expect("source should insert");
+        store
+            .upsert_skill(&SkillRecord {
+                id: "skill-installed".to_string(),
+                agent_id: "generic".to_string(),
+                name: "Installed".to_string(),
+                description: Some("Installed team skill".to_string()),
+                version: None,
+                author: None,
+                license: None,
+                tags: Vec::new(),
+                category: None,
+                install_path: workspace
+                    .join("skills/installed")
+                    .to_string_lossy()
+                    .to_string(),
+                scope: "custom".to_string(),
+                metadata_path: None,
+                metadata_status: "found".to_string(),
+                metadata_error: None,
+                source_id: Some("source-installed".to_string()),
+                local_fingerprint: None,
+                local_modified: Some(false),
+                last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+            })
+            .expect("skill should insert");
+        let manifest_json = serde_json::json!({
+            "version": "1",
+            "exported_at": "2026-06-20T12:00:00Z",
+            "skills": [
+                {
+                    "name": "Installed",
+                    "agent_id": "generic",
+                    "source_url": "https://github.com/example/team-skills.git",
+                    "source_repo_path": "skills/installed",
+                    "source_ref": "main",
+                    "source_commit": "aaa111",
+                    "install_path_hint": null
+                },
+                {
+                    "name": "Missing",
+                    "agent_id": "generic",
+                    "source_url": "https://github.com/example/team-skills.git",
+                    "source_repo_path": "skills/missing",
+                    "source_ref": "main",
+                    "source_commit": "bbb222",
+                    "install_path_hint": null
+                }
+            ]
+        })
+        .to_string();
+
+        let report = check_team_manifest_compliance_for_state(
+            &state,
+            DesktopTeamManifestComplianceRequest { manifest_json },
+        )
+        .expect("desktop compliance should return");
+        let json = serde_json::to_string(&report).expect("report should serialize");
+
+        drop(store);
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(report.summary.total, 2);
+        assert_eq!(report.summary.installed, 1);
+        assert_eq!(report.summary.missing, 1);
+        assert_eq!(report.items[0].status, "installed");
+        assert_eq!(report.items[1].status, "missing");
+        assert!(!json.contains("secret-token"));
+    }
+
+    #[test]
+    fn phase4_local_governance_exports_read_and_write_reports_without_credentials() {
+        let workspace = temp_dir("phase4-local-governance-exports");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let manifest_path = workspace.join("team/manifest.json");
+        fs::create_dir_all(manifest_path.parent().expect("manifest should have parent"))
+            .expect("manifest parent should be created");
+        fs::write(
+            &manifest_path,
+            r#"{"version":"1","exported_at":"2026-06-20T12:00:00Z","skills":[]}"#,
+        )
+        .expect("manifest should write");
+
+        let loaded_manifest = load_team_manifest_from_file_for_state(
+            &state,
+            manifest_path.to_string_lossy().to_string(),
+        )
+        .expect("manifest should load");
+
+        let store = state.open_store().expect("store should open");
+        store
+            .upsert_source(&SourceRecord {
+                id: "source-trusted".to_string(),
+                source_type: "git".to_string(),
+                url: "file:///tmp/metis-trusted".to_string(),
+                repo_path: "skills/trusted".to_string(),
+                ref_: "main".to_string(),
+                current_commit: Some("aaa111".to_string()),
+                remote_commit: Some("bbb222".to_string()),
+                last_checked_at: Some("2026-06-20T10:00:00Z".to_string()),
+                trusted: true,
+                auto_update: true,
+                credential_ref: Some("secret-token".to_string()),
+                created_at: None,
+                updated_at: None,
+            })
+            .expect("source should insert");
+        store
+            .upsert_skill(&SkillRecord {
+                id: "trusted-skill".to_string(),
+                agent_id: "generic".to_string(),
+                name: "Trusted Skill".to_string(),
+                description: Some("Trusted beta skill".to_string()),
+                version: None,
+                author: None,
+                license: None,
+                tags: Vec::new(),
+                category: None,
+                install_path: workspace
+                    .join("skills/trusted-skill")
+                    .to_string_lossy()
+                    .to_string(),
+                scope: "custom".to_string(),
+                metadata_path: None,
+                metadata_status: "found".to_string(),
+                metadata_error: None,
+                source_id: Some("source-trusted".to_string()),
+                local_fingerprint: None,
+                local_modified: Some(false),
+                last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+            })
+            .expect("skill should insert");
+        store
+            .insert_audit_event(&metis_storage::db::AuditEventRecord {
+                id: "audit-1".to_string(),
+                skill_id: "trusted-skill".to_string(),
+                action: "source_bound".to_string(),
+                detail: Some("bound source without secret values".to_string()),
+                commit_before: None,
+                commit_after: Some("aaa111".to_string()),
+                status: "success".to_string(),
+                risk_summary: None,
+                created_at: Some("2026-06-20T10:01:00Z".to_string()),
+            })
+            .expect("audit event should insert");
+        drop(store);
+
+        let compliance_report = DesktopTeamManifestComplianceReport {
+            generated_at: "2026-06-20T10:02:00Z".to_string(),
+            manifest_version: "1".to_string(),
+            summary: DesktopTeamManifestComplianceSummary {
+                total: 1,
+                installed: 1,
+                missing: 0,
+                version_mismatch: 0,
+                local_modified: 0,
+                source_mismatch: 0,
+            },
+            items: vec![DesktopTeamManifestComplianceItem {
+                name: "Trusted Skill".to_string(),
+                agent_id: "generic".to_string(),
+                status: "installed".to_string(),
+                expected_source_url: Some("file:///tmp/metis-trusted".to_string()),
+                expected_source_repo_path: Some("skills/trusted".to_string()),
+                expected_source_ref: Some("main".to_string()),
+                expected_commit: Some("aaa111".to_string()),
+                local_skill_id: Some("trusted-skill".to_string()),
+                local_install_path: Some(
+                    workspace
+                        .join("skills/trusted-skill")
+                        .to_string_lossy()
+                        .to_string(),
+                ),
+                local_source_url: Some("file:///tmp/metis-trusted".to_string()),
+                local_source_repo_path: Some("skills/trusted".to_string()),
+                local_source_ref: Some("main".to_string()),
+                local_commit: Some("aaa111".to_string()),
+                local_modified: Some(false),
+                trusted_source: Some(true),
+            }],
+        };
+
+        let compliance_output = workspace.join("reports/compliance.json");
+        let environment_output = workspace.join("reports/environment.json");
+        let audit_output = workspace.join("reports/audit.json");
+
+        let compliance_written = export_team_compliance_report_to_file_for_state(
+            &state,
+            DesktopTeamComplianceReportExportRequest {
+                output_path: compliance_output.to_string_lossy().to_string(),
+                report: compliance_report,
+            },
+        )
+        .expect("compliance report should export");
+        let environment_written = export_environment_report_to_file_for_state(
+            &state,
+            environment_output.to_string_lossy().to_string(),
+        )
+        .expect("environment report should export");
+        let audit_written = export_audit_log_report_to_file_for_state(
+            &state,
+            DesktopAuditLogExportRequest {
+                output_path: audit_output.to_string_lossy().to_string(),
+                limit: 200,
+                offset: 0,
+            },
+        )
+        .expect("audit report should export");
+
+        let compliance_json =
+            fs::read_to_string(&compliance_output).expect("compliance output should read");
+        let environment_json =
+            fs::read_to_string(&environment_output).expect("environment output should read");
+        let audit_json = fs::read_to_string(&audit_output).expect("audit output should read");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(loaded_manifest.contains("\"version\":\"1\""));
+        assert_eq!(
+            compliance_written.output_path,
+            compliance_output.to_string_lossy()
+        );
+        assert_eq!(
+            environment_written.output_path,
+            environment_output.to_string_lossy()
+        );
+        assert_eq!(audit_written.output_path, audit_output.to_string_lossy());
+        assert!(compliance_json.contains("\"status\": \"installed\""));
+        assert!(environment_json.contains("\"has_credential_ref\": true"));
+        assert!(audit_json.contains("\"total\": 1"));
+        assert!(audit_json.contains("\"action\": \"SourceBound\""));
+        assert!(!compliance_json.contains("secret-token"));
+        assert!(!environment_json.contains("secret-token"));
+        assert!(!audit_json.contains("secret-token"));
     }
 
     #[test]

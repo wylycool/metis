@@ -47,6 +47,14 @@ export interface DesktopSource {
 
 export interface DesktopSettings {
   custom_scan_paths: string[];
+  team_policy_path?: string | null;
+  enterprise_network?: DesktopEnterpriseNetworkSettings | null;
+}
+
+export interface DesktopEnterpriseNetworkSettings {
+  proxy_url?: string | null;
+  no_proxy?: string | null;
+  certificate_authority_bundle_path?: string | null;
 }
 
 export interface DesktopBindSourceRequest {
@@ -177,6 +185,91 @@ export interface DesktopEnvironmentSource {
   trusted: boolean;
   auto_update: boolean;
   has_credential_ref: boolean;
+}
+
+export interface DesktopFileExportResult {
+  output_path: string;
+  bytes_written: number;
+}
+
+export interface DesktopTeamPolicySummary {
+  version: string;
+  trusted_sources: number;
+  allow_auto_update: boolean;
+  require_trusted_source: boolean;
+}
+
+export interface DesktopTeamPolicyAuditReport {
+  generated_at: string;
+  total_bound_sources: number;
+  compliant: number;
+  should_mark_trusted: number;
+  auto_update_disallowed: number;
+  items: DesktopTeamPolicyAuditItem[];
+}
+
+export interface DesktopTeamPolicyAuditItem {
+  skill_id: string;
+  skill_name: string;
+  source_id: string;
+  source_url: string;
+  source_repo_path: string;
+  source_ref: string;
+  current_trusted: boolean;
+  current_auto_update: boolean;
+  policy_trusted: boolean;
+  auto_update_allowed: boolean;
+  status: string;
+  recommendation: string;
+}
+
+export interface DesktopTeamManifestComplianceRequest {
+  manifest_json: string;
+}
+
+export interface DesktopTeamManifestComplianceReport {
+  generated_at: string;
+  manifest_version: string;
+  summary: DesktopTeamManifestComplianceSummary;
+  items: DesktopTeamManifestComplianceItem[];
+}
+
+export interface DesktopTeamManifestComplianceSummary {
+  total: number;
+  installed: number;
+  missing: number;
+  version_mismatch: number;
+  local_modified: number;
+  source_mismatch: number;
+}
+
+export interface DesktopTeamManifestComplianceItem {
+  name: string;
+  agent_id: string;
+  status: string;
+  expected_source_url?: string | null;
+  expected_source_repo_path?: string | null;
+  expected_source_ref?: string | null;
+  expected_commit?: string | null;
+  local_skill_id?: string | null;
+  local_install_path?: string | null;
+  local_source_url?: string | null;
+  local_source_repo_path?: string | null;
+  local_source_ref?: string | null;
+  local_commit?: string | null;
+  local_modified?: boolean | null;
+  trusted_source?: boolean | null;
+}
+
+export interface DesktopTeamComplianceReportExportRequest {
+  output_path: string;
+  report: DesktopTeamManifestComplianceReport;
+}
+
+export interface DesktopAuditLogExportRequest {
+  output_path: string;
+  limit: number;
+  offset: number;
 }
 
 export interface DesktopError {

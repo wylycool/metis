@@ -196,6 +196,63 @@ h1 {
   margin-bottom: 14px;
 }
 
+.workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(16, 18, 22, 0.78);
+}
+
+.workspace-tab {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+.workspace-tab strong {
+  min-width: 22px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #d8e3de;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.workspace-tab.active {
+  color: var(--text);
+  border-color: rgba(208, 168, 79, 0.52);
+  background: rgba(208, 168, 79, 0.12);
+}
+
+.workspace-tab.active strong {
+  color: #151515;
+  background: var(--gold);
+}
+
+.workspace-pane {
+  animation: pane-in 140ms ease-out;
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .beta-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -226,6 +283,63 @@ h1 {
   justify-content: flex-end;
 }
 
+.file-action-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.network-field-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.report-preview-shell {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.report-preview-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-preview-header strong {
+  font-size: 13px;
+}
+
+.report-preview-header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.report-empty-state {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+  border: 1px dashed #3b4550;
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--muted);
+  background: rgba(16, 18, 22, 0.36);
+}
+
+.report-empty-state strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.report-empty-state span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .environment-report-preview {
   grid-column: 1 / -1;
   max-height: 260px;
@@ -240,6 +354,113 @@ h1 {
   line-height: 1.55;
   overflow: auto;
   white-space: pre-wrap;
+}
+
+.team-compliance-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(25, 29, 35, 0.88);
+  padding: 13px 14px;
+}
+
+.governance-audit-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(25, 29, 35, 0.86);
+  padding: 13px 14px;
+}
+
+.governance-audit-panel h2 {
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.governance-audit-panel p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.team-compliance-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.team-compliance-header h2 {
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.team-compliance-header p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.team-manifest-input {
+  min-height: 128px;
+}
+
+.team-compliance-result {
+  display: grid;
+  gap: 10px;
+}
+
+.team-compliance-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-compliance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-compliance-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #323b45;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(16, 18, 22, 0.66);
+}
+
+.compact-title h3 {
+  font-size: 15px;
+}
+
+.team-compliance-meta,
+.team-compliance-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.team-compliance-meta span {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--muted);
+  background: rgba(16, 18, 22, 0.74);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-compliance-source code {
+  width: min(100%, 360px);
 }
 
 .settings-panel {
@@ -302,6 +523,7 @@ h1 {
   grid-column: 1 / -1;
   display: grid;
   gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border-top: 1px solid #323b45;
   padding-top: 12px;
 }
@@ -332,8 +554,56 @@ h1 {
   gap: 8px;
 }
 
+.policy-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.policy-summary span {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 7px 9px;
+  color: var(--muted);
+  background: rgba(16, 18, 22, 0.68);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.policy-audit-result {
+  display: grid;
+  gap: 10px;
+}
+
+.policy-audit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.policy-audit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #323b45;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(16, 18, 22, 0.62);
+}
+
+.policy-recommendation {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .credential-note code {
   width: auto;
+}
+
+.credential-section {
+  grid-column: 1 / -1;
 }
 
 .path-remove-list {
@@ -621,6 +891,12 @@ h1 {
   background: rgba(224, 95, 95, 0.11);
 }
 
+.status-badge.warning {
+  color: #ffe0a6;
+  border-color: rgba(208, 168, 79, 0.5);
+  background: rgba(208, 168, 79, 0.12);
+}
+
 .status-badge.muted {
   color: #cad2d8;
   background: rgba(167, 176, 184, 0.08);
@@ -896,6 +1172,23 @@ h1 {
   font-size: 18px;
 }
 
+.empty-state {
+  align-content: center;
+  gap: 12px;
+}
+
+.empty-state p {
+  max-width: 520px;
+  line-height: 1.6;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
 .state-block p {
   max-width: 430px;
   line-height: 1.6;
@@ -955,10 +1248,15 @@ h1 {
 @media (max-width: 860px) {
   .summary-strip,
   .beta-panel,
+  .team-compliance-header,
+  .team-compliance-summary,
+  .file-action-row,
   .workspace,
   .skill-row-main,
   .source-form,
   .settings-panel,
+  .team-compliance-row,
+  .policy-audit-row,
   .backup-row {
     grid-template-columns: 1fr;
   }

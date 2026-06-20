@@ -50,6 +50,43 @@ pub struct SkillMismatch {
     pub local_commit: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TeamManifestComplianceReport {
+    pub generated_at: String,
+    pub manifest_version: String,
+    pub summary: TeamManifestComplianceSummary,
+    pub items: Vec<TeamManifestComplianceItem>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TeamManifestComplianceSummary {
+    pub total: usize,
+    pub installed: usize,
+    pub missing: usize,
+    pub version_mismatch: usize,
+    pub local_modified: usize,
+    pub source_mismatch: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TeamManifestComplianceItem {
+    pub name: String,
+    pub agent_id: String,
+    pub status: String,
+    pub expected_source_url: Option<String>,
+    pub expected_source_repo_path: Option<String>,
+    pub expected_source_ref: Option<String>,
+    pub expected_commit: Option<String>,
+    pub local_skill_id: Option<String>,
+    pub local_install_path: Option<String>,
+    pub local_source_url: Option<String>,
+    pub local_source_repo_path: Option<String>,
+    pub local_source_ref: Option<String>,
+    pub local_commit: Option<String>,
+    pub local_modified: Option<bool>,
+    pub trusted_source: Option<bool>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum LockfileError {
     #[error("storage error: {0}")]
@@ -188,6 +225,81 @@ pub fn import_lockfile(
     })
 }
 
+pub fn check_team_manifest_compliance(
+    file_path: impl AsRef<Path>,
+    store: &SkillIndexStore,
+) -> Result<TeamManifestComplianceReport, LockfileError> {
+    let contents = fs::read_to_string(file_path)?;
+    check_team_manifest_compliance_from_str(&contents, store)
+}
+
+pub fn check_team_manifest_compliance_from_str(
+    contents: &str,
+    store: &SkillIndexStore,
+) -> Result<TeamManifestComplianceReport, LockfileError> {
+    let lockfile = serde_json::from_str::<LockFile>(contents)?;
+    let local_skills = store.list_skills().map_err(LockfileError::from)?;
+    let mut local_candidates = Vec::new();
+    for skill in &local_skills {
+        let source = match skill.source_id.as_deref() {
+            Some(source_id) => store.get_source(source_id).map_err(LockfileError::from)?,
+            None => None,
+        };
+        local_candidates.push((skill, source));
+    }
+
+    let mut items = Vec::new();
+    let mut summary = TeamManifestComplianceSummary {
+        total: lockfile.skills.len(),
+        ..TeamManifestComplianceSummary::default()
+    };
+
+    for entry in lockfile.skills {
+        let Some((local_skill, local_source)) =
+            find_local_skill_by_agent_and_name(&entry, &local_candidates)
+        else {
+            summary.missing += 1;
+            items.push(compliance_item(&entry, None, None, "missing"));
+            continue;
+        };
+
+        let local_commit = local_source
+            .as_ref()
+            .and_then(|source| source.current_commit.as_deref());
+        let status = if lock_entry_has_source_identity(&entry)
+            && !source_matches_lock_entry(local_source, &entry)
+        {
+            "source_mismatch"
+        } else if local_skill.local_modified == Some(true) {
+            "local_modified"
+        } else if let (Some(expected), Some(local)) = (entry.source_commit.as_deref(), local_commit)
+        {
+            if expected != local {
+                "version_mismatch"
+            } else {
+                "installed"
+            }
+        } else {
+            "installed"
+        };
+
+        increment_compliance_summary(&mut summary, status);
+        items.push(compliance_item(
+            &entry,
+            Some(local_skill),
+            local_source.as_ref(),
+            status,
+        ));
+    }
+
+    Ok(TeamManifestComplianceReport {
+        generated_at: chrono::Utc::now().to_rfc3339(),
+        manifest_version: lockfile.version,
+        summary,
+        items,
+    })
+}
+
 fn find_local_lockfile_match<'a>(
     entry: &LockFileEntry,
     local_candidates: &'a [(&'a SkillRecord, Option<SourceRecord>)],
@@ -203,6 +315,19 @@ fn find_local_lockfile_match<'a>(
     })
 }
 
+fn find_local_skill_by_agent_and_name<'a>(
+    entry: &LockFileEntry,
+    local_candidates: &'a [(&'a SkillRecord, Option<SourceRecord>)],
+) -> Option<(&'a SkillRecord, &'a Option<SourceRecord>)> {
+    local_candidates.iter().find_map(|(skill, source)| {
+        if skill.agent_id == entry.agent_id && skill.name == entry.name {
+            Some((*skill, source))
+        } else {
+            None
+        }
+    })
+}
+
 fn lock_entry_has_source_identity(entry: &LockFileEntry) -> bool {
     entry.source_url.is_some() || entry.source_repo_path.is_some() || entry.source_ref.is_some()
 }
@@ -214,6 +339,42 @@ fn source_matches_lock_entry(source: &Option<SourceRecord>, entry: &LockFileEntr
     Some(source.url.as_str()) == entry.source_url.as_deref()
         && Some(source.repo_path.as_str()) == entry.source_repo_path.as_deref()
         && Some(source.ref_.as_str()) == entry.source_ref.as_deref()
+}
+
+fn increment_compliance_summary(summary: &mut TeamManifestComplianceSummary, status: &str) {
+    match status {
+        "installed" => summary.installed += 1,
+        "missing" => summary.missing += 1,
+        "version_mismatch" => summary.version_mismatch += 1,
+        "local_modified" => summary.local_modified += 1,
+        "source_mismatch" => summary.source_mismatch += 1,
+        _ => {}
+    }
+}
+
+fn compliance_item(
+    entry: &LockFileEntry,
+    local_skill: Option<&SkillRecord>,
+    local_source: Option<&SourceRecord>,
+    status: &str,
+) -> TeamManifestComplianceItem {
+    TeamManifestComplianceItem {
+        name: entry.name.clone(),
+        agent_id: entry.agent_id.clone(),
+        status: status.to_string(),
+        expected_source_url: entry.source_url.clone(),
+        expected_source_repo_path: entry.source_repo_path.clone(),
+        expected_source_ref: entry.source_ref.clone(),
+        expected_commit: entry.source_commit.clone(),
+        local_skill_id: local_skill.map(|skill| skill.id.clone()),
+        local_install_path: local_skill.map(|skill| skill.install_path.clone()),
+        local_source_url: local_source.map(|source| source.url.clone()),
+        local_source_repo_path: local_source.map(|source| source.repo_path.clone()),
+        local_source_ref: local_source.map(|source| source.ref_.clone()),
+        local_commit: local_source.and_then(|source| source.current_commit.clone()),
+        local_modified: local_skill.and_then(|skill| skill.local_modified),
+        trusted_source: local_source.map(|source| source.trusted),
+    }
 }
 
 impl From<StorageError> for LockfileError {
@@ -431,5 +592,182 @@ mod tests {
         assert_eq!(diff.matched[0].local_skill_id, "skill-a");
         assert!(diff.outdated.is_empty());
         assert!(diff.missing.is_empty());
+    }
+
+    #[test]
+    fn check_team_manifest_compliance_reports_phase41_statuses() {
+        let root = temp_dir("team-compliance-statuses");
+        let input = root.join("skills.lock.json");
+        let lockfile = LockFile {
+            version: "1".to_string(),
+            exported_at: "2026-06-20T12:00:00Z".to_string(),
+            skills: vec![
+                LockFileEntry {
+                    name: "Installed".to_string(),
+                    agent_id: "codex".to_string(),
+                    source_url: Some("https://github.com/example/team-skills.git".to_string()),
+                    source_repo_path: Some("skills/installed".to_string()),
+                    source_ref: Some("main".to_string()),
+                    source_commit: Some("aaa111".to_string()),
+                    install_path_hint: None,
+                },
+                LockFileEntry {
+                    name: "Outdated".to_string(),
+                    agent_id: "codex".to_string(),
+                    source_url: Some("https://github.com/example/team-skills.git".to_string()),
+                    source_repo_path: Some("skills/outdated".to_string()),
+                    source_ref: Some("main".to_string()),
+                    source_commit: Some("new456".to_string()),
+                    install_path_hint: None,
+                },
+                LockFileEntry {
+                    name: "Edited".to_string(),
+                    agent_id: "codex".to_string(),
+                    source_url: Some("https://github.com/example/team-skills.git".to_string()),
+                    source_repo_path: Some("skills/edited".to_string()),
+                    source_ref: Some("main".to_string()),
+                    source_commit: Some("ccc333".to_string()),
+                    install_path_hint: None,
+                },
+                LockFileEntry {
+                    name: "Wrong Source".to_string(),
+                    agent_id: "codex".to_string(),
+                    source_url: Some("https://github.com/example/team-skills.git".to_string()),
+                    source_repo_path: Some("skills/wrong-source".to_string()),
+                    source_ref: Some("main".to_string()),
+                    source_commit: Some("ddd444".to_string()),
+                    install_path_hint: None,
+                },
+                LockFileEntry {
+                    name: "Missing".to_string(),
+                    agent_id: "codex".to_string(),
+                    source_url: Some("https://github.com/example/team-skills.git".to_string()),
+                    source_repo_path: Some("skills/missing".to_string()),
+                    source_ref: Some("main".to_string()),
+                    source_commit: Some("eee555".to_string()),
+                    install_path_hint: None,
+                },
+            ],
+        };
+        fs::write(&input, serde_json::to_string_pretty(&lockfile).unwrap())
+            .expect("lockfile should write");
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+
+        let mut installed_source = sample_source("source-installed", "aaa111", None);
+        installed_source.url = "https://github.com/example/team-skills.git".to_string();
+        installed_source.repo_path = "skills/installed".to_string();
+        let mut outdated_source = sample_source("source-outdated", "old000", None);
+        outdated_source.url = "https://github.com/example/team-skills.git".to_string();
+        outdated_source.repo_path = "skills/outdated".to_string();
+        let mut edited_source = sample_source("source-edited", "ccc333", None);
+        edited_source.url = "https://github.com/example/team-skills.git".to_string();
+        edited_source.repo_path = "skills/edited".to_string();
+        let mut wrong_source = sample_source("source-wrong", "ddd444", None);
+        wrong_source.url = "https://github.com/example/personal-skills.git".to_string();
+        wrong_source.repo_path = "skills/wrong-source".to_string();
+
+        for source in [
+            installed_source,
+            outdated_source,
+            edited_source,
+            wrong_source,
+        ] {
+            store.upsert_source(&source).expect("source should upsert");
+        }
+
+        store
+            .upsert_skill(&sample_skill(
+                "skill-installed",
+                "Installed",
+                Some("source-installed"),
+            ))
+            .expect("installed skill should upsert");
+        store
+            .upsert_skill(&sample_skill(
+                "skill-outdated",
+                "Outdated",
+                Some("source-outdated"),
+            ))
+            .expect("outdated skill should upsert");
+        let mut edited = sample_skill("skill-edited", "Edited", Some("source-edited"));
+        edited.local_modified = Some(true);
+        store
+            .upsert_skill(&edited)
+            .expect("edited skill should upsert");
+        store
+            .upsert_skill(&sample_skill(
+                "skill-wrong",
+                "Wrong Source",
+                Some("source-wrong"),
+            ))
+            .expect("wrong source skill should upsert");
+
+        let report = check_team_manifest_compliance(input.as_path(), &store)
+            .expect("compliance report should compute");
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(report.summary.total, 5);
+        assert_eq!(report.summary.installed, 1);
+        assert_eq!(report.summary.version_mismatch, 1);
+        assert_eq!(report.summary.local_modified, 1);
+        assert_eq!(report.summary.source_mismatch, 1);
+        assert_eq!(report.summary.missing, 1);
+        let statuses = report
+            .items
+            .iter()
+            .map(|item| (item.name.as_str(), item.status.as_str()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            statuses,
+            vec![
+                ("Installed", "installed"),
+                ("Outdated", "version_mismatch"),
+                ("Edited", "local_modified"),
+                ("Wrong Source", "source_mismatch"),
+                ("Missing", "missing"),
+            ]
+        );
+    }
+
+    #[test]
+    fn team_manifest_compliance_report_does_not_include_credentials() {
+        let root = temp_dir("team-compliance-no-secrets");
+        let input = root.join("skills.lock.json");
+        let lockfile = LockFile {
+            version: "1".to_string(),
+            exported_at: "2026-06-20T12:00:00Z".to_string(),
+            skills: vec![LockFileEntry {
+                name: "Private Skill".to_string(),
+                agent_id: "codex".to_string(),
+                source_url: Some("https://github.com/example/private-skills.git".to_string()),
+                source_repo_path: Some("skills/private".to_string()),
+                source_ref: Some("main".to_string()),
+                source_commit: Some("abc123".to_string()),
+                install_path_hint: None,
+            }],
+        };
+        fs::write(&input, serde_json::to_string_pretty(&lockfile).unwrap())
+            .expect("lockfile should write");
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let mut source = sample_source("source-private", "abc123", Some("secret-token"));
+        source.url = "https://github.com/example/private-skills.git".to_string();
+        source.repo_path = "skills/private".to_string();
+        store.upsert_source(&source).expect("source should upsert");
+        store
+            .upsert_skill(&sample_skill(
+                "skill-private",
+                "Private Skill",
+                Some("source-private"),
+            ))
+            .expect("skill should upsert");
+
+        let report = check_team_manifest_compliance(input.as_path(), &store)
+            .expect("compliance report should compute");
+        let json = serde_json::to_string(&report).expect("report should serialize");
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(report.summary.installed, 1);
+        assert!(!json.contains("secret-token"));
+        assert!(!json.to_ascii_lowercase().contains("credential_ref"));
     }
 }

@@ -6,12 +6,19 @@ import type {
   DesktopBindSourceRequest,
   DesktopDiffDetail,
   DesktopEnvironmentReport,
+  DesktopFileExportResult,
   DesktopRestoreBackupRequest,
   DesktopRestoreBackupResult,
   DesktopScanResponse,
   DesktopSettings,
   DesktopSkill,
   DesktopSource,
+  DesktopAuditLogExportRequest,
+  DesktopTeamComplianceReportExportRequest,
+  DesktopTeamPolicyAuditReport,
+  DesktopTeamManifestComplianceReport,
+  DesktopTeamManifestComplianceRequest,
+  DesktopTeamPolicySummary,
   DesktopUpdateCheckRequest,
   DesktopUpdateCheckResult,
 } from "./types";
@@ -34,6 +41,14 @@ export function getDesktopSettings(): Promise<DesktopSettings> {
 
 export function saveDesktopSettings(settings: DesktopSettings): Promise<DesktopSettings> {
   return invoke("save_desktop_settings", { settings });
+}
+
+export function getTeamPolicySummary(): Promise<DesktopTeamPolicySummary | null> {
+  return invoke("get_team_policy_summary");
+}
+
+export function getTeamPolicyAuditReport(): Promise<DesktopTeamPolicyAuditReport> {
+  return invoke("get_team_policy_audit_report");
 }
 
 export function bindSkillSource(
@@ -72,4 +87,32 @@ export function restoreSkillBackup(
 
 export function exportEnvironmentReport(): Promise<DesktopEnvironmentReport> {
   return invoke("export_environment_report");
+}
+
+export function checkTeamManifestCompliance(
+  request: DesktopTeamManifestComplianceRequest,
+): Promise<DesktopTeamManifestComplianceReport> {
+  return invoke("check_team_manifest_compliance", { request });
+}
+
+export function loadTeamManifestFromFile(path: string): Promise<string> {
+  return invoke("load_team_manifest_from_file", { path });
+}
+
+export function exportTeamComplianceReportToFile(
+  request: DesktopTeamComplianceReportExportRequest,
+): Promise<DesktopFileExportResult> {
+  return invoke("export_team_compliance_report_to_file", { request });
+}
+
+export function exportEnvironmentReportToFile(
+  outputPath: string,
+): Promise<DesktopFileExportResult> {
+  return invoke("export_environment_report_to_file", { outputPath });
+}
+
+export function exportAuditLogReportToFile(
+  request: DesktopAuditLogExportRequest,
+): Promise<DesktopFileExportResult> {
+  return invoke("export_audit_log_report_to_file", { request });
 }
