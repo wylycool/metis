@@ -3,6 +3,7 @@
 //! Tauri command 是 UI 到 Core Engine 的薄封装层。
 //! 核心逻辑全部在 metis-core 中实现。
 
+use metis_core::audit::{query_audit_log as core_query_audit_log, AuditQuery};
 use metis_core::discovery::{
     list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
     ScanOptions, ScanResult,
@@ -344,6 +345,45 @@ pub struct DesktopTeamManifestComplianceItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopFileExportResult {
+    pub output_path: String,
+    pub bytes_written: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamComplianceReportExportRequest {
+    pub output_path: String,
+    pub report: DesktopTeamManifestComplianceReport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopAuditLogExportRequest {
+    pub output_path: String,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopAuditLogReport {
+    pub generated_at: String,
+    pub total: usize,
+    pub events: Vec<DesktopAuditEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopAuditEvent {
+    pub id: String,
+    pub skill_id: String,
+    pub action: String,
+    pub detail: Option<String>,
+    pub commit_before: Option<String>,
+    pub commit_after: Option<String>,
+    pub status: String,
+    pub risk_summary: Option<String>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopError {
     pub category: String,
     pub title: String,
@@ -599,6 +639,76 @@ pub fn check_team_manifest_compliance_for_state(
         .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
+pub fn load_team_manifest_from_file_for_state(
+    state: &DesktopAppState,
+    path: String,
+) -> Result<String, String> {
+    state.ensure_dirs()?;
+    fs::read_to_string(path)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
+pub fn export_team_compliance_report_to_file_for_state(
+    state: &DesktopAppState,
+    request: DesktopTeamComplianceReportExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    state.ensure_dirs()?;
+    write_json_file(&request.output_path, &request.report)
+}
+
+pub fn export_environment_report_to_file_for_state(
+    state: &DesktopAppState,
+    output_path: String,
+) -> Result<DesktopFileExportResult, String> {
+    let report = export_environment_report_for_state(state)?;
+    write_json_file(&output_path, &report)
+}
+
+pub fn export_audit_log_report_to_file_for_state(
+    state: &DesktopAppState,
+    request: DesktopAuditLogExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    let store = state.open_store()?;
+    let events = core_query_audit_log(
+        AuditQuery {
+            skill_id: None,
+            action: None,
+            limit: request.limit,
+            offset: request.offset,
+        },
+        &store,
+    )
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    let report = DesktopAuditLogReport {
+        generated_at: current_timestamp_string(),
+        total: events.len(),
+        events: events.into_iter().map(desktop_audit_event).collect(),
+    };
+
+    write_json_file(&request.output_path, &report)
+}
+
+fn write_json_file<T: Serialize>(
+    output_path: &str,
+    value: &T,
+) -> Result<DesktopFileExportResult, String> {
+    let path = PathBuf::from(output_path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+        }
+    }
+    let contents = serde_json::to_string_pretty(value)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    fs::write(&path, contents.as_bytes())
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())?;
+    Ok(DesktopFileExportResult {
+        output_path: output_path.to_string(),
+        bytes_written: contents.len() as u64,
+    })
+}
+
 fn current_timestamp_string() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -713,6 +823,38 @@ fn check_team_manifest_compliance(
     request: DesktopTeamManifestComplianceRequest,
 ) -> Result<DesktopTeamManifestComplianceReport, String> {
     check_team_manifest_compliance_for_state(&state, request)
+}
+
+#[tauri::command]
+fn load_team_manifest_from_file(
+    state: tauri::State<'_, DesktopAppState>,
+    path: String,
+) -> Result<String, String> {
+    load_team_manifest_from_file_for_state(&state, path)
+}
+
+#[tauri::command]
+fn export_team_compliance_report_to_file(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopTeamComplianceReportExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    export_team_compliance_report_to_file_for_state(&state, request)
+}
+
+#[tauri::command]
+fn export_environment_report_to_file(
+    state: tauri::State<'_, DesktopAppState>,
+    output_path: String,
+) -> Result<DesktopFileExportResult, String> {
+    export_environment_report_to_file_for_state(&state, output_path)
+}
+
+#[tauri::command]
+fn export_audit_log_report_to_file(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopAuditLogExportRequest,
+) -> Result<DesktopFileExportResult, String> {
+    export_audit_log_report_to_file_for_state(&state, request)
 }
 
 fn desktop_scan_response(
@@ -870,6 +1012,20 @@ fn desktop_team_manifest_compliance_item(
         local_commit: item.local_commit,
         local_modified: item.local_modified,
         trusted_source: item.trusted_source,
+    }
+}
+
+fn desktop_audit_event(event: metis_core::audit::AuditEvent) -> DesktopAuditEvent {
+    DesktopAuditEvent {
+        id: event.id,
+        skill_id: event.skill_id,
+        action: format!("{:?}", event.action),
+        detail: event.detail,
+        commit_before: event.commit_before,
+        commit_after: event.commit_after,
+        status: event.status,
+        risk_summary: event.risk_summary,
+        created_at: event.created_at,
     }
 }
 
@@ -1168,7 +1324,11 @@ pub fn run() {
             list_skill_backups,
             restore_skill_backup,
             export_environment_report,
-            check_team_manifest_compliance
+            check_team_manifest_compliance,
+            load_team_manifest_from_file,
+            export_team_compliance_report_to_file,
+            export_environment_report_to_file,
+            export_audit_log_report_to_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1945,6 +2105,172 @@ description: {description}
         assert_eq!(report.items[0].status, "installed");
         assert_eq!(report.items[1].status, "missing");
         assert!(!json.contains("secret-token"));
+    }
+
+    #[test]
+    fn phase4_local_governance_exports_read_and_write_reports_without_credentials() {
+        let workspace = temp_dir("phase4-local-governance-exports");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let manifest_path = workspace.join("team/manifest.json");
+        fs::create_dir_all(manifest_path.parent().expect("manifest should have parent"))
+            .expect("manifest parent should be created");
+        fs::write(
+            &manifest_path,
+            r#"{"version":"1","exported_at":"2026-06-20T12:00:00Z","skills":[]}"#,
+        )
+        .expect("manifest should write");
+
+        let loaded_manifest = load_team_manifest_from_file_for_state(
+            &state,
+            manifest_path.to_string_lossy().to_string(),
+        )
+        .expect("manifest should load");
+
+        let store = state.open_store().expect("store should open");
+        store
+            .upsert_source(&SourceRecord {
+                id: "source-trusted".to_string(),
+                source_type: "git".to_string(),
+                url: "file:///tmp/metis-trusted".to_string(),
+                repo_path: "skills/trusted".to_string(),
+                ref_: "main".to_string(),
+                current_commit: Some("aaa111".to_string()),
+                remote_commit: Some("bbb222".to_string()),
+                last_checked_at: Some("2026-06-20T10:00:00Z".to_string()),
+                trusted: true,
+                auto_update: true,
+                credential_ref: Some("secret-token".to_string()),
+                created_at: None,
+                updated_at: None,
+            })
+            .expect("source should insert");
+        store
+            .upsert_skill(&SkillRecord {
+                id: "trusted-skill".to_string(),
+                agent_id: "generic".to_string(),
+                name: "Trusted Skill".to_string(),
+                description: Some("Trusted beta skill".to_string()),
+                version: None,
+                author: None,
+                license: None,
+                tags: Vec::new(),
+                category: None,
+                install_path: workspace
+                    .join("skills/trusted-skill")
+                    .to_string_lossy()
+                    .to_string(),
+                scope: "custom".to_string(),
+                metadata_path: None,
+                metadata_status: "found".to_string(),
+                metadata_error: None,
+                source_id: Some("source-trusted".to_string()),
+                local_fingerprint: None,
+                local_modified: Some(false),
+                last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+            })
+            .expect("skill should insert");
+        store
+            .insert_audit_event(&metis_storage::db::AuditEventRecord {
+                id: "audit-1".to_string(),
+                skill_id: "trusted-skill".to_string(),
+                action: "source_bound".to_string(),
+                detail: Some("bound source without secret values".to_string()),
+                commit_before: None,
+                commit_after: Some("aaa111".to_string()),
+                status: "success".to_string(),
+                risk_summary: None,
+                created_at: Some("2026-06-20T10:01:00Z".to_string()),
+            })
+            .expect("audit event should insert");
+        drop(store);
+
+        let compliance_report = DesktopTeamManifestComplianceReport {
+            generated_at: "2026-06-20T10:02:00Z".to_string(),
+            manifest_version: "1".to_string(),
+            summary: DesktopTeamManifestComplianceSummary {
+                total: 1,
+                installed: 1,
+                missing: 0,
+                version_mismatch: 0,
+                local_modified: 0,
+                source_mismatch: 0,
+            },
+            items: vec![DesktopTeamManifestComplianceItem {
+                name: "Trusted Skill".to_string(),
+                agent_id: "generic".to_string(),
+                status: "installed".to_string(),
+                expected_source_url: Some("file:///tmp/metis-trusted".to_string()),
+                expected_source_repo_path: Some("skills/trusted".to_string()),
+                expected_source_ref: Some("main".to_string()),
+                expected_commit: Some("aaa111".to_string()),
+                local_skill_id: Some("trusted-skill".to_string()),
+                local_install_path: Some(
+                    workspace
+                        .join("skills/trusted-skill")
+                        .to_string_lossy()
+                        .to_string(),
+                ),
+                local_source_url: Some("file:///tmp/metis-trusted".to_string()),
+                local_source_repo_path: Some("skills/trusted".to_string()),
+                local_source_ref: Some("main".to_string()),
+                local_commit: Some("aaa111".to_string()),
+                local_modified: Some(false),
+                trusted_source: Some(true),
+            }],
+        };
+
+        let compliance_output = workspace.join("reports/compliance.json");
+        let environment_output = workspace.join("reports/environment.json");
+        let audit_output = workspace.join("reports/audit.json");
+
+        let compliance_written = export_team_compliance_report_to_file_for_state(
+            &state,
+            DesktopTeamComplianceReportExportRequest {
+                output_path: compliance_output.to_string_lossy().to_string(),
+                report: compliance_report,
+            },
+        )
+        .expect("compliance report should export");
+        let environment_written = export_environment_report_to_file_for_state(
+            &state,
+            environment_output.to_string_lossy().to_string(),
+        )
+        .expect("environment report should export");
+        let audit_written = export_audit_log_report_to_file_for_state(
+            &state,
+            DesktopAuditLogExportRequest {
+                output_path: audit_output.to_string_lossy().to_string(),
+                limit: 200,
+                offset: 0,
+            },
+        )
+        .expect("audit report should export");
+
+        let compliance_json =
+            fs::read_to_string(&compliance_output).expect("compliance output should read");
+        let environment_json =
+            fs::read_to_string(&environment_output).expect("environment output should read");
+        let audit_json = fs::read_to_string(&audit_output).expect("audit output should read");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(loaded_manifest.contains("\"version\":\"1\""));
+        assert_eq!(
+            compliance_written.output_path,
+            compliance_output.to_string_lossy()
+        );
+        assert_eq!(
+            environment_written.output_path,
+            environment_output.to_string_lossy()
+        );
+        assert_eq!(audit_written.output_path, audit_output.to_string_lossy());
+        assert!(compliance_json.contains("\"status\": \"installed\""));
+        assert!(environment_json.contains("\"has_credential_ref\": true"));
+        assert!(audit_json.contains("\"total\": 1"));
+        assert!(audit_json.contains("\"action\": \"SourceBound\""));
+        assert!(!compliance_json.contains("secret-token"));
+        assert!(!environment_json.contains("secret-token"));
+        assert!(!audit_json.contains("secret-token"));
     }
 
     #[test]

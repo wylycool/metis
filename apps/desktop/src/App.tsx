@@ -4,12 +4,16 @@ import {
   bindSkillSource,
   checkTeamManifestCompliance,
   checkSkillUpdates,
+  exportAuditLogReportToFile,
   exportEnvironmentReport,
+  exportEnvironmentReportToFile,
+  exportTeamComplianceReportToFile,
   getSkillDiff,
   getDesktopSettings,
   listSkillBackups,
   listAgents,
   listIndexedSkills,
+  loadTeamManifestFromFile,
   restoreSkillBackup,
   saveDesktopSettings,
   scanSkills,
@@ -83,6 +87,10 @@ function App() {
     null,
   );
   const [teamManifestDraft, setTeamManifestDraft] = useState("");
+  const [teamManifestFilePath, setTeamManifestFilePath] = useState("");
+  const [teamComplianceExportPath, setTeamComplianceExportPath] = useState("");
+  const [environmentReportExportPath, setEnvironmentReportExportPath] = useState("");
+  const [auditLogExportPath, setAuditLogExportPath] = useState("");
   const [teamComplianceReport, setTeamComplianceReport] =
     useState<DesktopTeamManifestComplianceReport | null>(null);
 
@@ -331,6 +339,38 @@ function App() {
     }
   }
 
+  async function handleExportEnvironmentReportToFile() {
+    setActionBusy("environment-report-file");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await exportEnvironmentReportToFile(environmentReportExportPath.trim());
+      setActionMessage(`环境报告已写出：${result.output_path}`);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleLoadTeamManifestFromFile() {
+    setActionBusy("team-manifest-file");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const manifest = await loadTeamManifestFromFile(teamManifestFilePath.trim());
+      setTeamManifestDraft(manifest);
+      setTeamComplianceReport(null);
+      setActionMessage("团队清单文件已载入");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function handleCheckTeamCompliance() {
     setActionBusy("team-compliance");
     setActionError(null);
@@ -342,6 +382,47 @@ function App() {
       });
       setTeamComplianceReport(report);
       setActionMessage("团队合规报告已生成");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleExportTeamComplianceReport() {
+    if (!teamComplianceReport) {
+      return;
+    }
+
+    setActionBusy("team-compliance-export");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await exportTeamComplianceReportToFile({
+        output_path: teamComplianceExportPath.trim(),
+        report: teamComplianceReport,
+      });
+      setActionMessage(`团队合规报告已写出：${result.output_path}`);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleExportAuditLogReport() {
+    setActionBusy("audit-log-export");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await exportAuditLogReportToFile({
+        output_path: auditLogExportPath.trim(),
+        limit: 200,
+        offset: 0,
+      });
+      setActionMessage(`审计日志已写出：${result.output_path}`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -579,6 +660,25 @@ function App() {
             {actionBusy === "auto-update" ? "更新中" : "受控自动更新"}
           </button>
         </div>
+        <div className="file-action-row">
+          <input
+            data-testid="environment-report-export-path"
+            value={environmentReportExportPath}
+            placeholder="/tmp/metis-environment-report.json"
+            onChange={(event) => setEnvironmentReportExportPath(event.target.value)}
+          />
+          <button
+            className="ghost-button compact"
+            data-testid="export-environment-report-to-file"
+            disabled={
+              actionBusy === "environment-report-file" ||
+              environmentReportExportPath.trim().length === 0
+            }
+            onClick={handleExportEnvironmentReportToFile}
+          >
+            {actionBusy === "environment-report-file" ? "写出中" : "写出环境报告"}
+          </button>
+        </div>
         {environmentReport && (
           <pre className="environment-report-preview">
             {JSON.stringify(environmentReport, null, 2)}
@@ -599,6 +699,24 @@ function App() {
             onClick={handleCheckTeamCompliance}
           >
             {actionBusy === "team-compliance" ? "校验中" : "校验清单"}
+          </button>
+        </div>
+        <div className="file-action-row">
+          <input
+            data-testid="team-manifest-file-path"
+            value={teamManifestFilePath}
+            placeholder="/tmp/team-manifest.json"
+            onChange={(event) => setTeamManifestFilePath(event.target.value)}
+          />
+          <button
+            className="ghost-button compact"
+            data-testid="load-team-manifest-from-file"
+            disabled={
+              actionBusy === "team-manifest-file" || teamManifestFilePath.trim().length === 0
+            }
+            onClick={handleLoadTeamManifestFromFile}
+          >
+            {actionBusy === "team-manifest-file" ? "载入中" : "从文件载入"}
           </button>
         </div>
         <textarea
@@ -644,8 +762,50 @@ function App() {
             <pre className="environment-report-preview">
               {JSON.stringify(teamComplianceReport, null, 2)}
             </pre>
+            <div className="file-action-row">
+              <input
+                data-testid="team-compliance-export-path"
+                value={teamComplianceExportPath}
+                placeholder="/tmp/metis-team-compliance-report.json"
+                onChange={(event) => setTeamComplianceExportPath(event.target.value)}
+              />
+              <button
+                className="ghost-button compact"
+                data-testid="export-team-compliance-report"
+                disabled={
+                  actionBusy === "team-compliance-export" ||
+                  teamComplianceExportPath.trim().length === 0
+                }
+                onClick={handleExportTeamComplianceReport}
+              >
+                {actionBusy === "team-compliance-export" ? "写出中" : "写出合规报告"}
+              </button>
+            </div>
           </div>
         )}
+      </section>
+
+      <section className="governance-audit-panel" aria-label="本地审计导出">
+        <div>
+          <h2>本地审计导出</h2>
+          <p>导出最近 200 条本机审计事件，用于团队只读审计和问题追溯。</p>
+        </div>
+        <div className="file-action-row">
+          <input
+            data-testid="audit-log-export-path"
+            value={auditLogExportPath}
+            placeholder="/tmp/metis-audit-log-report.json"
+            onChange={(event) => setAuditLogExportPath(event.target.value)}
+          />
+          <button
+            className="ghost-button compact"
+            data-testid="export-audit-log-report"
+            disabled={actionBusy === "audit-log-export" || auditLogExportPath.trim().length === 0}
+            onClick={handleExportAuditLogReport}
+          >
+            {actionBusy === "audit-log-export" ? "写出中" : "写出审计日志"}
+          </button>
+        </div>
       </section>
 
       <section className="settings-panel" aria-label="设置">

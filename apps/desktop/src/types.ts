@@ -179,6 +179,11 @@ export interface DesktopEnvironmentSource {
   has_credential_ref: boolean;
 }
 
+export interface DesktopFileExportResult {
+  output_path: string;
+  bytes_written: number;
+}
+
 export interface DesktopTeamManifestComplianceRequest {
   manifest_json: string;
 }
@@ -215,6 +220,17 @@ export interface DesktopTeamManifestComplianceItem {
   local_commit?: string | null;
   local_modified?: boolean | null;
   trusted_source?: boolean | null;
+}
+
+export interface DesktopTeamComplianceReportExportRequest {
+  output_path: string;
+  report: DesktopTeamManifestComplianceReport;
+}
+
+export interface DesktopAuditLogExportRequest {
+  output_path: string;
+  limit: number;
+  offset: number;
 }
 
 export interface DesktopError {

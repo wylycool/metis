@@ -6,12 +6,15 @@ import type {
   DesktopBindSourceRequest,
   DesktopDiffDetail,
   DesktopEnvironmentReport,
+  DesktopFileExportResult,
   DesktopRestoreBackupRequest,
   DesktopRestoreBackupResult,
   DesktopScanResponse,
   DesktopSettings,
   DesktopSkill,
   DesktopSource,
+  DesktopAuditLogExportRequest,
+  DesktopTeamComplianceReportExportRequest,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceRequest,
   DesktopUpdateCheckRequest,
@@ -80,4 +83,26 @@ export function checkTeamManifestCompliance(
   request: DesktopTeamManifestComplianceRequest,
 ): Promise<DesktopTeamManifestComplianceReport> {
   return invoke("check_team_manifest_compliance", { request });
+}
+
+export function loadTeamManifestFromFile(path: string): Promise<string> {
+  return invoke("load_team_manifest_from_file", { path });
+}
+
+export function exportTeamComplianceReportToFile(
+  request: DesktopTeamComplianceReportExportRequest,
+): Promise<DesktopFileExportResult> {
+  return invoke("export_team_compliance_report_to_file", { request });
+}
+
+export function exportEnvironmentReportToFile(
+  outputPath: string,
+): Promise<DesktopFileExportResult> {
+  return invoke("export_environment_report_to_file", { outputPath });
+}
+
+export function exportAuditLogReportToFile(
+  request: DesktopAuditLogExportRequest,
+): Promise<DesktopFileExportResult> {
+  return invoke("export_audit_log_report_to_file", { request });
 }

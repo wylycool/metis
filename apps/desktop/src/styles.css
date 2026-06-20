@@ -226,6 +226,14 @@ h1 {
   justify-content: flex-end;
 }
 
+.file-action-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .environment-report-preview {
   grid-column: 1 / -1;
   max-height: 260px;
@@ -250,6 +258,28 @@ h1 {
   border-radius: 8px;
   background: rgba(25, 29, 35, 0.88);
   padding: 13px 14px;
+}
+
+.governance-audit-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(25, 29, 35, 0.86);
+  padding: 13px 14px;
+}
+
+.governance-audit-panel h2 {
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.governance-audit-panel p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .team-compliance-header {
@@ -1048,6 +1078,7 @@ h1 {
   .beta-panel,
   .team-compliance-header,
   .team-compliance-summary,
+  .file-action-row,
   .workspace,
   .skill-row-main,
   .source-form,

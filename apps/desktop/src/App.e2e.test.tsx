@@ -144,6 +144,53 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByText("missing")).toBeTruthy();
     expect(screen.getByText(/"total": 5/)).toBeTruthy();
   });
+
+  test("phase4 imports and exports local governance reports", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("团队清单合规")).toBeTruthy();
+    await user.type(screen.getByTestId("team-manifest-file-path"), "/tmp/team-manifest.json");
+    await user.click(screen.getByTestId("load-team-manifest-from-file"));
+
+    expect(await screen.findByText("团队清单文件已载入")).toBeTruthy();
+    expect((screen.getByTestId("team-manifest-input") as HTMLTextAreaElement).value).toContain(
+      "Trusted Skill",
+    );
+
+    await user.click(screen.getByTestId("check-team-compliance"));
+    expect(await screen.findByText("团队合规报告已生成")).toBeTruthy();
+
+    await user.type(
+      screen.getByTestId("team-compliance-export-path"),
+      "/tmp/reports/compliance.json",
+    );
+    await user.click(screen.getByTestId("export-team-compliance-report"));
+    expect(await screen.findByText(/团队合规报告已写出/)).toBeTruthy();
+
+    await user.click(screen.getByTestId("export-environment-report"));
+    expect(await screen.findByText("环境报告已生成")).toBeTruthy();
+    await user.type(
+      screen.getByTestId("environment-report-export-path"),
+      "/tmp/reports/environment.json",
+    );
+    await user.click(screen.getByTestId("export-environment-report-to-file"));
+    expect(await screen.findByText(/环境报告已写出/)).toBeTruthy();
+
+    await user.type(screen.getByTestId("audit-log-export-path"), "/tmp/reports/audit.json");
+    await user.click(screen.getByTestId("export-audit-log-report"));
+    expect(await screen.findByText(/审计日志已写出/)).toBeTruthy();
+    expect(scenario.exportedPaths()).toEqual([
+      "/tmp/reports/compliance.json",
+      "/tmp/reports/environment.json",
+      "/tmp/reports/audit.json",
+    ]);
+  });
 });
 
 describe("Metis desktop GUI error paths", () => {
@@ -434,6 +481,7 @@ function createBetaReadinessScenario() {
     betaSkill("untrusted-skill", "Untrusted Skill", untrustedSource),
   ];
   const applied: string[] = [];
+  const exported: string[] = [];
   const agents: DesktopAgentStatus[] = [
     {
       agent_id: "generic",
@@ -453,6 +501,7 @@ function createBetaReadinessScenario() {
 
   return {
     appliedSkillIds: () => applied,
+    exportedPaths: () => exported,
     async invoke(command: string, args?: unknown) {
       switch (command) {
         case "list_agents":
@@ -490,6 +539,46 @@ function createBetaReadinessScenario() {
                 : null,
             })),
           };
+        case "load_team_manifest_from_file":
+          return JSON.stringify({
+            version: "1",
+            exported_at: "2026-06-20T12:00:00Z",
+            skills: [
+              {
+                name: "Trusted Skill",
+                agent_id: "generic",
+                source_url: "file:///tmp/metis-trusted",
+                source_repo_path: "skills/trusted",
+                source_ref: "main",
+                source_commit: "aaa111",
+                install_path_hint: null,
+              },
+            ],
+          });
+        case "export_team_compliance_report_to_file": {
+          const request = args as { request: { output_path: string } };
+          exported.push(request.request.output_path);
+          return {
+            output_path: request.request.output_path,
+            bytes_written: 2048,
+          };
+        }
+        case "export_environment_report_to_file": {
+          const request = args as { outputPath: string };
+          exported.push(request.outputPath);
+          return {
+            output_path: request.outputPath,
+            bytes_written: 1024,
+          };
+        }
+        case "export_audit_log_report_to_file": {
+          const request = args as { request: { output_path: string } };
+          exported.push(request.request.output_path);
+          return {
+            output_path: request.request.output_path,
+            bytes_written: 512,
+          };
+        }
         case "check_team_manifest_compliance":
           return {
             generated_at: "2026-06-20T10:03:00Z",
