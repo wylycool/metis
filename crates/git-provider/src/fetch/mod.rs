@@ -53,6 +53,9 @@ pub enum GitProviderError {
 
     #[error("path not found: {path}")]
     PathNotFound { path: String },
+
+    #[error("invalid repo_path: {repo_path}")]
+    InvalidRepoPath { repo_path: String },
 }
 
 #[derive(Debug, Clone, Copy, Default)]

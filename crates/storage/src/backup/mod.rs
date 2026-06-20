@@ -18,6 +18,9 @@ pub enum BackupError {
 
     #[error("path is not under root: {path}")]
     StripPrefix { path: String },
+
+    #[error("invalid skill directory: {path}: {reason}")]
+    InvalidSkillDirectory { path: String, reason: String },
 }
 
 pub fn copy_skill_directory(
@@ -31,6 +34,7 @@ pub fn copy_skill_directory(
         total_size_bytes: 0,
     };
 
+    validate_skill_directory(source, "source")?;
     fs::create_dir_all(target)?;
 
     for entry in WalkDir::new(source).follow_links(false) {
@@ -64,7 +68,12 @@ pub fn replace_skill_directory(
     source: impl AsRef<Path>,
     target: impl AsRef<Path>,
 ) -> Result<BackupCopyResult, BackupError> {
+    let source = source.as_ref();
     let target = target.as_ref();
+    validate_skill_directory(source, "source")?;
+    if target.exists() {
+        validate_skill_directory(target, "target")?;
+    }
     if target.exists() {
         fs::remove_dir_all(target)?;
     }
@@ -82,6 +91,22 @@ pub fn delete_backup_directory(path: impl AsRef<Path>) -> Result<(), BackupError
 fn is_in_git_dir(path: &Path) -> bool {
     path.components()
         .any(|component| component == Component::Normal(".git".as_ref()))
+}
+
+fn validate_skill_directory(path: &Path, role: &str) -> Result<(), BackupError> {
+    if !path.is_dir() {
+        return Err(BackupError::InvalidSkillDirectory {
+            path: path.to_string_lossy().to_string(),
+            reason: format!("{role} is not a directory"),
+        });
+    }
+    if !path.join("SKILL.md").is_file() {
+        return Err(BackupError::InvalidSkillDirectory {
+            path: path.to_string_lossy().to_string(),
+            reason: format!("{role} must contain SKILL.md"),
+        });
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -162,6 +187,53 @@ mod tests {
         );
         assert!(!target.join("stale.md").exists());
         assert!(!target.join(".git/config").exists());
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn replace_skill_directory_refuses_source_without_skill_manifest_before_touching_target() {
+        let root = temp_dir("replace-source-without-manifest");
+        let source = root.join("source");
+        let target = root.join("skill");
+        write_file(&source.join("README.md"), "not a skill");
+        write_file(&target.join("SKILL.md"), "# Old\n");
+        write_file(&target.join("notes.md"), "keep me");
+
+        let error = replace_skill_directory(&source, &target)
+            .expect_err("source without SKILL.md should be rejected");
+
+        assert!(error.to_string().contains("SKILL.md"));
+        assert_eq!(
+            fs::read_to_string(target.join("SKILL.md")).expect("target skill should remain"),
+            "# Old\n"
+        );
+        assert_eq!(
+            fs::read_to_string(target.join("notes.md")).expect("target extra file should remain"),
+            "keep me"
+        );
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn replace_skill_directory_refuses_target_without_skill_manifest_before_deleting() {
+        let root = temp_dir("replace-target-without-manifest");
+        let source = root.join("source");
+        let target = root.join("not-a-skill");
+        write_file(&source.join("SKILL.md"), "# New\n");
+        write_file(&target.join("README.md"), "important non-skill content");
+
+        let error = replace_skill_directory(&source, &target)
+            .expect_err("target without SKILL.md should be rejected");
+
+        assert!(error.to_string().contains("SKILL.md"));
+        assert_eq!(
+            fs::read_to_string(target.join("README.md"))
+                .expect("non-skill target content should remain"),
+            "important non-skill content"
+        );
+        assert!(!target.join("SKILL.md").exists());
 
         fs::remove_dir_all(&root).expect("temp directory should be removed");
     }
