@@ -10,7 +10,7 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 当前阶段
 
-项目处于 **Phase 3 Beta 稳定化收口点**：Phase 1 的 Core Engine 本地管理闭环和 Phase 2 Desktop MVP 已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出和受控自动更新。macOS 本机 `.dmg` 预览包已验证；Windows/Linux 预览包由 GitHub Actions workflow 承接实跑记录。
+项目处于 **Phase 3 Beta 稳定化完成点**：Phase 1 的 Core Engine 本地管理闭环、Phase 2 Desktop MVP 和 Phase 3 Beta 稳定化已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出和受控自动更新。macOS 本机 `.dmg` 预览包已验证；macOS/Windows/Linux 预览包已由 GitHub Actions workflow 实跑生成。
 
 ## 技术栈
 
@@ -76,7 +76,7 @@ cd apps/desktop && pnpm tauri build
 cd apps/desktop && pnpm tauri:build:mac-universal
 ```
 
-macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 用于构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
+macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已在 run `27862207405` 成功构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
 
 ## 暂不进入 MVP
 
