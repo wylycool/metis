@@ -34,6 +34,7 @@ describe("Metis desktop GUI main flow", () => {
     render(<App />);
 
     const skillRow = await screen.findByTestId("skill-row-e2e-skill");
+    expect(invokeMock).toHaveBeenCalledWith("scan_skills");
     expect(within(skillRow).getByText("e2e-skill")).toBeTruthy();
     expect(within(skillRow).getByText("未绑定来源")).toBeTruthy();
 
@@ -113,6 +114,7 @@ function createMainFlowScenario() {
     last_scanned_at: "2026-06-20T10:00:00Z",
   };
   let backups: DesktopBackupSummary[] = [];
+  let indexedSkills: DesktopSkill[] = [];
 
   const agents: DesktopAgentStatus[] = [
     {
@@ -138,13 +140,15 @@ function createMainFlowScenario() {
         case "list_agents":
           return agents;
         case "list_indexed_skills":
-          return [skill];
+          return indexedSkills;
         case "get_desktop_settings":
           return settings;
         case "scan_skills":
+          indexedSkills = [skill];
           return { skills: [skill], warnings: [] };
         case "bind_skill_source":
           skill = { ...skill, source_id: source.id, source };
+          indexedSkills = [skill];
           return source;
         case "check_skill_updates":
           return [updateResult(skill, source)];
@@ -161,6 +165,7 @@ function createMainFlowScenario() {
               remote_commit: "bbb222",
             },
           };
+          indexedSkills = [skill];
           return applyResult();
         case "list_skill_backups":
           return backups;
@@ -178,6 +183,7 @@ function createMainFlowScenario() {
               remote_commit: "bbb222",
             },
           };
+          indexedSkills = [skill];
           return {
             skill_id: "e2e-skill",
             restored_from_backup_id: "backup-pre-update",
