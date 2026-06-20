@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   applySkillUpdate,
   bindSkillSource,
+  checkTeamManifestCompliance,
   checkSkillUpdates,
   exportEnvironmentReport,
   getSkillDiff,
@@ -23,6 +24,8 @@ import type {
   DesktopScanWarning,
   DesktopSettings,
   DesktopSkill,
+  DesktopTeamManifestComplianceReport,
+  DesktopTeamManifestComplianceItem,
   DesktopUpdateCheckResult,
   LoadState,
 } from "./types";
@@ -79,6 +82,9 @@ function App() {
   const [environmentReport, setEnvironmentReport] = useState<DesktopEnvironmentReport | null>(
     null,
   );
+  const [teamManifestDraft, setTeamManifestDraft] = useState("");
+  const [teamComplianceReport, setTeamComplianceReport] =
+    useState<DesktopTeamManifestComplianceReport | null>(null);
 
   useEffect(() => {
     if (didBootstrap.current) {
@@ -325,6 +331,24 @@ function App() {
     }
   }
 
+  async function handleCheckTeamCompliance() {
+    setActionBusy("team-compliance");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const report = await checkTeamManifestCompliance({
+        manifest_json: teamManifestDraft.trim(),
+      });
+      setTeamComplianceReport(report);
+      setActionMessage("团队合规报告已生成");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function handleRunAutoUpdate() {
     setActionBusy("auto-update");
     setActionError(null);
@@ -562,6 +586,68 @@ function App() {
         )}
       </section>
 
+      <section className="team-compliance-panel" aria-label="团队清单合规">
+        <div className="team-compliance-header">
+          <div>
+            <h2>团队清单合规</h2>
+            <p>版本锁定、来源绑定和本地修改状态。</p>
+          </div>
+          <button
+            className="compact"
+            data-testid="check-team-compliance"
+            disabled={actionBusy === "team-compliance" || teamManifestDraft.trim().length === 0}
+            onClick={handleCheckTeamCompliance}
+          >
+            {actionBusy === "team-compliance" ? "校验中" : "校验清单"}
+          </button>
+        </div>
+        <textarea
+          className="team-manifest-input"
+          data-testid="team-manifest-input"
+          value={teamManifestDraft}
+          placeholder='{"version":"1","skills":[]}'
+          onChange={(event) => setTeamManifestDraft(event.target.value)}
+        />
+        {teamComplianceReport && (
+          <div className="team-compliance-result">
+            <div className="team-compliance-summary">
+              <SummaryMetric
+                label="清单 skills"
+                value={teamComplianceReport.summary.total.toString()}
+              />
+              <SummaryMetric
+                label="符合版本"
+                value={teamComplianceReport.summary.installed.toString()}
+              />
+              <SummaryMetric
+                label="缺失"
+                value={teamComplianceReport.summary.missing.toString()}
+              />
+              <SummaryMetric
+                label="版本不一致"
+                value={teamComplianceReport.summary.version_mismatch.toString()}
+              />
+              <SummaryMetric
+                label="本地修改"
+                value={teamComplianceReport.summary.local_modified.toString()}
+              />
+              <SummaryMetric
+                label="来源不一致"
+                value={teamComplianceReport.summary.source_mismatch.toString()}
+              />
+            </div>
+            <div className="team-compliance-list">
+              {teamComplianceReport.items.map((item) => (
+                <TeamComplianceRow key={`${item.agent_id}:${item.name}`} item={item} />
+              ))}
+            </div>
+            <pre className="environment-report-preview">
+              {JSON.stringify(teamComplianceReport, null, 2)}
+            </pre>
+          </div>
+        )}
+      </section>
+
       <section className="settings-panel" aria-label="设置">
         <button
           className="ghost-button settings-toggle"
@@ -725,6 +811,29 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function TeamComplianceRow({ item }: { item: DesktopTeamManifestComplianceItem }) {
+  return (
+    <article className="team-compliance-row">
+      <div>
+        <div className="skill-title compact-title">
+          <h3>{item.name}</h3>
+          <span>{item.agent_id}</span>
+        </div>
+        <div className="team-compliance-meta">
+          <span>expected {item.expected_commit ? shortCommit(item.expected_commit) : "unlocked"}</span>
+          <span>local {item.local_commit ? shortCommit(item.local_commit) : "none"}</span>
+          <span>{item.local_modified ? "local modified" : "local clean"}</span>
+        </div>
+        <div className="team-compliance-source">
+          <code>{item.expected_source_url ?? "no expected source"}</code>
+          <code>{item.local_source_url ?? "no local source"}</code>
+        </div>
+      </div>
+      <span className={`status-badge ${teamComplianceTone(item.status)}`}>{item.status}</span>
+    </article>
   );
 }
 
@@ -1191,6 +1300,19 @@ function updateTone(
   }
   if (!skill.source) {
     return "muted";
+  }
+  return "muted";
+}
+
+function teamComplianceTone(status: string): "good" | "danger" | "warning" | "muted" {
+  if (status === "installed") {
+    return "good";
+  }
+  if (status === "missing" || status === "source_mismatch") {
+    return "danger";
+  }
+  if (status === "version_mismatch" || status === "local_modified") {
+    return "warning";
   }
   return "muted";
 }

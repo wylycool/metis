@@ -242,6 +242,91 @@ h1 {
   white-space: pre-wrap;
 }
 
+.team-compliance-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(25, 29, 35, 0.88);
+  padding: 13px 14px;
+}
+
+.team-compliance-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.team-compliance-header h2 {
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.team-compliance-header p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.team-manifest-input {
+  min-height: 128px;
+}
+
+.team-compliance-result {
+  display: grid;
+  gap: 10px;
+}
+
+.team-compliance-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-compliance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-compliance-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #323b45;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(16, 18, 22, 0.66);
+}
+
+.compact-title h3 {
+  font-size: 15px;
+}
+
+.team-compliance-meta,
+.team-compliance-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.team-compliance-meta span {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--muted);
+  background: rgba(16, 18, 22, 0.74);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-compliance-source code {
+  width: min(100%, 360px);
+}
+
 .settings-panel {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -621,6 +706,12 @@ h1 {
   background: rgba(224, 95, 95, 0.11);
 }
 
+.status-badge.warning {
+  color: #ffe0a6;
+  border-color: rgba(208, 168, 79, 0.5);
+  background: rgba(208, 168, 79, 0.12);
+}
+
 .status-badge.muted {
   color: #cad2d8;
   background: rgba(167, 176, 184, 0.08);
@@ -955,10 +1046,13 @@ h1 {
 @media (max-width: 860px) {
   .summary-strip,
   .beta-panel,
+  .team-compliance-header,
+  .team-compliance-summary,
   .workspace,
   .skill-row-main,
   .source-form,
   .settings-panel,
+  .team-compliance-row,
   .backup-row {
     grid-template-columns: 1fr;
   }

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import App from "./App";
@@ -104,6 +104,45 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByText(/受控自动更新完成：已更新 1 个，跳过 1 个/)).toBeTruthy();
     expect(scenario.appliedSkillIds()).toEqual(["trusted-skill"]);
+  });
+
+  test("checks pasted team manifest compliance and previews a read-only report", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+    const manifest = {
+      version: "1",
+      exported_at: "2026-06-20T12:00:00Z",
+      skills: [
+        {
+          name: "Trusted Skill",
+          agent_id: "generic",
+          source_url: "file:///tmp/metis-trusted",
+          source_repo_path: "skills/trusted",
+          source_ref: "main",
+          source_commit: "aaa111",
+          install_path_hint: null,
+        },
+      ],
+    };
+
+    render(<App />);
+
+    expect(await screen.findByText("团队清单合规")).toBeTruthy();
+    fireEvent.change(screen.getByTestId("team-manifest-input"), {
+      target: { value: JSON.stringify(manifest) },
+    });
+    await user.click(screen.getByTestId("check-team-compliance"));
+
+    expect(await screen.findByText("团队合规报告已生成")).toBeTruthy();
+    expect(screen.getByText("installed")).toBeTruthy();
+    expect(screen.getByText("version_mismatch")).toBeTruthy();
+    expect(screen.getByText("local_modified")).toBeTruthy();
+    expect(screen.getByText("source_mismatch")).toBeTruthy();
+    expect(screen.getByText("missing")).toBeTruthy();
+    expect(screen.getByText(/"total": 5/)).toBeTruthy();
   });
 });
 
@@ -450,6 +489,106 @@ function createBetaReadinessScenario() {
                   }
                 : null,
             })),
+          };
+        case "check_team_manifest_compliance":
+          return {
+            generated_at: "2026-06-20T10:03:00Z",
+            manifest_version: "1",
+            summary: {
+              total: 5,
+              installed: 1,
+              missing: 1,
+              version_mismatch: 1,
+              local_modified: 1,
+              source_mismatch: 1,
+            },
+            items: [
+              {
+                name: "Trusted Skill",
+                agent_id: "generic",
+                status: "installed",
+                expected_source_url: "file:///tmp/metis-trusted",
+                expected_source_repo_path: "skills/trusted",
+                expected_source_ref: "main",
+                expected_commit: "aaa111",
+                local_skill_id: "trusted-skill",
+                local_install_path: "/tmp/metis-beta/skills/trusted",
+                local_source_url: "file:///tmp/metis-trusted",
+                local_source_repo_path: "skills/trusted",
+                local_source_ref: "main",
+                local_commit: "aaa111",
+                local_modified: false,
+                trusted_source: true,
+              },
+              {
+                name: "Outdated Skill",
+                agent_id: "generic",
+                status: "version_mismatch",
+                expected_source_url: "file:///tmp/metis-trusted",
+                expected_source_repo_path: "skills/outdated",
+                expected_source_ref: "main",
+                expected_commit: "bbb222",
+                local_skill_id: "outdated-skill",
+                local_install_path: "/tmp/metis-beta/skills/outdated",
+                local_source_url: "file:///tmp/metis-trusted",
+                local_source_repo_path: "skills/outdated",
+                local_source_ref: "main",
+                local_commit: "aaa111",
+                local_modified: false,
+                trusted_source: true,
+              },
+              {
+                name: "Edited Skill",
+                agent_id: "generic",
+                status: "local_modified",
+                expected_source_url: "file:///tmp/metis-trusted",
+                expected_source_repo_path: "skills/edited",
+                expected_source_ref: "main",
+                expected_commit: "ccc333",
+                local_skill_id: "edited-skill",
+                local_install_path: "/tmp/metis-beta/skills/edited",
+                local_source_url: "file:///tmp/metis-trusted",
+                local_source_repo_path: "skills/edited",
+                local_source_ref: "main",
+                local_commit: "ccc333",
+                local_modified: true,
+                trusted_source: true,
+              },
+              {
+                name: "Wrong Source",
+                agent_id: "generic",
+                status: "source_mismatch",
+                expected_source_url: "file:///tmp/metis-trusted",
+                expected_source_repo_path: "skills/wrong",
+                expected_source_ref: "main",
+                expected_commit: "ddd444",
+                local_skill_id: "wrong-source-skill",
+                local_install_path: "/tmp/metis-beta/skills/wrong",
+                local_source_url: "file:///tmp/personal",
+                local_source_repo_path: "skills/wrong",
+                local_source_ref: "main",
+                local_commit: "ddd444",
+                local_modified: false,
+                trusted_source: false,
+              },
+              {
+                name: "Missing Skill",
+                agent_id: "generic",
+                status: "missing",
+                expected_source_url: "file:///tmp/metis-trusted",
+                expected_source_repo_path: "skills/missing",
+                expected_source_ref: "main",
+                expected_commit: "eee555",
+                local_skill_id: null,
+                local_install_path: null,
+                local_source_url: null,
+                local_source_repo_path: null,
+                local_source_ref: null,
+                local_commit: null,
+                local_modified: null,
+                trusted_source: null,
+              },
+            ],
           };
         case "check_skill_updates": {
           const request = args as { request: { skill_ids: string[] } };

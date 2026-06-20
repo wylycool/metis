@@ -12,6 +12,8 @@ import type {
   DesktopSettings,
   DesktopSkill,
   DesktopSource,
+  DesktopTeamManifestComplianceReport,
+  DesktopTeamManifestComplianceRequest,
   DesktopUpdateCheckRequest,
   DesktopUpdateCheckResult,
 } from "./types";
@@ -72,4 +74,10 @@ export function restoreSkillBackup(
 
 export function exportEnvironmentReport(): Promise<DesktopEnvironmentReport> {
   return invoke("export_environment_report");
+}
+
+export function checkTeamManifestCompliance(
+  request: DesktopTeamManifestComplianceRequest,
+): Promise<DesktopTeamManifestComplianceReport> {
+  return invoke("check_team_manifest_compliance", { request });
 }

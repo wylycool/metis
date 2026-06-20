@@ -7,6 +7,12 @@ use metis_core::discovery::{
     list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
     ScanOptions, ScanResult,
 };
+use metis_core::lockfile::{
+    check_team_manifest_compliance_from_str as core_check_team_manifest_compliance_from_str,
+    TeamManifestComplianceItem as CoreTeamManifestComplianceItem,
+    TeamManifestComplianceReport as CoreTeamManifestComplianceReport,
+    TeamManifestComplianceSummary as CoreTeamManifestComplianceSummary,
+};
 use metis_core::rollback::{
     list_backups as core_list_backups, restore_backup as core_restore_backup,
     BackupSummary as CoreBackupSummary, RestoreBackupOptions, RestoreResult as CoreRestoreResult,
@@ -296,6 +302,48 @@ pub struct DesktopEnvironmentSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceRequest {
+    pub manifest_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceReport {
+    pub generated_at: String,
+    pub manifest_version: String,
+    pub summary: DesktopTeamManifestComplianceSummary,
+    pub items: Vec<DesktopTeamManifestComplianceItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceSummary {
+    pub total: usize,
+    pub installed: usize,
+    pub missing: usize,
+    pub version_mismatch: usize,
+    pub local_modified: usize,
+    pub source_mismatch: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamManifestComplianceItem {
+    pub name: String,
+    pub agent_id: String,
+    pub status: String,
+    pub expected_source_url: Option<String>,
+    pub expected_source_repo_path: Option<String>,
+    pub expected_source_ref: Option<String>,
+    pub expected_commit: Option<String>,
+    pub local_skill_id: Option<String>,
+    pub local_install_path: Option<String>,
+    pub local_source_url: Option<String>,
+    pub local_source_repo_path: Option<String>,
+    pub local_source_ref: Option<String>,
+    pub local_commit: Option<String>,
+    pub local_modified: Option<bool>,
+    pub trusted_source: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopError {
     pub category: String,
     pub title: String,
@@ -541,6 +589,16 @@ pub fn export_environment_report_for_state(
     })
 }
 
+pub fn check_team_manifest_compliance_for_state(
+    state: &DesktopAppState,
+    request: DesktopTeamManifestComplianceRequest,
+) -> Result<DesktopTeamManifestComplianceReport, String> {
+    let store = state.open_store()?;
+    core_check_team_manifest_compliance_from_str(&request.manifest_json, &store)
+        .map(desktop_team_manifest_compliance_report)
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
 fn current_timestamp_string() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -649,6 +707,14 @@ fn export_environment_report(
     export_environment_report_for_state(&state)
 }
 
+#[tauri::command]
+fn check_team_manifest_compliance(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopTeamManifestComplianceRequest,
+) -> Result<DesktopTeamManifestComplianceReport, String> {
+    check_team_manifest_compliance_for_state(&state, request)
+}
+
 fn desktop_scan_response(
     result: ScanResult,
     store: &SkillIndexStore,
@@ -754,6 +820,56 @@ fn desktop_source_from_record(source: SourceRecord) -> DesktopSource {
         trusted: source.trusted,
         auto_update: source.auto_update,
         credential_ref: source.credential_ref,
+    }
+}
+
+fn desktop_team_manifest_compliance_report(
+    report: CoreTeamManifestComplianceReport,
+) -> DesktopTeamManifestComplianceReport {
+    DesktopTeamManifestComplianceReport {
+        generated_at: report.generated_at,
+        manifest_version: report.manifest_version,
+        summary: desktop_team_manifest_compliance_summary(report.summary),
+        items: report
+            .items
+            .into_iter()
+            .map(desktop_team_manifest_compliance_item)
+            .collect(),
+    }
+}
+
+fn desktop_team_manifest_compliance_summary(
+    summary: CoreTeamManifestComplianceSummary,
+) -> DesktopTeamManifestComplianceSummary {
+    DesktopTeamManifestComplianceSummary {
+        total: summary.total,
+        installed: summary.installed,
+        missing: summary.missing,
+        version_mismatch: summary.version_mismatch,
+        local_modified: summary.local_modified,
+        source_mismatch: summary.source_mismatch,
+    }
+}
+
+fn desktop_team_manifest_compliance_item(
+    item: CoreTeamManifestComplianceItem,
+) -> DesktopTeamManifestComplianceItem {
+    DesktopTeamManifestComplianceItem {
+        name: item.name,
+        agent_id: item.agent_id,
+        status: item.status,
+        expected_source_url: item.expected_source_url,
+        expected_source_repo_path: item.expected_source_repo_path,
+        expected_source_ref: item.expected_source_ref,
+        expected_commit: item.expected_commit,
+        local_skill_id: item.local_skill_id,
+        local_install_path: item.local_install_path,
+        local_source_url: item.local_source_url,
+        local_source_repo_path: item.local_source_repo_path,
+        local_source_ref: item.local_source_ref,
+        local_commit: item.local_commit,
+        local_modified: item.local_modified,
+        trusted_source: item.trusted_source,
     }
 }
 
@@ -1051,7 +1167,8 @@ pub fn run() {
             apply_skill_update,
             list_skill_backups,
             restore_skill_backup,
-            export_environment_report
+            export_environment_report,
+            check_team_manifest_compliance
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1736,6 +1853,97 @@ description: {description}
                 .expect("source summary should exist")
                 .has_credential_ref
         );
+        assert!(!json.contains("secret-token"));
+    }
+
+    #[test]
+    fn check_team_manifest_compliance_for_state_returns_read_only_report() {
+        let workspace = temp_dir("team-compliance");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let store = state.open_store().expect("store should open");
+        store
+            .upsert_source(&SourceRecord {
+                id: "source-installed".to_string(),
+                source_type: "git".to_string(),
+                url: "https://github.com/example/team-skills.git".to_string(),
+                repo_path: "skills/installed".to_string(),
+                ref_: "main".to_string(),
+                current_commit: Some("aaa111".to_string()),
+                remote_commit: None,
+                last_checked_at: None,
+                trusted: true,
+                auto_update: false,
+                credential_ref: Some("secret-token".to_string()),
+                created_at: None,
+                updated_at: None,
+            })
+            .expect("source should insert");
+        store
+            .upsert_skill(&SkillRecord {
+                id: "skill-installed".to_string(),
+                agent_id: "generic".to_string(),
+                name: "Installed".to_string(),
+                description: Some("Installed team skill".to_string()),
+                version: None,
+                author: None,
+                license: None,
+                tags: Vec::new(),
+                category: None,
+                install_path: workspace
+                    .join("skills/installed")
+                    .to_string_lossy()
+                    .to_string(),
+                scope: "custom".to_string(),
+                metadata_path: None,
+                metadata_status: "found".to_string(),
+                metadata_error: None,
+                source_id: Some("source-installed".to_string()),
+                local_fingerprint: None,
+                local_modified: Some(false),
+                last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+            })
+            .expect("skill should insert");
+        let manifest_json = serde_json::json!({
+            "version": "1",
+            "exported_at": "2026-06-20T12:00:00Z",
+            "skills": [
+                {
+                    "name": "Installed",
+                    "agent_id": "generic",
+                    "source_url": "https://github.com/example/team-skills.git",
+                    "source_repo_path": "skills/installed",
+                    "source_ref": "main",
+                    "source_commit": "aaa111",
+                    "install_path_hint": null
+                },
+                {
+                    "name": "Missing",
+                    "agent_id": "generic",
+                    "source_url": "https://github.com/example/team-skills.git",
+                    "source_repo_path": "skills/missing",
+                    "source_ref": "main",
+                    "source_commit": "bbb222",
+                    "install_path_hint": null
+                }
+            ]
+        })
+        .to_string();
+
+        let report = check_team_manifest_compliance_for_state(
+            &state,
+            DesktopTeamManifestComplianceRequest { manifest_json },
+        )
+        .expect("desktop compliance should return");
+        let json = serde_json::to_string(&report).expect("report should serialize");
+
+        drop(store);
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(report.summary.total, 2);
+        assert_eq!(report.summary.installed, 1);
+        assert_eq!(report.summary.missing, 1);
+        assert_eq!(report.items[0].status, "installed");
+        assert_eq!(report.items[1].status, "missing");
         assert!(!json.contains("secret-token"));
     }
 

@@ -179,6 +179,44 @@ export interface DesktopEnvironmentSource {
   has_credential_ref: boolean;
 }
 
+export interface DesktopTeamManifestComplianceRequest {
+  manifest_json: string;
+}
+
+export interface DesktopTeamManifestComplianceReport {
+  generated_at: string;
+  manifest_version: string;
+  summary: DesktopTeamManifestComplianceSummary;
+  items: DesktopTeamManifestComplianceItem[];
+}
+
+export interface DesktopTeamManifestComplianceSummary {
+  total: number;
+  installed: number;
+  missing: number;
+  version_mismatch: number;
+  local_modified: number;
+  source_mismatch: number;
+}
+
+export interface DesktopTeamManifestComplianceItem {
+  name: string;
+  agent_id: string;
+  status: string;
+  expected_source_url?: string | null;
+  expected_source_repo_path?: string | null;
+  expected_source_ref?: string | null;
+  expected_commit?: string | null;
+  local_skill_id?: string | null;
+  local_install_path?: string | null;
+  local_source_url?: string | null;
+  local_source_repo_path?: string | null;
+  local_source_ref?: string | null;
+  local_commit?: string | null;
+  local_modified?: boolean | null;
+  trusted_source?: boolean | null;
+}
+
 export interface DesktopError {
   category: string;
   title: string;
