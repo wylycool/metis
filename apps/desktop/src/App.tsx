@@ -665,7 +665,7 @@ function SkillRow({
   const canApplyUpdate = canShowDiff && !updateResult?.local_modified;
 
   return (
-    <article className="skill-row">
+    <article className="skill-row" data-testid={`skill-row-${skill.id}`}>
       <div className="skill-row-main">
         <div className="skill-main">
           <div className="skill-title">
@@ -711,17 +711,28 @@ function SkillRow({
       <div className="skill-actions">
         {skill.source ? (
           <>
-            <button className="ghost-button compact" disabled={checkingBusy} onClick={onCheck}>
+            <button
+              className="ghost-button compact"
+              data-testid={`check-updates-${skill.id}`}
+              disabled={checkingBusy}
+              onClick={onCheck}
+            >
               {checkingBusy ? "检查中" : "检查更新"}
             </button>
             {canShowDiff && (
-              <button className="ghost-button compact" disabled={diffBusy} onClick={onToggleDiff}>
+              <button
+                className="ghost-button compact"
+                data-testid={`toggle-diff-${skill.id}`}
+                disabled={diffBusy}
+                onClick={onToggleDiff}
+              >
                 {diffBusy ? "加载中" : diffDetail ? "收起 diff" : "查看 diff"}
               </button>
             )}
             {canShowDiff && (
               <button
                 className="compact"
+                data-testid={`apply-update-${skill.id}`}
                 disabled={applyBusy || !canApplyUpdate}
                 onClick={onApplyUpdate}
               >
@@ -731,7 +742,11 @@ function SkillRow({
             <button className="ghost-button compact" disabled={backupsBusy} onClick={onToggleBackups}>
               {backupsBusy ? "加载中" : backupOpen ? "收起备份" : "备份/回滚"}
             </button>
-            <button className="ghost-button compact" onClick={onOpenBind}>
+            <button
+              className="ghost-button compact"
+              data-testid={`open-bind-source-${skill.id}`}
+              onClick={onOpenBind}
+            >
               编辑来源
             </button>
             <button
@@ -743,7 +758,11 @@ function SkillRow({
             </button>
           </>
         ) : (
-          <button className="ghost-button compact" onClick={onOpenBind}>
+          <button
+            className="ghost-button compact"
+            data-testid={`open-bind-source-${skill.id}`}
+            onClick={onOpenBind}
+          >
             绑定来源
           </button>
         )}
@@ -754,6 +773,7 @@ function SkillRow({
       {backupError && <div className="inline-error">{backupError}</div>}
       {backupOpen && (
         <BackupPanel
+          skillId={skill.id}
           backups={backups}
           busyKey={busyKey}
           onRestoreBackup={onRestoreBackup}
@@ -762,6 +782,7 @@ function SkillRow({
 
       {isBinding && (
         <BindSourceForm
+          skillId={skill.id}
           draft={bindDraft}
           busy={bindingBusy}
           onChange={onDraftChange}
@@ -774,10 +795,12 @@ function SkillRow({
 }
 
 function BackupPanel({
+  skillId,
   backups,
   busyKey,
   onRestoreBackup,
 }: {
+  skillId: string;
   backups: DesktopBackupSummary[];
   busyKey: string | null;
   onRestoreBackup: (backupId: string) => void;
@@ -808,6 +831,7 @@ function BackupPanel({
                 </div>
                 <button
                   className="danger-button compact"
+                  data-testid={`restore-backup-${skillId}-${backup.backup_id}`}
                   disabled={restoring}
                   onClick={() => onRestoreBackup(backup.backup_id)}
                 >
@@ -853,12 +877,14 @@ function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
 }
 
 function BindSourceForm({
+  skillId,
   draft,
   busy,
   onChange,
   onCancel,
   onSubmit,
 }: {
+  skillId: string;
   draft: BindDraft;
   busy: boolean;
   onChange: (draft: BindDraft) => void;
@@ -872,6 +898,7 @@ function BindSourceForm({
       <label>
         <span>Git URL</span>
         <input
+          data-testid={`bind-url-${skillId}`}
           value={draft.url}
           placeholder="https://github.com/org/repo.git"
           onChange={(event) => onChange({ ...draft, url: event.target.value })}
@@ -880,6 +907,7 @@ function BindSourceForm({
       <label>
         <span>Repo Path</span>
         <input
+          data-testid={`bind-repo-path-${skillId}`}
           value={draft.repo_path}
           placeholder="skills/example"
           onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
@@ -888,6 +916,7 @@ function BindSourceForm({
       <label>
         <span>Ref</span>
         <input
+          data-testid={`bind-ref-${skillId}`}
           value={draft.ref_}
           placeholder="main"
           onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
@@ -896,6 +925,7 @@ function BindSourceForm({
       <label>
         <span>Credential Ref</span>
         <input
+          data-testid={`bind-credential-ref-${skillId}`}
           value={draft.credential_ref}
           placeholder="github-main"
           onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
@@ -922,7 +952,9 @@ function BindSourceForm({
           取消
         </button>
         <button className="compact" disabled={disabled} onClick={onSubmit}>
-          {busy ? "保存中" : "保存来源"}
+          <span data-testid={`submit-bind-source-${skillId}`}>
+            {busy ? "保存中" : "保存来源"}
+          </span>
         </button>
       </div>
     </div>

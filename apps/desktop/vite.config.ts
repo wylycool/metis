@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -15,5 +16,8 @@ export default defineConfig({
       // 监听 src 目录变化
       ignored: ["**/src-tauri/**"],
     },
+  },
+  test: {
+    setupFiles: ["src/test/setup.ts"],
   },
 });
