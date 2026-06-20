@@ -1,6 +1,6 @@
-# Metis — Agent Skill Manager
+# Metis：Agent Skill 管理器
 
-> A cross-platform, local-first, open-source version manager for AI agent skills.
+> 一个跨平台、本地优先、开源的 AI Agent Skill 版本管理器。
 
 Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill 管理器，用于发现、登记、更新、回滚和审计 Codex、Claude Code、OpenClaw、Hermes、opencode 以及其他 Agent 工具中的 skills。
 
