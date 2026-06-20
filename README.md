@@ -24,7 +24,9 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 当前阶段
 
-项目处于 **Phase 3 Beta 稳定化完成点**：Phase 1 的 Core Engine 本地管理闭环、Phase 2 Desktop MVP 和 Phase 3 Beta 稳定化已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出和受控自动更新。macOS 本机 `.dmg` 预览包已验证；macOS/Windows/Linux 预览包已由 GitHub Actions workflow 实跑生成。
+项目处于 **Phase 5 产品化体验与稳定性收口完成点 / Beta 2 候选**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地企业治理能力和 Phase 5 产品化收口均已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出、团队清单合规、团队策略审计、企业网络配置和受控自动更新。
+
+当前已发布下载仍是 `desktop-v0.1.0-beta.1`；当前开发分支完成了 Beta 2 候选体验打磨，包括 Skills / Governance / Settings 工作区、空状态、报告预览占位、设置保存反馈和本地验证清单。
 
 ## 技术栈
 
@@ -103,9 +105,16 @@ Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 
 
 签名、公证和 Windows Authenticode 属于后续可选信任增强，不阻塞开源 Beta 通过 GitHub Releases 分发。
 
-## 暂不进入 MVP
+首次打开后的建议路径：
 
-以下方向重要，但不进入第一阶段：
+1. 在 `Skills` 工作区点击重新扫描，确认本机已安装 skills。
+2. 对需要治理的 skill 绑定 Git source，并按需标记 trusted source。
+3. 在 `Governance` 工作区导出环境报告，或粘贴团队清单检查合规状态。
+4. 在 `Settings` 工作区配置额外扫描路径、团队策略文件和企业代理/CA bundle。
+
+## 当前不做
+
+以下方向重要，但不进入当前 Beta 产品化收口：
 
 - skill marketplace
 - 云同步

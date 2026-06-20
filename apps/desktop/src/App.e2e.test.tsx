@@ -203,7 +203,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     await user.type(screen.getByTestId("team-policy-path"), "/tmp/team-policy.json");
     await user.click(screen.getByText("保存"));
-    expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
+    expect(await screen.findByText("设置已保存")).toBeTruthy();
     await user.click(screen.getByTestId("preview-team-policy"));
 
     expect(await screen.findByText("策略版本 1")).toBeTruthy();
@@ -241,7 +241,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     await user.type(screen.getByTestId("team-policy-path"), "/tmp/team-policy.json");
     await user.click(screen.getByText("保存"));
-    expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
+    expect(await screen.findByText("设置已保存")).toBeTruthy();
     await user.click(screen.getByTestId("run-team-policy-audit"));
 
     expect(await screen.findByText("策略审计已生成")).toBeTruthy();
@@ -276,7 +276,7 @@ describe("Metis desktop GUI main flow", () => {
     );
     await user.click(screen.getByText("保存"));
 
-    expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
+    expect(await screen.findByText("设置已保存")).toBeTruthy();
     expect(screen.getByText("已配置企业代理")).toBeTruthy();
     expect(screen.getByText("已配置企业 CA bundle")).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith("save_desktop_settings", {
@@ -318,6 +318,31 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByText("扫描路径")).toBeTruthy();
     expect(screen.getByText("企业网络")).toBeTruthy();
     expect(screen.queryByText("团队清单合规")).toBeNull();
+  });
+
+  test("phase5 shows actionable empty states and report placeholders", async () => {
+    const user = userEvent.setup();
+    const scenario = createEmptyWorkspaceScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    const emptyState = await screen.findByTestId("skills-empty-state");
+    expect(emptyState).toBeTruthy();
+    expect(within(emptyState).getByText("还没有发现 skills")).toBeTruthy();
+    expect(within(emptyState).getByText("重新扫描")).toBeTruthy();
+    await user.click(within(emptyState).getByText("添加扫描路径"));
+
+    expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
+    expect(screen.getByText("扫描路径")).toBeTruthy();
+
+    await user.click(screen.getByTestId("workspace-tab-governance"));
+    expect(await screen.findByTestId("environment-report-empty")).toBeTruthy();
+    expect(screen.getByText("先生成环境报告，再决定是否写出到文件。")).toBeTruthy();
+    expect(screen.getByTestId("team-compliance-empty")).toBeTruthy();
+    expect(screen.getByText("粘贴或载入团队清单后再校验合规状态。")).toBeTruthy();
   });
 });
 
@@ -923,6 +948,42 @@ function createBetaReadinessScenario() {
             new_commit: request.skillId === "trusted-skill" ? "bbb222" : "ddd444",
           };
         }
+        default:
+          throw new Error(`Unexpected invoke command: ${command}`);
+      }
+    },
+  };
+}
+
+function createEmptyWorkspaceScenario() {
+  const agents: DesktopAgentStatus[] = [
+    {
+      agent_id: "generic",
+      agent_name: "Generic Agent Skills",
+      enabled: true,
+      paths: [
+        {
+          path: "/tmp/metis-empty/skills",
+          scope: "custom",
+          exists: true,
+          readable: true,
+          writable: true,
+        },
+      ],
+    },
+  ];
+
+  return {
+    async invoke(command: string, _args?: unknown) {
+      switch (command) {
+        case "list_agents":
+          return agents;
+        case "list_indexed_skills":
+          return [];
+        case "get_desktop_settings":
+          return { custom_scan_paths: [] };
+        case "scan_skills":
+          return { skills: [], warnings: [] };
         default:
           throw new Error(`Unexpected invoke command: ${command}`);
       }

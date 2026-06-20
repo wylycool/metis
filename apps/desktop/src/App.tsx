@@ -213,7 +213,7 @@ function App() {
       syncEnterpriseNetworkDrafts(saved);
       setTeamPolicySummary(null);
       setTeamPolicyAuditReport(null);
-      setActionMessage("扫描路径已保存");
+      setActionMessage("设置已保存");
       if (scanAfterSave) {
         await handleScan();
       } else {
@@ -803,10 +803,16 @@ function App() {
                 {actionBusy === "environment-report-file" ? "写出中" : "写出环境报告"}
               </button>
             </div>
-            {environmentReport && (
-              <pre className="environment-report-preview">
+            {environmentReport ? (
+              <ReportPreview title="环境报告预览" subtitle="不包含 token 或 credential_ref 值。">
                 {JSON.stringify(environmentReport, null, 2)}
-              </pre>
+              </ReportPreview>
+            ) : (
+              <ReportEmptyState
+                testId="environment-report-empty"
+                title="暂无环境报告"
+                description="先生成环境报告，再决定是否写出到文件。"
+              />
             )}
           </section>
 
@@ -850,7 +856,7 @@ function App() {
               placeholder='{"version":"1","skills":[]}'
               onChange={(event) => setTeamManifestDraft(event.target.value)}
             />
-            {teamComplianceReport && (
+            {teamComplianceReport ? (
               <div className="team-compliance-result">
                 <div className="team-compliance-summary">
                   <SummaryMetric
@@ -883,9 +889,9 @@ function App() {
                     <TeamComplianceRow key={`${item.agent_id}:${item.name}`} item={item} />
                   ))}
                 </div>
-                <pre className="environment-report-preview">
+                <ReportPreview title="团队合规报告预览" subtitle="用于提交给团队或归档审计。">
                   {JSON.stringify(teamComplianceReport, null, 2)}
-                </pre>
+                </ReportPreview>
                 <div className="file-action-row">
                   <input
                     data-testid="team-compliance-export-path"
@@ -906,6 +912,12 @@ function App() {
                   </button>
                 </div>
               </div>
+            ) : (
+              <ReportEmptyState
+                testId="team-compliance-empty"
+                title="暂无团队合规报告"
+                description="粘贴或载入团队清单后再校验合规状态。"
+              />
             )}
           </section>
 
@@ -1142,7 +1154,9 @@ function App() {
 
             {state === "loading" && <LoadingState />}
             {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
-            {state === "loaded" && skills.length === 0 && <EmptyState onScan={handleScan} />}
+            {state === "loaded" && skills.length === 0 && (
+              <EmptyState onOpenSettings={() => setActiveWorkspace("settings")} onScan={handleScan} />
+            )}
             {state === "loaded" && skills.length > 0 && (
               <div className="skill-list">
                 {skills.map((skill) => (
@@ -1270,6 +1284,43 @@ function PolicyAuditRow({ item }: { item: DesktopTeamPolicyAuditItem }) {
       </div>
       <span className={`status-badge ${policyAuditTone(item.status)}`}>{item.status}</span>
     </article>
+  );
+}
+
+function ReportPreview({
+  children,
+  subtitle,
+  title,
+}: {
+  children: string;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <div className="report-preview-shell">
+      <div className="report-preview-header">
+        <strong>{title}</strong>
+        <span>{subtitle}</span>
+      </div>
+      <pre className="environment-report-preview">{children}</pre>
+    </div>
+  );
+}
+
+function ReportEmptyState({
+  description,
+  testId,
+  title,
+}: {
+  description: string;
+  testId: string;
+  title: string;
+}) {
+  return (
+    <div className="report-empty-state" data-testid={testId}>
+      <strong>{title}</strong>
+      <span>{description}</span>
+    </div>
   );
 }
 
@@ -1676,12 +1727,21 @@ function ErrorState({ message, onRetry }: { message: DesktopError | null; onRetr
   );
 }
 
-function EmptyState({ onScan }: { onScan: () => void }) {
+function EmptyState({
+  onOpenSettings,
+  onScan,
+}: {
+  onOpenSettings: () => void;
+  onScan: () => void;
+}) {
   return (
-    <div className="state-block">
+    <div className="state-block empty-state" data-testid="skills-empty-state">
       <h3>还没有发现 skills</h3>
-      <p>默认目录中暂时没有可索引的 `SKILL.md`。</p>
-      <button onClick={onScan}>重新扫描</button>
+      <p>默认目录中暂时没有可索引的 SKILL.md。可以重新扫描，或添加团队/个人的 Generic Agent Skills 根目录。</p>
+      <div className="empty-actions">
+        <button onClick={onScan}>重新扫描</button>
+        <button className="ghost-button" onClick={onOpenSettings}>添加扫描路径</button>
+      </div>
     </div>
   );
 }

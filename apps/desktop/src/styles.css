@@ -296,6 +296,50 @@ h1 {
   gap: 8px;
 }
 
+.report-preview-shell {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.report-preview-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-preview-header strong {
+  font-size: 13px;
+}
+
+.report-preview-header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.report-empty-state {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+  border: 1px dashed #3b4550;
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--muted);
+  background: rgba(16, 18, 22, 0.36);
+}
+
+.report-empty-state strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.report-empty-state span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .environment-report-preview {
   grid-column: 1 / -1;
   max-height: 260px;
@@ -479,6 +523,7 @@ h1 {
   grid-column: 1 / -1;
   display: grid;
   gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border-top: 1px solid #323b45;
   padding-top: 12px;
 }
@@ -555,6 +600,10 @@ h1 {
 
 .credential-note code {
   width: auto;
+}
+
+.credential-section {
+  grid-column: 1 / -1;
 }
 
 .path-remove-list {
@@ -1121,6 +1170,23 @@ h1 {
   margin-bottom: 8px;
   color: var(--text);
   font-size: 18px;
+}
+
+.empty-state {
+  align-content: center;
+  gap: 12px;
+}
+
+.empty-state p {
+  max-width: 520px;
+  line-height: 1.6;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
 
 .state-block p {
