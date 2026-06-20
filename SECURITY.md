@@ -8,7 +8,7 @@ Metis 是一个本地优先的 Agent Skill 管理器。安全是核心设计目�
 
 1. **本地优先**：用户数据、索引、备份和审计记录默认只存本机，不上传任何远程服务。
 2. **显式信任**：默认只检测更新，不自动更新。只有用户明确标记为 `trusted` 的来源才允许自动更新。
-3. **凭据隔离**：Token、私钥等敏感凭据只存系统 keychain，绝不写入配置文件、lock 文件或导出报告。
+3. **凭据隔离**：Metis 当前不保存 Token、私钥等敏感凭据，只保存 `credential_ref` 引用名；真实认证由系统 Git、SSH agent 或 Git credential helper 完成。
 4. **可回滚**：任何覆盖本地文件的更新操作必须先创建完整备份。
 5. **不自动执行**：Metis 默认不执行 skill 内的任何脚本。安全检查只做静态分析。
 
@@ -44,7 +44,7 @@ Metis 是一个本地优先的 Agent Skill 管理器。安全是核心设计目�
 
 | 存储位置 | 允许内容 | 禁止内容 |
 |---------|---------|---------|
-| 系统 keychain | Token、私钥、密码 | — |
+| 系统 Git / SSH agent / credential helper | Token、私钥、密码 | Metis 不直接读取 |
 | 配置文件 | `credential_ref: "name"` | Token 明文、带 token 的 URL |
 | lock 文件 | 来源 URL、ref、commit | Token 明文 |
 | SQLite | `credential_ref` 字符串 | Token 明文 |
