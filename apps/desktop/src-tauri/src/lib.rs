@@ -11,11 +11,21 @@ use metis_core::discovery::{
     list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
     ScanOptions, ScanResult,
 };
+use metis_core::install::{
+    install_remote_skill_to_targets as core_install_remote_skill_to_targets,
+    InstallRemoteSkillOptions, InstallRemoteSkillResult as CoreInstallRemoteSkillResult,
+    InstallSkillTarget, InstallTargetResult as CoreInstallTargetResult,
+    InstallTargetStatus as CoreInstallTargetStatus,
+};
 use metis_core::lockfile::{
     check_team_manifest_compliance_from_str as core_check_team_manifest_compliance_from_str,
     TeamManifestComplianceItem as CoreTeamManifestComplianceItem,
     TeamManifestComplianceReport as CoreTeamManifestComplianceReport,
     TeamManifestComplianceSummary as CoreTeamManifestComplianceSummary,
+};
+use metis_core::preview::{
+    preview_remote_skill_source as core_preview_remote_skill_source,
+    PreviewRemoteSkillSourceOptions, RemoteSkillPreview as CoreRemoteSkillPreview,
 };
 use metis_core::rollback::{
     list_backups as core_list_backups, restore_backup as core_restore_backup,
@@ -24,6 +34,10 @@ use metis_core::rollback::{
 use metis_core::source::{
     bind_source as core_bind_source, unbind_source as core_unbind_source, Source, SourceInput,
     SourceType,
+};
+use metis_core::sync::{
+    get_skill_targets_for_source as core_get_skill_targets_for_source,
+    SkillTarget as CoreSkillTarget, SkillTargetSource, SkillTargetStatus as CoreSkillTargetStatus,
 };
 use metis_core::update::{
     apply_update as core_apply_update, check_updates as core_check_updates,
@@ -188,6 +202,77 @@ pub struct DesktopBindSourceRequest {
     pub credential_ref: Option<String>,
     pub trusted: bool,
     pub auto_update: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopPreviewRemoteSkillSourceRequest {
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopRemoteSkillPreview {
+    pub name: String,
+    pub description: Option<String>,
+    pub install_name: String,
+    pub commit: String,
+    pub repo_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSkillTargetsRequest {
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+    pub commit: String,
+    pub install_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSkillTarget {
+    pub agent_id: String,
+    pub agent_name: String,
+    pub root_path: String,
+    pub install_path: String,
+    pub status: String,
+    pub local_modified: bool,
+    pub skill_id: Option<String>,
+    pub source_id: Option<String>,
+    pub root_available: bool,
+    pub root_status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopInstallRemoteSkillRequest {
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+    pub commit: String,
+    pub install_name: String,
+    pub targets: Vec<DesktopInstallSkillTarget>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopInstallSkillTarget {
+    pub agent_id: String,
+    pub agent_name: String,
+    pub install_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopInstallRemoteSkillResult {
+    pub targets: Vec<DesktopInstallTargetResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopInstallTargetResult {
+    pub agent_id: String,
+    pub install_path: String,
+    pub status: String,
+    pub reason: Option<String>,
+    pub skill_id: Option<String>,
+    pub backup_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -637,6 +722,78 @@ pub fn unbind_skill_source_for_state(
     core_unbind_source(&skill_id, &store).map_err(|error| error.to_string())
 }
 
+pub fn preview_remote_skill_source_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    request: DesktopPreviewRemoteSkillSourceRequest,
+    checker: &C,
+) -> Result<DesktopRemoteSkillPreview, String> {
+    state.ensure_dirs()?;
+    core_preview_remote_skill_source(
+        PreviewRemoteSkillSourceOptions {
+            url: request.url,
+            repo_path: request.repo_path,
+            ref_: request.ref_,
+            cache_dir: state.cache_root().to_string_lossy().to_string(),
+        },
+        checker,
+    )
+    .map(desktop_remote_skill_preview)
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
+pub fn get_skill_targets_for_source_for_state(
+    state: &DesktopAppState,
+    request: DesktopSkillTargetsRequest,
+) -> Result<Vec<DesktopSkillTarget>, String> {
+    let store = state.open_store()?;
+    core_get_skill_targets_for_source(
+        SkillTargetSource {
+            url: request.url,
+            repo_path: request.repo_path,
+            ref_: request.ref_,
+            commit: request.commit,
+            install_name: request.install_name,
+        },
+        &store,
+    )
+    .map(|targets| targets.into_iter().map(desktop_skill_target).collect())
+    .map_err(|error| friendly_desktop_error(&error).wire_string())
+}
+
+pub fn install_remote_skill_to_targets_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    request: DesktopInstallRemoteSkillRequest,
+    checker: &C,
+) -> Result<DesktopInstallRemoteSkillResult, String> {
+    let mut store = state.open_store()?;
+    core_install_remote_skill_to_targets(
+        InstallRemoteSkillOptions {
+            source: SkillTargetSource {
+                url: request.url,
+                repo_path: request.repo_path,
+                ref_: request.ref_,
+                commit: request.commit,
+                install_name: request.install_name,
+            },
+            targets: request
+                .targets
+                .into_iter()
+                .map(|target| InstallSkillTarget {
+                    agent_id: target.agent_id,
+                    agent_name: target.agent_name,
+                    install_path: target.install_path,
+                })
+                .collect(),
+            backup_root: state.backup_root().to_string_lossy().to_string(),
+            cache_dir: state.cache_root().to_string_lossy().to_string(),
+        },
+        &mut store,
+        checker,
+    )
+    .map(desktop_install_remote_skill_result)
+    .map_err(|error| friendly_desktop_error(&error).wire_string())
+}
+
 pub fn check_skill_updates_for_state_with_checker<C: RemoteCommitChecker>(
     state: &DesktopAppState,
     request: DesktopUpdateCheckRequest,
@@ -925,6 +1082,32 @@ fn unbind_skill_source(
 }
 
 #[tauri::command]
+fn preview_remote_skill_source(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopPreviewRemoteSkillSourceRequest,
+) -> Result<DesktopRemoteSkillPreview, String> {
+    let checker = system_git_checker_for_state(&state)?;
+    preview_remote_skill_source_for_state_with_checker(&state, request, &checker)
+}
+
+#[tauri::command]
+fn get_skill_targets_for_source(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopSkillTargetsRequest,
+) -> Result<Vec<DesktopSkillTarget>, String> {
+    get_skill_targets_for_source_for_state(&state, request)
+}
+
+#[tauri::command]
+fn install_remote_skill_to_targets(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopInstallRemoteSkillRequest,
+) -> Result<DesktopInstallRemoteSkillResult, String> {
+    let checker = system_git_checker_for_state(&state)?;
+    install_remote_skill_to_targets_for_state_with_checker(&state, request, &checker)
+}
+
+#[tauri::command]
 fn check_skill_updates(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopUpdateCheckRequest,
@@ -1154,6 +1337,77 @@ fn desktop_source_from_record(source: SourceRecord) -> DesktopSource {
         auto_update: source.auto_update,
         credential_ref: source.credential_ref,
     }
+}
+
+fn desktop_remote_skill_preview(preview: CoreRemoteSkillPreview) -> DesktopRemoteSkillPreview {
+    DesktopRemoteSkillPreview {
+        name: preview.name,
+        description: preview.description,
+        install_name: preview.install_name,
+        commit: preview.commit,
+        repo_path: preview.repo_path,
+    }
+}
+
+fn desktop_skill_target(target: CoreSkillTarget) -> DesktopSkillTarget {
+    DesktopSkillTarget {
+        agent_id: target.agent_id,
+        agent_name: target.agent_name,
+        root_path: target.root_path,
+        install_path: target.install_path,
+        status: desktop_skill_target_status(target.status),
+        local_modified: target.local_modified,
+        skill_id: target.skill_id,
+        source_id: target.source_id,
+        root_available: target.root_available,
+        root_status: target.root_status,
+    }
+}
+
+fn desktop_skill_target_status(status: CoreSkillTargetStatus) -> String {
+    match status {
+        CoreSkillTargetStatus::NotInstalled => "NotInstalled",
+        CoreSkillTargetStatus::InstalledUnbound => "InstalledUnbound",
+        CoreSkillTargetStatus::InstalledBound => "InstalledBound",
+        CoreSkillTargetStatus::UpToDate => "UpToDate",
+        CoreSkillTargetStatus::UpdateAvailable => "UpdateAvailable",
+        CoreSkillTargetStatus::ConflictNonSkill => "ConflictNonSkill",
+        CoreSkillTargetStatus::AgentRootUnavailable => "AgentRootUnavailable",
+    }
+    .to_string()
+}
+
+fn desktop_install_remote_skill_result(
+    result: CoreInstallRemoteSkillResult,
+) -> DesktopInstallRemoteSkillResult {
+    DesktopInstallRemoteSkillResult {
+        targets: result
+            .targets
+            .into_iter()
+            .map(desktop_install_target_result)
+            .collect(),
+    }
+}
+
+fn desktop_install_target_result(result: CoreInstallTargetResult) -> DesktopInstallTargetResult {
+    DesktopInstallTargetResult {
+        agent_id: result.agent_id,
+        install_path: result.install_path,
+        status: desktop_install_target_status(result.status),
+        reason: result.reason,
+        skill_id: result.skill_id,
+        backup_id: result.backup_id,
+    }
+}
+
+fn desktop_install_target_status(status: CoreInstallTargetStatus) -> String {
+    match status {
+        CoreInstallTargetStatus::Installed => "Installed",
+        CoreInstallTargetStatus::Updated => "Updated",
+        CoreInstallTargetStatus::Skipped => "Skipped",
+        CoreInstallTargetStatus::Failed => "Failed",
+    }
+    .to_string()
 }
 
 fn desktop_team_manifest_compliance_report(
@@ -1470,6 +1724,19 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         );
     }
 
+    if lower.contains("repo_path")
+        || lower.contains("repo path")
+        || lower.contains("not a skill directory")
+    {
+        return desktop_error(
+            "git_source",
+            "Git source 错误",
+            "Metis 无法根据当前来源信息预览远端 skill。",
+            "检查 Git URL、ref、repo path，并确认目标目录包含 SKILL.md。",
+            message,
+        );
+    }
+
     if lower.contains("no such file or directory")
         || lower.contains("not a directory")
         || lower.contains("path")
@@ -1490,7 +1757,6 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         || lower.contains("missing current commit")
         || lower.contains("missing remote commit")
         || lower.contains("no source")
-        || lower.contains("repo_path")
     {
         return desktop_error(
             "git_source",
@@ -1555,6 +1821,9 @@ pub fn run() {
             get_team_policy_audit_report,
             bind_skill_source,
             unbind_skill_source,
+            preview_remote_skill_source,
+            get_skill_targets_for_source,
+            install_remote_skill_to_targets,
             check_skill_updates,
             get_skill_diff,
             apply_skill_update,
@@ -1685,6 +1954,154 @@ mod tests {
         ) -> Result<CheckoutResult, String> {
             unreachable!("auth failure should stop before checkout")
         }
+    }
+
+    #[test]
+    fn preview_remote_skill_source_for_state_returns_desktop_dto() {
+        let workspace = temp_dir("preview-remote");
+        let data_root = workspace.join("data");
+        let cache_root = workspace.join("cache");
+        let state = DesktopAppState::new(&data_root, &cache_root);
+        let skill_dir = write_skill(
+            &workspace.join("checkout").join("skills"),
+            "example",
+            "example",
+            "Remote skill preview",
+        );
+        let checker = FakeUpdateChecker {
+            commits: HashMap::from([("remote-preview".to_string(), "abc123".to_string())]),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: Some(CheckoutResult {
+                checkout_dir: workspace.join("checkout").to_string_lossy().to_string(),
+                skill_dir: skill_dir.to_string_lossy().to_string(),
+            }),
+        };
+
+        let preview = preview_remote_skill_source_for_state_with_checker(
+            &state,
+            DesktopPreviewRemoteSkillSourceRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/example".to_string(),
+                ref_: "main".to_string(),
+            },
+            &checker,
+        )
+        .expect("remote preview should succeed");
+
+        assert_eq!(preview.name, "example");
+        assert_eq!(preview.description.as_deref(), Some("Remote skill preview"));
+        assert_eq!(preview.install_name, "example");
+        assert_eq!(preview.commit, "abc123");
+        assert_eq!(preview.repo_path, "skills/example");
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn preview_remote_skill_source_for_state_maps_authentication_error() {
+        let workspace = temp_dir("preview-auth");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+
+        let error = preview_remote_skill_source_for_state_with_checker(
+            &state,
+            DesktopPreviewRemoteSkillSourceRequest {
+                url: "https://github.com/private/metis-skills.git".to_string(),
+                repo_path: "skills/private".to_string(),
+                ref_: "main".to_string(),
+            },
+            &AuthFailureChecker,
+        )
+        .expect_err("auth failure should be mapped");
+
+        let desktop_error: DesktopError =
+            serde_json::from_str(&error).expect("desktop error should be JSON");
+        assert_eq!(desktop_error.category, "authentication");
+        assert_eq!(desktop_error.title, "认证失败");
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn get_skill_targets_for_source_for_state_returns_desktop_dtos() {
+        let workspace = temp_dir("sync-targets");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+
+        let targets = get_skill_targets_for_source_for_state(
+            &state,
+            DesktopSkillTargetsRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/example".to_string(),
+                ref_: "main".to_string(),
+                commit: "abc123".to_string(),
+                install_name: "example".to_string(),
+            },
+        )
+        .expect("targets should load");
+
+        assert_eq!(targets.len(), 5);
+        assert_eq!(targets[0].agent_id, "codex");
+        assert_eq!(targets[0].status, "AgentRootUnavailable");
+        assert!(!targets[0].install_path.contains("{name}"));
+        assert!(targets.iter().all(|target| target.agent_id != "generic"));
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn install_remote_skill_to_targets_for_state_returns_per_target_results() {
+        let workspace = temp_dir("desktop-install");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let checkout_skill = write_skill(
+            &workspace.join("checkout"),
+            "remote",
+            "Remote Skill",
+            "Install me",
+        );
+        let install_path = workspace.join("codex-skills").join("remote");
+        let checker = FakeUpdateChecker {
+            commits: HashMap::new(),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: Some(CheckoutResult {
+                checkout_dir: workspace.join("checkout").to_string_lossy().to_string(),
+                skill_dir: checkout_skill.to_string_lossy().to_string(),
+            }),
+        };
+
+        let result = install_remote_skill_to_targets_for_state_with_checker(
+            &state,
+            DesktopInstallRemoteSkillRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/remote".to_string(),
+                ref_: "main".to_string(),
+                commit: "abc123".to_string(),
+                install_name: "remote".to_string(),
+                targets: vec![DesktopInstallSkillTarget {
+                    agent_id: "codex".to_string(),
+                    agent_name: "Codex".to_string(),
+                    install_path: install_path.to_string_lossy().to_string(),
+                }],
+            },
+            &checker,
+        )
+        .expect("desktop install should complete");
+
+        assert_eq!(result.targets.len(), 1);
+        assert_eq!(result.targets[0].status, "Installed");
+        assert!(result.targets[0].skill_id.is_some());
+        assert!(install_path.join("SKILL.md").is_file());
+
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
 
     fn temp_dir(name: &str) -> PathBuf {

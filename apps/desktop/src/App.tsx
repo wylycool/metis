@@ -10,12 +10,15 @@ import {
   exportTeamComplianceReportToFile,
   getSkillDiff,
   getDesktopSettings,
+  getSkillTargetsForSource,
   getTeamPolicyAuditReport,
   getTeamPolicySummary,
+  installRemoteSkillToTargets,
   listSkillBackups,
   listAgents,
   listIndexedSkills,
   loadTeamManifestFromFile,
+  previewRemoteSkillSource,
   restoreSkillBackup,
   saveDesktopSettings,
   scanSkills,
@@ -27,9 +30,12 @@ import type {
   DesktopDiffDetail,
   DesktopError,
   DesktopEnvironmentReport,
+  DesktopInstallRemoteSkillResult,
+  DesktopRemoteSkillPreview,
   DesktopScanWarning,
   DesktopSettings,
   DesktopSkill,
+  DesktopSkillTarget,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceItem,
   DesktopTeamPolicyAuditReport,
@@ -46,6 +52,12 @@ interface BindDraft {
   credential_ref: string;
   trusted: boolean;
   auto_update: boolean;
+}
+
+interface RemoteSyncDraft {
+  url: string;
+  repo_path: string;
+  ref_: string;
 }
 
 type WorkspaceKey = "skills" | "governance" | "settings";
@@ -83,6 +95,18 @@ function App() {
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [skillSearchQuery, setSkillSearchQuery] = useState("");
+  const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>({
+    url: "",
+    repo_path: "",
+    ref_: "main",
+  });
+  const [remotePreview, setRemotePreview] = useState<DesktopRemoteSkillPreview | null>(null);
+  const [remoteTargets, setRemoteTargets] = useState<DesktopSkillTarget[]>([]);
+  const [selectedRemoteTargetIds, setSelectedRemoteTargetIds] = useState<string[]>([]);
+  const [remoteInstallResult, setRemoteInstallResult] =
+    useState<DesktopInstallRemoteSkillResult | null>(null);
   const didBootstrap = useRef(false);
 
   const groupedSkills = useMemo(() => {
@@ -91,6 +115,25 @@ function App() {
       skills: skills.filter((skill) => skill.agent_id === agent.agent_id),
     }));
   }, [agents, skills]);
+  const selectedAgent = useMemo(
+    () => groupedSkills.find((agent) => agent.agent_id === selectedAgentId) ?? null,
+    [groupedSkills, selectedAgentId],
+  );
+  const normalizedSearchQuery = skillSearchQuery.trim().toLocaleLowerCase();
+  const visibleSkills = useMemo(() => {
+    if (normalizedSearchQuery) {
+      return skills.filter((skill) => skillMatchesSearch(skill, normalizedSearchQuery));
+    }
+    if (selectedAgent) {
+      return selectedAgent.skills;
+    }
+    return skills;
+  }, [normalizedSearchQuery, selectedAgent, skills]);
+  const visibleBoundCount = visibleSkills.filter((skill) => skill.source).length;
+  const visibleModifiedCount = visibleSkills.filter((skill) => skill.local_modified).length;
+  const visibleUpdateAvailableCount = visibleSkills.filter(
+    (skill) => updateResults[skill.id]?.status === "UpdateAvailable",
+  ).length;
 
   const totalExistingPaths = agents.reduce(
     (count, agent) => count + agent.paths.filter((path) => path.exists).length,
@@ -392,12 +435,12 @@ function App() {
     }
   }
 
-  async function handleCheckUpdates(skillIds: string[]) {
+  async function handleCheckUpdates(skillIds: string[], busyKey = "check-updates") {
     if (skillIds.length === 0) {
       return;
     }
 
-    setActionBusy("check-updates");
+    setActionBusy(busyKey);
     setActionError(null);
     setActionMessage(null);
 
@@ -411,6 +454,90 @@ function App() {
         return next;
       });
       setDiffError({});
+      await refreshIndexedSkills();
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleCheckAgentUpdates(agentId: string) {
+    const agentSkillIds = skills
+      .filter((skill) => skill.agent_id === agentId)
+      .map((skill) => skill.id);
+    await handleCheckUpdates(agentSkillIds, `agent-check:${agentId}`);
+  }
+
+  async function handlePreviewRemoteSync() {
+    setActionBusy("remote-sync-preview");
+    setActionError(null);
+    setActionMessage(null);
+    setRemotePreview(null);
+    setRemoteTargets([]);
+    setSelectedRemoteTargetIds([]);
+    setRemoteInstallResult(null);
+
+    try {
+      const preview = await previewRemoteSkillSource({
+        url: remoteSyncDraft.url.trim(),
+        repo_path: remoteSyncDraft.repo_path.trim(),
+        ref_: remoteSyncDraft.ref_.trim() || "main",
+      });
+      const targets = await getSkillTargetsForSource({
+        url: remoteSyncDraft.url.trim(),
+        repo_path: preview.repo_path === "." ? "" : preview.repo_path,
+        ref_: remoteSyncDraft.ref_.trim() || "main",
+        commit: preview.commit,
+        install_name: preview.install_name,
+      });
+      setRemotePreview(preview);
+      setRemoteTargets(targets);
+      setSelectedRemoteTargetIds([]);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  function toggleRemoteTarget(target: DesktopSkillTarget) {
+    const id = remoteTargetId(target);
+    setSelectedRemoteTargetIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
+
+  async function handleInstallRemoteTargets() {
+    if (!remotePreview) {
+      return;
+    }
+    const selectedTargets = remoteTargets.filter((target) =>
+      selectedRemoteTargetIds.includes(remoteTargetId(target)),
+    );
+    if (selectedTargets.length === 0) {
+      return;
+    }
+
+    setActionBusy("remote-sync-install");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const result = await installRemoteSkillToTargets({
+        url: remoteSyncDraft.url.trim(),
+        repo_path: remotePreview.repo_path === "." ? "" : remotePreview.repo_path,
+        ref_: remoteSyncDraft.ref_.trim() || "main",
+        commit: remotePreview.commit,
+        install_name: remotePreview.install_name,
+        targets: selectedTargets.map((target) => ({
+          agent_id: target.agent_id,
+          agent_name: target.agent_name,
+          install_path: target.install_path,
+        })),
+      });
+      setRemoteInstallResult(result);
+      setActionMessage("跨 Agent 同步已完成");
       await refreshIndexedSkills();
     } catch (caught) {
       setActionError(desktopError(caught));
@@ -1130,13 +1257,20 @@ function App() {
             </div>
             <div className="agent-list">
               {groupedSkills.map((agent) => (
-                <div className="agent-row" key={agent.agent_id}>
+                <button
+                  aria-label={`查看 Agent ${agent.agent_id}`}
+                  aria-pressed={selectedAgentId === agent.agent_id}
+                  className={`agent-row ${selectedAgentId === agent.agent_id ? "active" : ""}`}
+                  data-testid={`agent-row-${agent.agent_id}`}
+                  key={agent.agent_id}
+                  onClick={() => setSelectedAgentId(agent.agent_id)}
+                >
                   <div>
                     <strong>{agent.agent_name}</strong>
                     <span>{agent.agent_id}</span>
                   </div>
                   <b>{agent.skills.length}</b>
-                </div>
+                </button>
               ))}
             </div>
           </aside>
@@ -1144,22 +1278,159 @@ function App() {
           <section className="skill-panel">
             <div className="panel-heading">
               <div>
-                <h2>Skill 索引</h2>
-                <p>{statusText(state, skills.length)}</p>
+                <h2>{panelTitle(selectedAgent, normalizedSearchQuery)}</h2>
+                <p>{panelSubtitle(state, visibleSkills.length, normalizedSearchQuery)}</p>
               </div>
+              {selectedAgent && !normalizedSearchQuery && (
+                <button
+                  className="ghost-button compact"
+                  data-testid={`check-agent-updates-${selectedAgent.agent_id}`}
+                  disabled={actionBusy === `agent-check:${selectedAgent.agent_id}`}
+                  onClick={() => handleCheckAgentUpdates(selectedAgent.agent_id)}
+                >
+                  {actionBusy === `agent-check:${selectedAgent.agent_id}`
+                    ? "检查中"
+                    : "检查此 Agent"}
+                </button>
+              )}
               {warnings.length > 0 && (
                 <span className="warning-pill">{warnings.length} 条 warning</span>
               )}
             </div>
+            <div className="skill-search-bar">
+              <input
+                data-testid="skill-search-input"
+                placeholder="搜索本机 skill、Agent、路径或来源"
+                value={skillSearchQuery}
+                onChange={(event) => setSkillSearchQuery(event.target.value)}
+              />
+              {skillSearchQuery && (
+                <button className="ghost-button compact" onClick={() => setSkillSearchQuery("")}>
+                  清空
+                </button>
+              )}
+            </div>
+            <section className="remote-sync-panel" aria-label="跨 Agent 同步">
+              <div className="remote-sync-header">
+                <div>
+                  <h3>跨 Agent 同步</h3>
+                  <p>从远端 Git skill 预览后安装或更新到选中的本机 Agent。</p>
+                </div>
+                <button
+                  className="compact"
+                  data-testid="remote-sync-preview"
+                  disabled={
+                    actionBusy === "remote-sync-preview" ||
+                    remoteSyncDraft.url.trim().length === 0
+                  }
+                  onClick={handlePreviewRemoteSync}
+                >
+                  {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
+                </button>
+              </div>
+              <div className="remote-sync-form">
+                <input
+                  data-testid="remote-sync-url"
+                  value={remoteSyncDraft.url}
+                  placeholder="https://github.com/example/metis-skills.git"
+                  onChange={(event) =>
+                    setRemoteSyncDraft((current) => ({ ...current, url: event.target.value }))
+                  }
+                />
+                <input
+                  data-testid="remote-sync-repo-path"
+                  value={remoteSyncDraft.repo_path}
+                  placeholder="skills/example"
+                  onChange={(event) =>
+                    setRemoteSyncDraft((current) => ({
+                      ...current,
+                      repo_path: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  data-testid="remote-sync-ref"
+                  value={remoteSyncDraft.ref_}
+                  placeholder="main"
+                  onChange={(event) =>
+                    setRemoteSyncDraft((current) => ({ ...current, ref_: event.target.value }))
+                  }
+                />
+              </div>
+              {remotePreview && (
+                <div className="remote-preview-card">
+                  <div>
+                    <strong>{remotePreview.name}</strong>
+                    <span>{remotePreview.description ?? "无描述"}</span>
+                  </div>
+                  <code>{shortCommit(remotePreview.commit)}</code>
+                </div>
+              )}
+              {remoteTargets.length > 0 && (
+                <div className="remote-target-list">
+                  {remoteTargets.map((target) => (
+                    <label
+                      className="remote-target-row"
+                      data-testid={`remote-target-${target.agent_id}`}
+                      key={remoteTargetId(target)}
+                    >
+                      <input
+                        data-testid={`remote-target-checkbox-${target.agent_id}`}
+                        type="checkbox"
+                        checked={selectedRemoteTargetIds.includes(remoteTargetId(target))}
+                        disabled={!isRemoteTargetSelectable(target)}
+                        onChange={() => toggleRemoteTarget(target)}
+                      />
+                      <span>
+                        <strong>{target.agent_name}</strong>
+                        <small>{target.install_path}</small>
+                      </span>
+                      <b>{remoteTargetStatusLabel(target)}</b>
+                    </label>
+                  ))}
+                  <button
+                    className="compact"
+                    data-testid="remote-sync-install"
+                    disabled={
+                      actionBusy === "remote-sync-install" || selectedRemoteTargetIds.length === 0
+                    }
+                    onClick={handleInstallRemoteTargets}
+                  >
+                    {actionBusy === "remote-sync-install" ? "同步中" : "同步选中 Agent"}
+                  </button>
+                </div>
+              )}
+              {remoteInstallResult && (
+                <div className="remote-install-result">
+                  {remoteInstallResult.targets.map((target) => (
+                    <span key={`${target.agent_id}:${target.install_path}`}>
+                      {agentNameFromId(target.agent_id)}：{target.status}
+                      {target.reason ? ` (${target.reason})` : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
+            {selectedAgent && !normalizedSearchQuery && (
+              <div
+                className="agent-detail-summary"
+                data-testid={`agent-detail-${selectedAgent.agent_id}`}
+              >
+                <SummaryMetric label="此 Agent skills" value={visibleSkills.length.toString()} />
+                <SummaryMetric label="已绑定来源" value={visibleBoundCount.toString()} />
+                <SummaryMetric label="本地修改" value={visibleModifiedCount.toString()} />
+                <SummaryMetric label="待更新" value={visibleUpdateAvailableCount.toString()} />
+              </div>
+            )}
 
             {state === "loading" && <LoadingState />}
             {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
-            {state === "loaded" && skills.length === 0 && (
+            {state === "loaded" && visibleSkills.length === 0 && (
               <EmptyState onOpenSettings={() => setActiveWorkspace("settings")} onScan={handleScan} />
             )}
-            {state === "loaded" && skills.length > 0 && (
+            {state === "loaded" && visibleSkills.length > 0 && (
               <div className="skill-list">
-                {skills.map((skill) => (
+                {visibleSkills.map((skill) => (
                   <SkillRow
                     key={skill.id}
                     skill={skill}
@@ -1746,17 +2017,80 @@ function EmptyState({
   );
 }
 
-function statusText(state: LoadState, count: number) {
+function panelTitle(
+  selectedAgent: (DesktopAgentStatus & { skills: DesktopSkill[] }) | null,
+  searchQuery: string,
+) {
+  if (searchQuery) {
+    return "搜索结果";
+  }
+  if (selectedAgent) {
+    return `${selectedAgent.agent_name} 工作区`;
+  }
+  return "Skill 索引";
+}
+
+function panelSubtitle(state: LoadState, count: number, searchQuery: string) {
   if (state === "loading") {
     return "正在同步 Core discovery 与 SQLite 索引";
   }
   if (state === "error") {
     return "请查看错误信息后重试";
   }
+  if (searchQuery) {
+    return `全局匹配 ${count} 个本机 skill，结果保留所属 Agent。`;
+  }
   if (count === 0) {
     return "默认目录暂无已发现 skill";
   }
   return "来自本机 SQLite 索引和最新扫描结果";
+}
+
+function remoteTargetId(target: DesktopSkillTarget) {
+  return `${target.agent_id}:${target.install_path}`;
+}
+
+function isRemoteTargetSelectable(target: DesktopSkillTarget) {
+  return ["NotInstalled", "InstalledUnbound", "UpdateAvailable"].includes(target.status);
+}
+
+function remoteTargetStatusLabel(target: DesktopSkillTarget) {
+  const labels: Record<string, string> = {
+    NotInstalled: "未安装",
+    InstalledUnbound: "未绑定",
+    InstalledBound: "已绑定",
+    UpToDate: "已最新",
+    UpdateAvailable: "可更新",
+    ConflictNonSkill: "冲突",
+    AgentRootUnavailable: "root 不可用",
+  };
+  return labels[target.status] ?? target.status;
+}
+
+function agentNameFromId(agentId: string) {
+  const names: Record<string, string> = {
+    codex: "Codex",
+    "claude-code": "Claude Code",
+    openclaw: "OpenClaw",
+    hermes: "Hermes",
+    opencode: "opencode",
+    generic: "Generic Agent Skills",
+  };
+  return names[agentId] ?? agentId;
+}
+
+function skillMatchesSearch(skill: DesktopSkill, query: string) {
+  return [
+    skill.name,
+    skill.description,
+    skill.agent_name,
+    skill.agent_id,
+    skill.install_path,
+    skill.source?.url,
+    skill.source?.repo_path,
+  ]
+    .filter(Boolean)
+    .some((value) => value?.toLocaleLowerCase().includes(query));
 }
 
 function metadataTone(status: string) {

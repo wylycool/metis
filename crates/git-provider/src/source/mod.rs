@@ -1,5 +1,5 @@
 use crate::fetch::{GitCliProvider, GitCommandRunner, GitProviderError};
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitCheckoutRequest {
@@ -45,6 +45,7 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
         self.runner()
             .run_git(&["-C", &checkout_dir_text, "checkout", &request.target_commit])?;
 
+        validate_repo_path(&request.repo_path)?;
         let skill_dir = checkout_dir.join(&request.repo_path);
         if !skill_dir.is_dir() {
             return Err(GitProviderError::PathNotFound {
@@ -57,6 +58,21 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
             skill_dir: skill_dir.to_string_lossy().to_string(),
         })
     }
+}
+
+fn validate_repo_path(repo_path: &str) -> Result<(), GitProviderError> {
+    let path = Path::new(repo_path);
+    if path.components().any(|component| {
+        matches!(
+            component,
+            Component::Prefix(_) | Component::RootDir | Component::ParentDir
+        )
+    }) {
+        return Err(GitProviderError::InvalidRepoPath {
+            repo_path: repo_path.to_string(),
+        });
+    }
+    Ok(())
 }
 
 fn sanitize_commit(commit: &str) -> String {
@@ -197,6 +213,35 @@ mod tests {
             .expect_err("missing repo_path should fail clearly");
         assert!(matches!(error, GitProviderError::PathNotFound { .. }));
 
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn checkout_to_cache_rejects_repo_path_escape() {
+        let root = temp_dir("repo-path-escape");
+        let source_repo = root.join("source");
+        let cache_root = root.join("cache");
+        fs::create_dir_all(source_repo.join("skills/example"))
+            .expect("skill directory should be created");
+        write_file(&source_repo.join("skills/example/SKILL.md"), "# Example\n");
+        git(&source_repo, &["init"]);
+        git(&source_repo, &["add", "."]);
+        let target_commit = git_commit(&source_repo, "initial skill");
+        fs::create_dir_all(cache_root.join("outside")).expect("outside dir should exist");
+        write_file(&cache_root.join("outside/SKILL.md"), "# Outside\n");
+        let provider = GitCliProvider::new(SystemGitRunner);
+
+        let error = provider
+            .checkout_to_cache(&GitCheckoutRequest {
+                url: source_repo.to_string_lossy().to_string(),
+                ref_: "HEAD".to_string(),
+                repo_path: "../outside".to_string(),
+                target_commit,
+                cache_dir: cache_root.to_string_lossy().to_string(),
+            })
+            .expect_err("repo_path should not escape checkout dir");
+
+        assert!(error.to_string().contains("repo_path"));
         fs::remove_dir_all(&root).expect("temp directory should be removed");
     }
 

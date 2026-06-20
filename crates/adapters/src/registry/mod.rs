@@ -43,6 +43,15 @@ impl AdapterRegistry {
             .collect()
     }
 
+    /// 跨 Agent 同步只面向内置明确支持安装根的 Agent，不包含 Generic 自定义目录。
+    pub fn sync_target_adapters(&self) -> Vec<&dyn AgentAdapter> {
+        self.adapters
+            .iter()
+            .filter(|adapter| adapter.agent_id() != "generic")
+            .map(|adapter| adapter.as_ref())
+            .collect()
+    }
+
     /// 构建内置 adapter 注册表
     pub fn with_builtin_adapters() -> Self {
         let mut registry = Self::new();
@@ -85,6 +94,21 @@ mod tests {
                 "opencode",
                 "generic"
             ]
+        );
+    }
+
+    #[test]
+    fn sync_target_adapters_exclude_generic_custom_paths() {
+        let registry = AdapterRegistry::default();
+        let agent_ids = registry
+            .sync_target_adapters()
+            .iter()
+            .map(|adapter| adapter.agent_id())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            agent_ids,
+            vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
         );
     }
 }
