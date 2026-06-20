@@ -24,7 +24,7 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 当前阶段
 
-项目处于 **Phase 5 产品化体验与稳定性收口完成点 / Beta 2 已发布**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地企业治理能力和 Phase 5 产品化收口均已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出、团队清单合规、团队策略审计、企业网络配置、受控自动更新和跨 Agent Git skill 同步。
+项目处于 **Phase 5 产品化体验与稳定性收口完成点 / Beta 3 已发布**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地企业治理能力和 Phase 5 产品化收口均已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出、团队清单合规、团队策略审计、企业网络配置、受控自动更新和跨 Agent Git skill 同步。
 
 当前推荐下载版本是 `desktop-v0.1.0-beta.3`；该版本包含 Beta 2 体验打磨和 Beta 3 P0 安全加固，包括 Skills / Governance / Settings 工作区、空状态、报告预览占位、设置保存反馈、本地验证清单、skill 目录替换删除前校验和 Git `repo_path` 逃逸防护。
 
