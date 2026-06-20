@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   applySkillUpdate,
   bindSkillSource,
@@ -24,6 +24,9 @@ import {
   scanSkills,
   unbindSkillSource,
 } from "./api";
+import type { RemoteSyncDraft } from "./AddSkillPage";
+import { remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
+import { InlineError, type BindDraft } from "./SkillRow";
 import type {
   DesktopAgentStatus,
   DesktopBackupSummary,
@@ -45,23 +48,7 @@ import type {
   LoadState,
 } from "./types";
 
-interface BindDraft {
-  url: string;
-  repo_path: string;
-  ref_: string;
-  credential_ref: string;
-  trusted: boolean;
-  auto_update: boolean;
-}
-
-interface RemoteSyncDraft {
-  url: string;
-  repo_path: string;
-  ref_: string;
-}
-
 type WorkspaceKey = "skills" | "governance" | "settings";
-type SkillsRoute = { kind: "list" } | { kind: "detail"; skillId: string } | { kind: "add" };
 
 function App() {
   const [agents, setAgents] = useState<DesktopAgentStatus[]>([]);
@@ -96,7 +83,6 @@ function App() {
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
-  const [skillsRoute, setSkillsRoute] = useState<SkillsRoute>({ kind: "list" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>({
@@ -117,41 +103,6 @@ function App() {
   const [detailInstallResults, setDetailInstallResults] = useState<
     Record<string, DesktopInstallRemoteSkillResult>
   >({});
-  const didBootstrap = useRef(false);
-
-  const groupedSkills = useMemo(() => {
-    return agents.map((agent) => ({
-      ...agent,
-      skills: skills.filter((skill) => skill.agent_id === agent.agent_id),
-    }));
-  }, [agents, skills]);
-  const selectedAgent = useMemo(
-    () => groupedSkills.find((agent) => agent.agent_id === selectedAgentId) ?? null,
-    [groupedSkills, selectedAgentId],
-  );
-  const normalizedSearchQuery = skillSearchQuery.trim().toLocaleLowerCase();
-  const visibleSkills = useMemo(() => {
-    if (normalizedSearchQuery) {
-      return skills.filter((skill) => skillMatchesSearch(skill, normalizedSearchQuery));
-    }
-    if (selectedAgent) {
-      return selectedAgent.skills;
-    }
-    return skills;
-  }, [normalizedSearchQuery, selectedAgent, skills]);
-  const visibleBoundCount = visibleSkills.filter((skill) => skill.source).length;
-  const visibleModifiedCount = visibleSkills.filter((skill) => skill.local_modified).length;
-  const visibleUpdateAvailableCount = visibleSkills.filter(
-    (skill) => updateResults[skill.id]?.status === "UpdateAvailable",
-  ).length;
-  const routedSkill = useMemo(
-    () =>
-      skillsRoute.kind === "detail"
-        ? skills.find((skill) => skill.id === skillsRoute.skillId) ?? null
-        : null,
-    [skills, skillsRoute],
-  );
-
   const totalExistingPaths = agents.reduce(
     (count, agent) => count + agent.paths.filter((path) => path.exists).length,
     0,
@@ -173,6 +124,7 @@ function App() {
   const [auditLogExportPath, setAuditLogExportPath] = useState("");
   const [teamComplianceReport, setTeamComplianceReport] =
     useState<DesktopTeamManifestComplianceReport | null>(null);
+  const didBootstrap = useRef(false);
 
   useEffect(() => {
     if (didBootstrap.current) {
@@ -182,22 +134,6 @@ function App() {
     void bootstrap();
   }, []);
 
-  useEffect(() => {
-    if (activeWorkspace !== "skills" || skillsRoute.kind !== "detail" || !routedSkill?.source) {
-      return;
-    }
-    if (detailTargets[routedSkill.id] || detailTargetErrors[routedSkill.id]) {
-      return;
-    }
-    void loadDetailTargets(routedSkill);
-  }, [
-    activeWorkspace,
-    routedSkill?.id,
-    routedSkill?.source?.url,
-    routedSkill?.source?.repo_path,
-    routedSkill?.source?.ref_,
-    skillsRoute.kind,
-  ]);
 
   async function bootstrap() {
     setState("loading");
@@ -1383,257 +1319,55 @@ function App() {
       )}
 
       {activeWorkspace === "skills" && (
-        <main className="workspace workspace-pane phase6-workspace" data-testid="workspace-skills">
-          {skillsRoute.kind === "detail" && routedSkill && (
-            <section className="skill-panel skill-detail-page" data-testid={`skill-detail-${routedSkill.id}`}>
-              <button className="breadcrumb-button" onClick={() => setSkillsRoute({ kind: "list" })}>
-                <span aria-hidden="true">←</span>
-                <span>Skills / {routedSkill.name}</span>
-              </button>
-              <SkillRow
-                skill={routedSkill}
-                updateResult={updateResults[routedSkill.id]}
-                diffDetail={diffDetails[routedSkill.id]}
-                diffError={diffError[routedSkill.id]}
-                backups={backups[routedSkill.id] ?? []}
-                backupOpen={backupPanels[routedSkill.id] ?? false}
-                backupError={backupError[routedSkill.id]}
-                isBinding={bindingSkillId === routedSkill.id}
-                bindDraft={bindDraft}
-                busyKey={actionBusy}
-                onOpenBind={() => openBindForm(routedSkill)}
-                onCancelBind={() => setBindingSkillId(null)}
-                onDraftChange={setBindDraft}
-                onBind={() => handleBindSource(routedSkill.id)}
-                onUnbind={() => handleUnbindSource(routedSkill.id)}
-                onCheck={() => handleCheckUpdates([routedSkill.id])}
-                onToggleDiff={() => handleToggleDiff(routedSkill.id)}
-                onApplyUpdate={() => handleApplyUpdate(routedSkill.id)}
-                onToggleBackups={() => handleToggleBackups(routedSkill.id)}
-                onRestoreBackup={(backupId) => handleRestoreBackup(routedSkill.id, backupId)}
-              />
-              {routedSkill.source && (
-                <CrossAgentTargetMatrix
-                  currentAgentId={routedSkill.agent_id}
-                  error={detailTargetErrors[routedSkill.id]}
-                  installResult={detailInstallResults[routedSkill.id]}
-                  loading={actionBusy === `detail-targets:${routedSkill.id}`}
-                  selectedTargetIds={selectedDetailTargetIds[routedSkill.id] ?? []}
-                  targets={detailTargets[routedSkill.id] ?? []}
-                  title="跨 Agent 安装状态"
-                  onInstall={() => handleInstallDetailTargets(routedSkill)}
-                  onRefresh={() => loadDetailTargets(routedSkill)}
-                  onToggleTarget={(target) => toggleDetailTarget(routedSkill.id, target)}
-                />
-              )}
-            </section>
-          )}
-
-          {skillsRoute.kind === "add" && (
-            <section className="skill-panel add-skill-page" data-testid="add-skill-page">
-              <button className="breadcrumb-button" onClick={() => setSkillsRoute({ kind: "list" })}>
-                <span aria-hidden="true">←</span>
-                <span>Skills / 添加 Skill</span>
-              </button>
-              <section className="remote-sync-panel" aria-label="添加 Skill">
-                <div className="remote-sync-header">
-                  <div>
-                    <h2>添加 Skill</h2>
-                    <p>预览远端 Git skill，然后安装或更新到选中的本机 Agent。</p>
-                  </div>
-                  <button
-                    className="compact"
-                    data-testid="add-skill-preview"
-                    disabled={
-                      actionBusy === "remote-sync-preview" ||
-                      remoteSyncDraft.url.trim().length === 0
-                    }
-                    onClick={handlePreviewRemoteSync}
-                  >
-                    {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
-                  </button>
-                </div>
-                <div className="remote-sync-form">
-                  <input
-                    data-testid="add-skill-url"
-                    value={remoteSyncDraft.url}
-                    placeholder="https://github.com/example/metis-skills.git"
-                    onChange={(event) =>
-                      setRemoteSyncDraft((current) => ({ ...current, url: event.target.value }))
-                    }
-                  />
-                  <input
-                    data-testid="add-skill-repo-path"
-                    value={remoteSyncDraft.repo_path}
-                    placeholder="skills/example"
-                    onChange={(event) =>
-                      setRemoteSyncDraft((current) => ({
-                        ...current,
-                        repo_path: event.target.value,
-                      }))
-                    }
-                  />
-                  <input
-                    data-testid="add-skill-ref"
-                    value={remoteSyncDraft.ref_}
-                    placeholder="main"
-                    onChange={(event) =>
-                      setRemoteSyncDraft((current) => ({ ...current, ref_: event.target.value }))
-                    }
-                  />
-                </div>
-                {remotePreview && (
-                  <div className="remote-preview-card">
-                    <div>
-                      <strong>{remotePreview.name}</strong>
-                      <span>{remotePreview.description ?? "无描述"}</span>
-                    </div>
-                    <code>{shortCommit(remotePreview.commit)}</code>
-                  </div>
-                )}
-                {(remotePreview || remoteTargets.length > 0 || actionBusy === "remote-sync-preview") && (
-                  <CrossAgentTargetMatrix
-                    currentAgentId={null}
-                    installResult={remoteInstallResult ?? undefined}
-                    loading={actionBusy === "remote-sync-preview"}
-                    selectedTargetIds={selectedRemoteTargetIds}
-                    targets={remoteTargets}
-                    title="安装目标"
-                    onInstall={handleInstallRemoteTargets}
-                    onRefresh={handlePreviewRemoteSync}
-                    onToggleTarget={toggleRemoteTarget}
-                  />
-                )}
-              </section>
-            </section>
-          )}
-
-          {skillsRoute.kind === "list" && (
-            <section className="skill-panel">
-              <div className="panel-heading">
-                <div>
-                  <h2>{panelTitle(selectedAgent, normalizedSearchQuery)}</h2>
-                  <p>{panelSubtitle(state, visibleSkills.length, normalizedSearchQuery)}</p>
-                </div>
-                <div className="phase6-list-actions">
-                  {selectedAgent && !normalizedSearchQuery && (
-                    <button
-                      className="ghost-button compact"
-                      data-testid={`check-agent-updates-${selectedAgent.agent_id}`}
-                      disabled={actionBusy === `agent-check:${selectedAgent.agent_id}`}
-                      onClick={() => handleCheckAgentUpdates(selectedAgent.agent_id)}
-                    >
-                      {actionBusy === `agent-check:${selectedAgent.agent_id}`
-                        ? "检查中"
-                        : `检查 ${selectedAgent.agent_name} 全部更新`}
-                    </button>
-                  )}
-                  <button className="compact" data-testid="open-add-skill" onClick={() => setSkillsRoute({ kind: "add" })}>
-                    + 添加 Skill
-                  </button>
-                  {warnings.length > 0 && (
-                    <span className="warning-pill">{warnings.length} 条 warning</span>
-                  )}
-                </div>
-              </div>
-              <div className="agent-filter-bar" aria-label="Agent 筛选">
-                <button
-                  aria-pressed={!selectedAgentId}
-                  className={`agent-filter-pill ${!selectedAgentId ? "active" : ""}`}
-                  data-testid="agent-filter-all"
-                  onClick={() => setSelectedAgentId(null)}
-                >
-                  全部 <span>{skills.length}</span>
-                </button>
-                {groupedSkills.map((agent) => (
-                  <button
-                    aria-label={`查看 Agent ${agent.agent_id}`}
-                    aria-pressed={selectedAgentId === agent.agent_id}
-                    className={`agent-filter-pill ${selectedAgentId === agent.agent_id ? "active" : ""} ${
-                      agent.skills.length === 0 ? "empty" : ""
-                    }`}
-                    data-testid={`agent-filter-${agent.agent_id}`}
-                    key={agent.agent_id}
-                    onClick={() => setSelectedAgentId(agent.agent_id)}
-                  >
-                    {agent.agent_name} <span>{agent.skills.length}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="skill-search-bar">
-                <input
-                  data-testid="skill-search-input"
-                  placeholder="搜索本机 skill、Agent、路径或来源"
-                  value={skillSearchQuery}
-                  onChange={(event) => setSkillSearchQuery(event.target.value)}
-                />
-                {skillSearchQuery && (
-                  <button className="ghost-button compact" onClick={() => setSkillSearchQuery("")}>
-                    清空
-                  </button>
-                )}
-              </div>
-              <div className="agent-detail-summary">
-                <SummaryMetric label="全部" value={visibleSkills.length.toString()} />
-                <SummaryMetric
-                  label="已最新"
-                  value={visibleSkills
-                    .filter((skill) => updateResults[skill.id]?.status === "UpToDate")
-                    .length.toString()}
-                />
-                <SummaryMetric label="待更新" value={visibleUpdateAvailableCount.toString()} />
-                <SummaryMetric label="已修改" value={visibleModifiedCount.toString()} />
-              </div>
-              {selectedAgent && !normalizedSearchQuery && (
-                <div
-                  className="agent-detail-summary"
-                  data-testid={`agent-detail-${selectedAgent.agent_id}`}
-                >
-                  <SummaryMetric label="此 Agent skills" value={visibleSkills.length.toString()} />
-                  <SummaryMetric label="已绑定来源" value={visibleBoundCount.toString()} />
-                  <SummaryMetric label="本地修改" value={visibleModifiedCount.toString()} />
-                  <SummaryMetric label="待更新" value={visibleUpdateAvailableCount.toString()} />
-                </div>
-              )}
-
-              {state === "loading" && <LoadingState />}
-              {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
-              {state === "loaded" && visibleSkills.length === 0 && (
-                <EmptyState onOpenSettings={() => setActiveWorkspace("settings")} onScan={handleScan} />
-              )}
-              {state === "loaded" && visibleSkills.length > 0 && (
-                <div className="skill-list">
-                  {visibleSkills.map((skill) => (
-                    <SkillRow
-                      key={skill.id}
-                      skill={skill}
-                      updateResult={updateResults[skill.id]}
-                      diffDetail={diffDetails[skill.id]}
-                      diffError={diffError[skill.id]}
-                      backups={backups[skill.id] ?? []}
-                      backupOpen={backupPanels[skill.id] ?? false}
-                      backupError={backupError[skill.id]}
-                      isBinding={bindingSkillId === skill.id}
-                      bindDraft={bindDraft}
-                      busyKey={actionBusy}
-                      onOpenDetail={() => setSkillsRoute({ kind: "detail", skillId: skill.id })}
-                      onOpenBind={() => openBindForm(skill)}
-                      onCancelBind={() => setBindingSkillId(null)}
-                      onDraftChange={setBindDraft}
-                      onBind={() => handleBindSource(skill.id)}
-                      onUnbind={() => handleUnbindSource(skill.id)}
-                      onCheck={() => handleCheckUpdates([skill.id])}
-                      onToggleDiff={() => handleToggleDiff(skill.id)}
-                      onApplyUpdate={() => handleApplyUpdate(skill.id)}
-                      onToggleBackups={() => handleToggleBackups(skill.id)}
-                      onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-        </main>
+        <SkillsWorkspace
+          actionBusy={actionBusy}
+          agents={agents}
+          backupError={backupError}
+          backupPanels={backupPanels}
+          backups={backups}
+          bindDraft={bindDraft}
+          bindingSkillId={bindingSkillId}
+          detailInstallResults={detailInstallResults}
+          detailTargetErrors={detailTargetErrors}
+          detailTargets={detailTargets}
+          diffDetails={diffDetails}
+          diffError={diffError}
+          error={error}
+          remoteInstallResult={remoteInstallResult}
+          remotePreview={remotePreview}
+          remoteSyncDraft={remoteSyncDraft}
+          remoteTargets={remoteTargets}
+          selectedAgentId={selectedAgentId}
+          selectedDetailTargetIds={selectedDetailTargetIds}
+          selectedRemoteTargetIds={selectedRemoteTargetIds}
+          skillSearchQuery={skillSearchQuery}
+          skills={skills}
+          state={state}
+          updateResults={updateResults}
+          warnings={warnings}
+          onApplyUpdate={handleApplyUpdate}
+          onBackupsToggle={handleToggleBackups}
+          onBind={handleBindSource}
+          onCancelBind={() => setBindingSkillId(null)}
+          onCheckAgentUpdates={handleCheckAgentUpdates}
+          onCheckUpdates={handleCheckUpdates}
+          onDraftChange={setBindDraft}
+          onInstallDetailTargets={handleInstallDetailTargets}
+          onInstallRemoteTargets={handleInstallRemoteTargets}
+          onLoadDetailTargets={loadDetailTargets}
+          onOpenBind={openBindForm}
+          onOpenSettings={() => setActiveWorkspace("settings")}
+          onPreviewRemoteSync={handlePreviewRemoteSync}
+          onRestoreBackup={handleRestoreBackup}
+          onScan={handleScan}
+          onSearchChange={setSkillSearchQuery}
+          onSelectAgent={setSelectedAgentId}
+          onSetRemoteSyncDraft={setRemoteSyncDraft}
+          onToggleDetailTarget={toggleDetailTarget}
+          onToggleDiff={handleToggleDiff}
+          onToggleRemoteTarget={toggleRemoteTarget}
+          onUnbind={handleUnbindSource}
+        />
       )}
 
       {warnings.length > 0 && (
@@ -1770,665 +1504,6 @@ function ReportEmptyState({
   );
 }
 
-function SkillRow({
-  skill,
-  updateResult,
-  diffDetail,
-  diffError,
-  backups,
-  backupOpen,
-  backupError,
-  isBinding,
-  bindDraft,
-  busyKey,
-  onOpenDetail,
-  onOpenBind,
-  onCancelBind,
-  onDraftChange,
-  onBind,
-  onUnbind,
-  onCheck,
-  onToggleDiff,
-  onApplyUpdate,
-  onToggleBackups,
-  onRestoreBackup,
-}: {
-  skill: DesktopSkill;
-  updateResult?: DesktopUpdateCheckResult;
-  diffDetail?: DesktopDiffDetail;
-  diffError?: DesktopError;
-  backups: DesktopBackupSummary[];
-  backupOpen: boolean;
-  backupError?: DesktopError;
-  isBinding: boolean;
-  bindDraft: BindDraft;
-  busyKey: string | null;
-  onOpenDetail?: () => void;
-  onOpenBind: () => void;
-  onCancelBind: () => void;
-  onDraftChange: (draft: BindDraft) => void;
-  onBind: () => void;
-  onUnbind: () => void;
-  onCheck: () => void;
-  onToggleDiff: () => void;
-  onApplyUpdate: () => void;
-  onToggleBackups: () => void;
-  onRestoreBackup: (backupId: string) => void;
-}) {
-  const bindingBusy = busyKey === `bind:${skill.id}`;
-  const unbindingBusy = busyKey === `unbind:${skill.id}`;
-  const checkingBusy = busyKey === "check-updates";
-  const diffBusy = busyKey === `diff:${skill.id}`;
-  const applyBusy = busyKey === `apply:${skill.id}`;
-  const backupsBusy = busyKey === `backups:${skill.id}`;
-  const canShowDiff = updateResult?.status === "UpdateAvailable";
-  const canApplyUpdate = canShowDiff && !updateResult?.local_modified;
-
-  return (
-    <article
-      className="skill-row"
-      data-testid={`skill-row-${skill.id}`}
-      onClick={(event) => {
-        const target = event.target as HTMLElement;
-        if (target.closest("button, input, textarea, label, a")) {
-          return;
-        }
-        onOpenDetail?.();
-      }}
-    >
-      <div className="skill-row-main">
-        <div className="skill-main">
-          <div className="skill-title">
-            <h3>{skill.name}</h3>
-            <span>{skill.agent_name}</span>
-          </div>
-          {skill.description && <p>{skill.description}</p>}
-          <code>{skill.install_path}</code>
-          {skill.source && (
-            <div className="source-line">
-              <strong>{skill.source.ref_}</strong>
-              <span>{skill.source.url}</span>
-              <em>{skill.source.repo_path}</em>
-              <div className="source-policy">
-                <small>{skill.source.trusted ? "trusted source" : "untrusted source"}</small>
-                <small>{skill.source.auto_update ? "auto update on" : "auto update off"}</small>
-                {skill.source.credential_ref && <small>已配置凭据引用</small>}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="skill-status">
-          <StatusBadge tone={metadataTone(skill.metadata_status)}>
-            metadata: {metadataLabel(skill.metadata_status)}
-          </StatusBadge>
-          <StatusBadge tone={skill.local_modified ? "danger" : "muted"}>
-            {localModifiedLabel(skill.local_modified)}
-          </StatusBadge>
-          <StatusBadge tone={updateTone(updateResult, skill)}>
-            {updateLabel(updateResult, skill)}
-          </StatusBadge>
-        </div>
-      </div>
-
-      {updateResult?.diff_summary && (
-        <div className="update-summary">
-          <span>+{updateResult.diff_summary.files_added}</span>
-          <span>~{updateResult.diff_summary.files_modified}</span>
-          <span>-{updateResult.diff_summary.files_deleted}</span>
-          {updateResult.commits_behind !== null && updateResult.commits_behind !== undefined && (
-            <strong>{updateResult.commits_behind} commits behind</strong>
-          )}
-        </div>
-      )}
-
-      <div className="skill-actions">
-        {skill.source ? (
-          <>
-            <button
-              className="ghost-button compact"
-              data-testid={`check-updates-${skill.id}`}
-              disabled={checkingBusy}
-              onClick={onCheck}
-            >
-              {checkingBusy ? "检查中" : "检查更新"}
-            </button>
-            {canShowDiff && (
-              <button
-                className="ghost-button compact"
-                data-testid={`toggle-diff-${skill.id}`}
-                disabled={diffBusy}
-                onClick={onToggleDiff}
-              >
-                {diffBusy ? "加载中" : diffDetail ? "收起 diff" : "查看 diff"}
-              </button>
-            )}
-            {canShowDiff && (
-              <button
-                className="compact"
-                data-testid={`apply-update-${skill.id}`}
-                disabled={applyBusy || !canApplyUpdate}
-                onClick={onApplyUpdate}
-              >
-                {applyBusy ? "更新中" : "应用更新"}
-              </button>
-            )}
-            <button className="ghost-button compact" disabled={backupsBusy} onClick={onToggleBackups}>
-              {backupsBusy ? "加载中" : backupOpen ? "收起备份" : "备份/回滚"}
-            </button>
-            <button
-              className="ghost-button compact"
-              data-testid={`open-bind-source-${skill.id}`}
-              onClick={onOpenBind}
-            >
-              编辑来源
-            </button>
-            <button
-              className="danger-button compact"
-              disabled={unbindingBusy}
-              onClick={onUnbind}
-            >
-              {unbindingBusy ? "解绑中" : "解绑"}
-            </button>
-          </>
-        ) : (
-          <button
-            className="ghost-button compact"
-            data-testid={`open-bind-source-${skill.id}`}
-            onClick={onOpenBind}
-          >
-            绑定来源
-          </button>
-        )}
-      </div>
-
-      {diffError && <InlineError error={diffError} />}
-      {diffDetail && <DiffPanel detail={diffDetail} />}
-      {backupError && <InlineError error={backupError} />}
-      {backupOpen && (
-        <BackupPanel
-          skillId={skill.id}
-          backups={backups}
-          busyKey={busyKey}
-          onRestoreBackup={onRestoreBackup}
-        />
-      )}
-
-      {isBinding && (
-        <BindSourceForm
-          skillId={skill.id}
-          draft={bindDraft}
-          busy={bindingBusy}
-          onChange={onDraftChange}
-          onCancel={onCancelBind}
-          onSubmit={onBind}
-        />
-      )}
-    </article>
-  );
-}
-
-function CrossAgentTargetMatrix({
-  currentAgentId,
-  error,
-  installResult,
-  loading,
-  selectedTargetIds,
-  targets,
-  title,
-  onInstall,
-  onRefresh,
-  onToggleTarget,
-}: {
-  currentAgentId: string | null;
-  error?: DesktopError;
-  installResult?: DesktopInstallRemoteSkillResult;
-  loading: boolean;
-  selectedTargetIds: string[];
-  targets: DesktopSkillTarget[];
-  title: string;
-  onInstall: () => void;
-  onRefresh: () => void;
-  onToggleTarget: (target: DesktopSkillTarget) => void;
-}) {
-  const selectedCount = selectedTargetIds.length;
-
-  return (
-    <section className="target-matrix" aria-label={title}>
-      <div className="target-matrix-header">
-        <div>
-          <h3>{title}</h3>
-          <p>同一远端 source 在各 Agent 根目录下的安装与更新状态。</p>
-        </div>
-        <button className="ghost-button compact" disabled={loading} onClick={onRefresh}>
-          {loading ? "检查中" : "重新检查状态"}
-        </button>
-      </div>
-      {error && <InlineError error={error} />}
-      {loading && targets.length === 0 && <p className="matrix-muted">正在检查跨 Agent 状态</p>}
-      {!loading && !error && targets.length === 0 && (
-        <p className="matrix-muted">没有可用安装目标</p>
-      )}
-      {targets.length > 0 && (
-        <div className="remote-target-list">
-          {targets.map((target) => {
-            const id = remoteTargetId(target);
-            const selectable = isRemoteTargetSelectable(target);
-            const isCurrent = currentAgentId === target.agent_id;
-            return (
-              <label
-                className={`remote-target-row ${isCurrent ? "current" : ""}`}
-                data-testid={`target-row-${target.agent_id}`}
-                key={id}
-              >
-                <input
-                  data-testid={`target-checkbox-${target.agent_id}`}
-                  type="checkbox"
-                  checked={selectedTargetIds.includes(id)}
-                  disabled={!selectable}
-                  onChange={() => onToggleTarget(target)}
-                />
-                <span>
-                  <strong>
-                    {target.agent_name}
-                    {isCurrent && <em>当前查看</em>}
-                  </strong>
-                  <small>{target.install_path}</small>
-                </span>
-                <b>{remoteTargetStatusLabel(target)}</b>
-              </label>
-            );
-          })}
-        </div>
-      )}
-      {targets.length > 0 && (
-        <div className="target-action-bar">
-          <span>已选 {selectedCount} 个 Agent</span>
-          <button
-            className="compact"
-            data-testid="install-selected-targets"
-            disabled={loading || selectedCount === 0}
-            onClick={onInstall}
-          >
-            安装/更新选中
-          </button>
-        </div>
-      )}
-      {installResult && (
-        <div className="remote-install-result">
-          {installResult.targets.map((target) => (
-            <span key={`${target.agent_id}:${target.install_path}`}>
-              {agentNameFromId(target.agent_id)}：{target.status}
-              {target.reason ? ` (${target.reason})` : ""}
-            </span>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function BackupPanel({
-  skillId,
-  backups,
-  busyKey,
-  onRestoreBackup,
-}: {
-  skillId: string;
-  backups: DesktopBackupSummary[];
-  busyKey: string | null;
-  onRestoreBackup: (backupId: string) => void;
-}) {
-  return (
-    <div className="backup-panel">
-      <div className="backup-heading">
-        <strong>备份</strong>
-        <span>{backups.length} items</span>
-      </div>
-      {backups.length === 0 ? (
-        <p className="empty-backups">暂无备份。应用更新或手动备份后会出现在这里。</p>
-      ) : (
-        <div className="backup-list">
-          {backups.map((backup) => {
-            const restoring = busyKey === `restore:${backup.backup_id}`;
-            return (
-              <article className="backup-row" key={backup.backup_id}>
-                <div>
-                  <strong>{backup.reason}</strong>
-                  <span>{backup.created_at || "unknown time"}</span>
-                  <code>{backup.backup_id}</code>
-                </div>
-                <div className="backup-meta">
-                  {backup.source_commit && <span>{shortCommit(backup.source_commit)}</span>}
-                  <span>{backup.file_count} files</span>
-                  <span>{formatBytes(backup.total_size_bytes)}</span>
-                </div>
-                <button
-                  className="danger-button compact"
-                  data-testid={`restore-backup-${skillId}-${backup.backup_id}`}
-                  disabled={restoring}
-                  onClick={() => onRestoreBackup(backup.backup_id)}
-                >
-                  {restoring ? "回滚中" : "回滚"}
-                </button>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
-  return (
-    <div className="diff-panel">
-      <div className="diff-heading">
-        <span>{shortCommit(detail.current_commit)}</span>
-        <strong>→</strong>
-        <span>{shortCommit(detail.target_commit)}</span>
-        <b>{detail.files.length} files</b>
-      </div>
-      <div className="diff-file-list">
-        {detail.files.map((file) => (
-          <article className="diff-file" key={`${file.status}-${file.old_path ?? ""}-${file.path}`}>
-            <div className="diff-file-heading">
-              <StatusBadge tone={file.status === "Deleted" ? "danger" : "muted"}>
-                {file.status}
-              </StatusBadge>
-              <code>{file.old_path ? `${file.old_path} → ${file.path}` : file.path}</code>
-            </div>
-            {file.patch ? (
-              <pre>{file.patch}</pre>
-            ) : (
-              <p className="no-patch">这个文件没有可展示的 patch 文本。</p>
-            )}
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BindSourceForm({
-  skillId,
-  draft,
-  busy,
-  onChange,
-  onCancel,
-  onSubmit,
-}: {
-  skillId: string;
-  draft: BindDraft;
-  busy: boolean;
-  onChange: (draft: BindDraft) => void;
-  onCancel: () => void;
-  onSubmit: () => void;
-}) {
-  const disabled = busy || !draft.url.trim() || !draft.repo_path.trim();
-
-  return (
-    <div className="source-form">
-      <label>
-        <span>Git URL</span>
-        <input
-          data-testid={`bind-url-${skillId}`}
-          value={draft.url}
-          placeholder="https://github.com/org/repo.git"
-          onChange={(event) => onChange({ ...draft, url: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>Repo Path</span>
-        <input
-          data-testid={`bind-repo-path-${skillId}`}
-          value={draft.repo_path}
-          placeholder="skills/example"
-          onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>Ref</span>
-        <input
-          data-testid={`bind-ref-${skillId}`}
-          value={draft.ref_}
-          placeholder="main"
-          onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>Credential Ref</span>
-        <input
-          data-testid={`bind-credential-ref-${skillId}`}
-          value={draft.credential_ref}
-          placeholder="github-main"
-          onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
-        />
-      </label>
-      <label className="check-label">
-        <input
-          data-testid={`bind-trusted-${skillId}`}
-          checked={draft.trusted}
-          type="checkbox"
-          onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
-        />
-        <span>Trusted</span>
-      </label>
-      <label className="check-label">
-        <input
-          data-testid={`bind-auto-update-${skillId}`}
-          checked={draft.auto_update}
-          type="checkbox"
-          onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
-        />
-        <span>Auto update</span>
-      </label>
-      <div className="form-actions">
-        <button className="ghost-button compact" onClick={onCancel}>
-          取消
-        </button>
-        <button className="compact" disabled={disabled} onClick={onSubmit}>
-          <span data-testid={`submit-bind-source-${skillId}`}>
-            {busy ? "保存中" : "保存来源"}
-          </span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({
-  children,
-  tone,
-}: {
-  children: React.ReactNode;
-  tone: "good" | "danger" | "muted";
-}) {
-  return <span className={`status-badge ${tone}`}>{children}</span>;
-}
-
-function LoadingState() {
-  return (
-    <div className="state-block">
-      <div className="loader" />
-      <p>正在读取本地索引并扫描默认 skill 目录</p>
-    </div>
-  );
-}
-
-function InlineError({ error }: { error: DesktopError }) {
-  return (
-    <div className="inline-error" data-error-category={error.category}>
-      <div className="error-heading">
-        <strong>{error.title}</strong>
-        <span>{error.category}</span>
-      </div>
-      <p>{error.message}</p>
-      <p className="error-suggestion">{error.suggestion}</p>
-      {error.debug_detail && (
-        <details>
-          <summary>调试详情</summary>
-          <code>{error.debug_detail}</code>
-        </details>
-      )}
-    </div>
-  );
-}
-
-function ErrorState({ message, onRetry }: { message: DesktopError | null; onRetry: () => void }) {
-  return (
-    <div className="state-block error-state">
-      <h3>扫描失败</h3>
-      {message ? <InlineError error={message} /> : <p>未知错误</p>}
-      <button onClick={onRetry}>重试扫描</button>
-    </div>
-  );
-}
-
-function EmptyState({
-  onOpenSettings,
-  onScan,
-}: {
-  onOpenSettings: () => void;
-  onScan: () => void;
-}) {
-  return (
-    <div className="state-block empty-state" data-testid="skills-empty-state">
-      <h3>还没有发现 skills</h3>
-      <p>默认目录中暂时没有可索引的 SKILL.md。可以重新扫描，或添加团队/个人的 Generic Agent Skills 根目录。</p>
-      <div className="empty-actions">
-        <button onClick={onScan}>重新扫描</button>
-        <button className="ghost-button" onClick={onOpenSettings}>添加扫描路径</button>
-      </div>
-    </div>
-  );
-}
-
-function panelTitle(
-  selectedAgent: (DesktopAgentStatus & { skills: DesktopSkill[] }) | null,
-  searchQuery: string,
-) {
-  if (searchQuery) {
-    return "搜索结果";
-  }
-  if (selectedAgent) {
-    return `${selectedAgent.agent_name} 工作区`;
-  }
-  return "Skill 索引";
-}
-
-function panelSubtitle(state: LoadState, count: number, searchQuery: string) {
-  if (state === "loading") {
-    return "正在同步 Core discovery 与 SQLite 索引";
-  }
-  if (state === "error") {
-    return "请查看错误信息后重试";
-  }
-  if (searchQuery) {
-    return `全局匹配 ${count} 个本机 skill，结果保留所属 Agent。`;
-  }
-  if (count === 0) {
-    return "默认目录暂无已发现 skill";
-  }
-  return "来自本机 SQLite 索引和最新扫描结果";
-}
-
-function remoteTargetId(target: DesktopSkillTarget) {
-  return `${target.agent_id}:${target.install_path}`;
-}
-
-function isRemoteTargetSelectable(target: DesktopSkillTarget) {
-  if (target.status === "UpdateAvailable") {
-    return target.local_modified !== true;
-  }
-  return ["NotInstalled", "InstalledUnbound"].includes(target.status);
-}
-
-function remoteTargetStatusLabel(target: DesktopSkillTarget) {
-  if (target.status === "UpdateAvailable" && target.local_modified) {
-    return "本地已修改，跳过更新";
-  }
-  const labels: Record<string, string> = {
-    NotInstalled: "未安装",
-    InstalledUnbound: "可绑定并更新",
-    InstalledBound: "已绑定",
-    UpToDate: "最新",
-    UpdateAvailable: "可更新",
-    ConflictNonSkill: "冲突",
-    AgentRootUnavailable: "不可用",
-  };
-  return labels[target.status] ?? target.status;
-}
-
-function agentNameFromId(agentId: string) {
-  const names: Record<string, string> = {
-    codex: "Codex",
-    "claude-code": "Claude Code",
-    openclaw: "OpenClaw",
-    hermes: "Hermes",
-    opencode: "opencode",
-    generic: "Generic Agent Skills",
-  };
-  return names[agentId] ?? agentId;
-}
-
-function skillMatchesSearch(skill: DesktopSkill, query: string) {
-  return [
-    skill.name,
-    skill.description,
-    skill.agent_name,
-    skill.agent_id,
-    skill.install_path,
-    skill.source?.url,
-    skill.source?.repo_path,
-  ]
-    .filter(Boolean)
-    .some((value) => value?.toLocaleLowerCase().includes(query));
-}
-
-function metadataTone(status: string) {
-  return status === "found" ? "good" : "danger";
-}
-
-function metadataLabel(status: string) {
-  if (status === "found") {
-    return "found";
-  }
-  if (status === "parse_error") {
-    return "parse error";
-  }
-  return status;
-}
-
-function localModifiedLabel(value: boolean | null | undefined) {
-  if (value === true) {
-    return "本地已修改";
-  }
-  if (value === false) {
-    return "未发现修改";
-  }
-  return "未检测修改";
-}
-
-function updateTone(
-  result: DesktopUpdateCheckResult | undefined,
-  skill: DesktopSkill,
-): "good" | "danger" | "muted" {
-  if (result?.local_modified || result?.status === "CheckFailed") {
-    return "danger";
-  }
-  if (result?.status === "UpToDate") {
-    return "good";
-  }
-  if (result?.status === "UpdateAvailable") {
-    return "danger";
-  }
-  if (!skill.source) {
-    return "muted";
-  }
-  return "muted";
-}
-
 function teamComplianceTone(status: string): "good" | "danger" | "warning" | "muted" {
   if (status === "installed") {
     return "good";
@@ -2453,25 +1528,6 @@ function policyAuditTone(status: string): "good" | "danger" | "warning" | "muted
     return "warning";
   }
   return "muted";
-}
-
-function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
-  if (result?.local_modified) {
-    return "本地修改，先处理";
-  }
-  if (result?.status === "UpToDate") {
-    return "已最新";
-  }
-  if (result?.status === "UpdateAvailable") {
-    return "有更新";
-  }
-  if (result?.status === "CheckFailed") {
-    return `检查失败${result.failure_reason ? `: ${result.failure_reason}` : ""}`;
-  }
-  if (result?.status === "NoSource" || !skill.source) {
-    return "未绑定来源";
-  }
-  return "未检查更新";
 }
 
 function emptyBindDraft(): BindDraft {
@@ -2503,16 +1559,6 @@ function shortPath(path: string) {
     return path;
   }
   return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
-}
-
-function formatBytes(value: number) {
-  if (value < 1024) {
-    return `${value} B`;
-  }
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(1)} KB`;
-  }
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function desktopError(caught: unknown): DesktopError {
