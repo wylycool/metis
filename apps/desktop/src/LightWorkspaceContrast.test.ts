@@ -3,15 +3,37 @@ import { describe, expect, test } from "vitest";
 
 const stylesheet = readFileSync("src/styles.css", "utf8");
 
-function latestVariableValue(name: string): string {
-  const matches = [...stylesheet.matchAll(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`, "g"))];
+function latestVariableValue(name: string, seen = new Set<string>()): string {
+  if (seen.has(name)) {
+    throw new Error(`Circular CSS variable reference for ${name}`);
+  }
+  seen.add(name);
+
+  const matches = [
+    ...stylesheet.matchAll(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6}|var\\((--[^)]+)\\))`, "g")),
+  ];
   const latest = matches[matches.length - 1];
 
   if (!latest) {
     throw new Error(`Missing CSS variable ${name}`);
   }
 
+  if (latest[2]) {
+    return latestVariableValue(latest[2], seen);
+  }
+
   return latest[1];
+}
+
+function blockFor(selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = stylesheet.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, "m"));
+
+  if (!match) {
+    throw new Error(`Missing CSS block for ${selector}`);
+  }
+
+  return match[1];
 }
 
 function relativeLuminance(hex: string): number {
@@ -33,14 +55,80 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe("Phase 6 light workspace contrast", () => {
+  test("defines semantic light theme tokens for brand, surfaces, borders, text, and status", () => {
+    const requiredTokens = [
+      "--brand",
+      "--brand-hover",
+      "--brand-soft",
+      "--brand-border",
+      "--surface-canvas",
+      "--surface-panel",
+      "--surface-raised",
+      "--surface-subtle",
+      "--surface-selected",
+      "--border-subtle",
+      "--border-default",
+      "--border-strong",
+      "--text-primary",
+      "--text-secondary",
+      "--text-tertiary",
+      "--text-placeholder",
+      "--text-disabled",
+      "--text-inverse",
+      "--success-fg",
+      "--success-bg",
+      "--warning-fg",
+      "--warning-bg",
+      "--danger-fg",
+      "--danger-bg",
+      "--info-fg",
+      "--info-bg",
+    ];
+
+    for (const token of requiredTokens) {
+      expect(stylesheet).toContain(`${token}:`);
+    }
+  });
+
+  test("uses distinct canvas, panel, subtle, and selected surfaces", () => {
+    expect(latestVariableValue("--surface-canvas")).not.toBe(
+      latestVariableValue("--surface-panel"),
+    );
+    expect(latestVariableValue("--surface-subtle")).not.toBe(
+      latestVariableValue("--surface-panel"),
+    );
+    expect(latestVariableValue("--surface-selected")).not.toBe(
+      latestVariableValue("--surface-panel"),
+    );
+  });
+
   test("uses a comfortably readable muted text color on white panels", () => {
     expect(
       contrastRatio(latestVariableValue("--muted"), latestVariableValue("--panel")),
     ).toBeGreaterThanOrEqual(6);
   });
 
+  test("maps legacy theme aliases to semantic text and surface tokens", () => {
+    expect(stylesheet).toContain("--bg: var(--surface-canvas);");
+    expect(stylesheet).toContain("--panel: var(--surface-panel);");
+    expect(stylesheet).toContain("--text: var(--text-primary);");
+    expect(stylesheet).toContain("--muted: var(--text-secondary);");
+    expect(stylesheet).toContain("--subtle: var(--text-tertiary);");
+    expect(stylesheet).toContain("--primary: var(--brand);");
+  });
+
   test("routes Governance and Settings description copy through the muted color token", () => {
     expect(stylesheet).toContain(".governance-audit-panel p,\n.settings-section p,");
     expect(stylesheet).toContain("color: var(--muted);");
+  });
+
+  test("keeps the topbar in normal flow so scrolling content is not covered", () => {
+    expect(blockFor(".topbar")).not.toContain("position: sticky");
+  });
+
+  test("collapses settings editor sections to a single column at narrow desktop widths", () => {
+    expect(stylesheet).toMatch(
+      /@media\s*\(max-width:\s*860px\)\s*\{[\s\S]*\.settings-editor[\s\S]*grid-template-columns:\s*1fr;/,
+    );
   });
 });
