@@ -61,6 +61,7 @@ interface RemoteSyncDraft {
 }
 
 type WorkspaceKey = "skills" | "governance" | "settings";
+type SkillsRoute = { kind: "list" } | { kind: "detail"; skillId: string } | { kind: "add" };
 
 function App() {
   const [agents, setAgents] = useState<DesktopAgentStatus[]>([]);
@@ -95,6 +96,7 @@ function App() {
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
+  const [skillsRoute, setSkillsRoute] = useState<SkillsRoute>({ kind: "list" });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>({
@@ -107,6 +109,14 @@ function App() {
   const [selectedRemoteTargetIds, setSelectedRemoteTargetIds] = useState<string[]>([]);
   const [remoteInstallResult, setRemoteInstallResult] =
     useState<DesktopInstallRemoteSkillResult | null>(null);
+  const [detailTargets, setDetailTargets] = useState<Record<string, DesktopSkillTarget[]>>({});
+  const [detailTargetErrors, setDetailTargetErrors] = useState<Record<string, DesktopError>>({});
+  const [selectedDetailTargetIds, setSelectedDetailTargetIds] = useState<Record<string, string[]>>(
+    {},
+  );
+  const [detailInstallResults, setDetailInstallResults] = useState<
+    Record<string, DesktopInstallRemoteSkillResult>
+  >({});
   const didBootstrap = useRef(false);
 
   const groupedSkills = useMemo(() => {
@@ -134,6 +144,13 @@ function App() {
   const visibleUpdateAvailableCount = visibleSkills.filter(
     (skill) => updateResults[skill.id]?.status === "UpdateAvailable",
   ).length;
+  const routedSkill = useMemo(
+    () =>
+      skillsRoute.kind === "detail"
+        ? skills.find((skill) => skill.id === skillsRoute.skillId) ?? null
+        : null,
+    [skills, skillsRoute],
+  );
 
   const totalExistingPaths = agents.reduce(
     (count, agent) => count + agent.paths.filter((path) => path.exists).length,
@@ -164,6 +181,23 @@ function App() {
     didBootstrap.current = true;
     void bootstrap();
   }, []);
+
+  useEffect(() => {
+    if (activeWorkspace !== "skills" || skillsRoute.kind !== "detail" || !routedSkill?.source) {
+      return;
+    }
+    if (detailTargets[routedSkill.id] || detailTargetErrors[routedSkill.id]) {
+      return;
+    }
+    void loadDetailTargets(routedSkill);
+  }, [
+    activeWorkspace,
+    routedSkill?.id,
+    routedSkill?.source?.url,
+    routedSkill?.source?.repo_path,
+    routedSkill?.source?.ref_,
+    skillsRoute.kind,
+  ]);
 
   async function bootstrap() {
     setState("loading");
@@ -494,6 +528,106 @@ function App() {
       setRemotePreview(preview);
       setRemoteTargets(targets);
       setSelectedRemoteTargetIds([]);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function loadDetailTargets(skill: DesktopSkill) {
+    if (!skill.source) {
+      return;
+    }
+
+    setActionBusy(`detail-targets:${skill.id}`);
+    setActionError(null);
+    setDetailTargetErrors((current) => {
+      const next = { ...current };
+      delete next[skill.id];
+      return next;
+    });
+
+    try {
+      const source = skill.source;
+      const preview = await previewRemoteSkillSource({
+        url: source.url,
+        repo_path: source.repo_path,
+        ref_: source.ref_ || "main",
+      });
+      const targets = await getSkillTargetsForSource({
+        url: source.url,
+        repo_path: preview.repo_path === "." ? "" : preview.repo_path,
+        ref_: source.ref_ || "main",
+        commit: preview.commit,
+        install_name: preview.install_name,
+      });
+      setDetailTargets((current) => ({ ...current, [skill.id]: targets }));
+      setSelectedDetailTargetIds((current) => ({ ...current, [skill.id]: [] }));
+    } catch (caught) {
+      setDetailTargetErrors((current) => ({ ...current, [skill.id]: desktopError(caught) }));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  function toggleDetailTarget(skillId: string, target: DesktopSkillTarget) {
+    const id = remoteTargetId(target);
+    setSelectedDetailTargetIds((current) => {
+      const selected = current[skillId] ?? [];
+      return {
+        ...current,
+        [skillId]: selected.includes(id)
+          ? selected.filter((item) => item !== id)
+          : [...selected, id],
+      };
+    });
+  }
+
+  async function handleInstallDetailTargets(skill: DesktopSkill) {
+    if (!skill.source || !detailTargets[skill.id]) {
+      return;
+    }
+    const selectedIds = selectedDetailTargetIds[skill.id] ?? [];
+    const selectedTargets = detailTargets[skill.id].filter((target) =>
+      selectedIds.includes(remoteTargetId(target)),
+    );
+    if (selectedTargets.length === 0) {
+      return;
+    }
+
+    setActionBusy(`detail-install:${skill.id}`);
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const source = skill.source;
+      const preview = await previewRemoteSkillSource({
+        url: source.url,
+        repo_path: source.repo_path,
+        ref_: source.ref_ || "main",
+      });
+      const result = await installRemoteSkillToTargets({
+        url: source.url,
+        repo_path: preview.repo_path === "." ? "" : preview.repo_path,
+        ref_: source.ref_ || "main",
+        commit: preview.commit,
+        install_name: preview.install_name,
+        targets: selectedTargets.map((target) => ({
+          agent_id: target.agent_id,
+          agent_name: target.agent_name,
+          install_path: target.install_path,
+        })),
+      });
+      setDetailInstallResults((current) => ({ ...current, [skill.id]: result }));
+      setActionMessage("跨 Agent 同步已完成");
+      await refreshIndexedSkills();
+      setDetailTargets((current) => {
+        const next = { ...current };
+        delete next[skill.id];
+        return next;
+      });
+      await loadDetailTargets(skill);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1249,215 +1383,256 @@ function App() {
       )}
 
       {activeWorkspace === "skills" && (
-        <main className="workspace workspace-pane" data-testid="workspace-skills">
-          <aside className="agent-rail" aria-label="Agent 分组">
-            <div className="rail-heading">
-              <span>Agent</span>
-              <strong>{agents.length}</strong>
-            </div>
-            <div className="agent-list">
-              {groupedSkills.map((agent) => (
-                <button
-                  aria-label={`查看 Agent ${agent.agent_id}`}
-                  aria-pressed={selectedAgentId === agent.agent_id}
-                  className={`agent-row ${selectedAgentId === agent.agent_id ? "active" : ""}`}
-                  data-testid={`agent-row-${agent.agent_id}`}
-                  key={agent.agent_id}
-                  onClick={() => setSelectedAgentId(agent.agent_id)}
-                >
-                  <div>
-                    <strong>{agent.agent_name}</strong>
-                    <span>{agent.agent_id}</span>
-                  </div>
-                  <b>{agent.skills.length}</b>
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          <section className="skill-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>{panelTitle(selectedAgent, normalizedSearchQuery)}</h2>
-                <p>{panelSubtitle(state, visibleSkills.length, normalizedSearchQuery)}</p>
-              </div>
-              {selectedAgent && !normalizedSearchQuery && (
-                <button
-                  className="ghost-button compact"
-                  data-testid={`check-agent-updates-${selectedAgent.agent_id}`}
-                  disabled={actionBusy === `agent-check:${selectedAgent.agent_id}`}
-                  onClick={() => handleCheckAgentUpdates(selectedAgent.agent_id)}
-                >
-                  {actionBusy === `agent-check:${selectedAgent.agent_id}`
-                    ? "检查中"
-                    : "检查此 Agent"}
-                </button>
-              )}
-              {warnings.length > 0 && (
-                <span className="warning-pill">{warnings.length} 条 warning</span>
-              )}
-            </div>
-            <div className="skill-search-bar">
-              <input
-                data-testid="skill-search-input"
-                placeholder="搜索本机 skill、Agent、路径或来源"
-                value={skillSearchQuery}
-                onChange={(event) => setSkillSearchQuery(event.target.value)}
+        <main className="workspace workspace-pane phase6-workspace" data-testid="workspace-skills">
+          {skillsRoute.kind === "detail" && routedSkill && (
+            <section className="skill-panel skill-detail-page" data-testid={`skill-detail-${routedSkill.id}`}>
+              <button className="breadcrumb-button" onClick={() => setSkillsRoute({ kind: "list" })}>
+                <span aria-hidden="true">←</span>
+                <span>Skills / {routedSkill.name}</span>
+              </button>
+              <SkillRow
+                skill={routedSkill}
+                updateResult={updateResults[routedSkill.id]}
+                diffDetail={diffDetails[routedSkill.id]}
+                diffError={diffError[routedSkill.id]}
+                backups={backups[routedSkill.id] ?? []}
+                backupOpen={backupPanels[routedSkill.id] ?? false}
+                backupError={backupError[routedSkill.id]}
+                isBinding={bindingSkillId === routedSkill.id}
+                bindDraft={bindDraft}
+                busyKey={actionBusy}
+                onOpenBind={() => openBindForm(routedSkill)}
+                onCancelBind={() => setBindingSkillId(null)}
+                onDraftChange={setBindDraft}
+                onBind={() => handleBindSource(routedSkill.id)}
+                onUnbind={() => handleUnbindSource(routedSkill.id)}
+                onCheck={() => handleCheckUpdates([routedSkill.id])}
+                onToggleDiff={() => handleToggleDiff(routedSkill.id)}
+                onApplyUpdate={() => handleApplyUpdate(routedSkill.id)}
+                onToggleBackups={() => handleToggleBackups(routedSkill.id)}
+                onRestoreBackup={(backupId) => handleRestoreBackup(routedSkill.id, backupId)}
               />
-              {skillSearchQuery && (
-                <button className="ghost-button compact" onClick={() => setSkillSearchQuery("")}>
-                  清空
-                </button>
+              {routedSkill.source && (
+                <CrossAgentTargetMatrix
+                  currentAgentId={routedSkill.agent_id}
+                  error={detailTargetErrors[routedSkill.id]}
+                  installResult={detailInstallResults[routedSkill.id]}
+                  loading={actionBusy === `detail-targets:${routedSkill.id}`}
+                  selectedTargetIds={selectedDetailTargetIds[routedSkill.id] ?? []}
+                  targets={detailTargets[routedSkill.id] ?? []}
+                  title="跨 Agent 安装状态"
+                  onInstall={() => handleInstallDetailTargets(routedSkill)}
+                  onRefresh={() => loadDetailTargets(routedSkill)}
+                  onToggleTarget={(target) => toggleDetailTarget(routedSkill.id, target)}
+                />
               )}
-            </div>
-            <section className="remote-sync-panel" aria-label="跨 Agent 同步">
-              <div className="remote-sync-header">
-                <div>
-                  <h3>跨 Agent 同步</h3>
-                  <p>从远端 Git skill 预览后安装或更新到选中的本机 Agent。</p>
-                </div>
-                <button
-                  className="compact"
-                  data-testid="remote-sync-preview"
-                  disabled={
-                    actionBusy === "remote-sync-preview" ||
-                    remoteSyncDraft.url.trim().length === 0
-                  }
-                  onClick={handlePreviewRemoteSync}
-                >
-                  {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
-                </button>
-              </div>
-              <div className="remote-sync-form">
-                <input
-                  data-testid="remote-sync-url"
-                  value={remoteSyncDraft.url}
-                  placeholder="https://github.com/example/metis-skills.git"
-                  onChange={(event) =>
-                    setRemoteSyncDraft((current) => ({ ...current, url: event.target.value }))
-                  }
-                />
-                <input
-                  data-testid="remote-sync-repo-path"
-                  value={remoteSyncDraft.repo_path}
-                  placeholder="skills/example"
-                  onChange={(event) =>
-                    setRemoteSyncDraft((current) => ({
-                      ...current,
-                      repo_path: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  data-testid="remote-sync-ref"
-                  value={remoteSyncDraft.ref_}
-                  placeholder="main"
-                  onChange={(event) =>
-                    setRemoteSyncDraft((current) => ({ ...current, ref_: event.target.value }))
-                  }
-                />
-              </div>
-              {remotePreview && (
-                <div className="remote-preview-card">
+            </section>
+          )}
+
+          {skillsRoute.kind === "add" && (
+            <section className="skill-panel add-skill-page" data-testid="add-skill-page">
+              <button className="breadcrumb-button" onClick={() => setSkillsRoute({ kind: "list" })}>
+                <span aria-hidden="true">←</span>
+                <span>Skills / 添加 Skill</span>
+              </button>
+              <section className="remote-sync-panel" aria-label="添加 Skill">
+                <div className="remote-sync-header">
                   <div>
-                    <strong>{remotePreview.name}</strong>
-                    <span>{remotePreview.description ?? "无描述"}</span>
+                    <h2>添加 Skill</h2>
+                    <p>预览远端 Git skill，然后安装或更新到选中的本机 Agent。</p>
                   </div>
-                  <code>{shortCommit(remotePreview.commit)}</code>
-                </div>
-              )}
-              {remoteTargets.length > 0 && (
-                <div className="remote-target-list">
-                  {remoteTargets.map((target) => (
-                    <label
-                      className="remote-target-row"
-                      data-testid={`remote-target-${target.agent_id}`}
-                      key={remoteTargetId(target)}
-                    >
-                      <input
-                        data-testid={`remote-target-checkbox-${target.agent_id}`}
-                        type="checkbox"
-                        checked={selectedRemoteTargetIds.includes(remoteTargetId(target))}
-                        disabled={!isRemoteTargetSelectable(target)}
-                        onChange={() => toggleRemoteTarget(target)}
-                      />
-                      <span>
-                        <strong>{target.agent_name}</strong>
-                        <small>{target.install_path}</small>
-                      </span>
-                      <b>{remoteTargetStatusLabel(target)}</b>
-                    </label>
-                  ))}
                   <button
                     className="compact"
-                    data-testid="remote-sync-install"
+                    data-testid="add-skill-preview"
                     disabled={
-                      actionBusy === "remote-sync-install" || selectedRemoteTargetIds.length === 0
+                      actionBusy === "remote-sync-preview" ||
+                      remoteSyncDraft.url.trim().length === 0
                     }
-                    onClick={handleInstallRemoteTargets}
+                    onClick={handlePreviewRemoteSync}
                   >
-                    {actionBusy === "remote-sync-install" ? "同步中" : "同步选中 Agent"}
+                    {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
                   </button>
                 </div>
+                <div className="remote-sync-form">
+                  <input
+                    data-testid="add-skill-url"
+                    value={remoteSyncDraft.url}
+                    placeholder="https://github.com/example/metis-skills.git"
+                    onChange={(event) =>
+                      setRemoteSyncDraft((current) => ({ ...current, url: event.target.value }))
+                    }
+                  />
+                  <input
+                    data-testid="add-skill-repo-path"
+                    value={remoteSyncDraft.repo_path}
+                    placeholder="skills/example"
+                    onChange={(event) =>
+                      setRemoteSyncDraft((current) => ({
+                        ...current,
+                        repo_path: event.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    data-testid="add-skill-ref"
+                    value={remoteSyncDraft.ref_}
+                    placeholder="main"
+                    onChange={(event) =>
+                      setRemoteSyncDraft((current) => ({ ...current, ref_: event.target.value }))
+                    }
+                  />
+                </div>
+                {remotePreview && (
+                  <div className="remote-preview-card">
+                    <div>
+                      <strong>{remotePreview.name}</strong>
+                      <span>{remotePreview.description ?? "无描述"}</span>
+                    </div>
+                    <code>{shortCommit(remotePreview.commit)}</code>
+                  </div>
+                )}
+                {(remotePreview || remoteTargets.length > 0 || actionBusy === "remote-sync-preview") && (
+                  <CrossAgentTargetMatrix
+                    currentAgentId={null}
+                    installResult={remoteInstallResult ?? undefined}
+                    loading={actionBusy === "remote-sync-preview"}
+                    selectedTargetIds={selectedRemoteTargetIds}
+                    targets={remoteTargets}
+                    title="安装目标"
+                    onInstall={handleInstallRemoteTargets}
+                    onRefresh={handlePreviewRemoteSync}
+                    onToggleTarget={toggleRemoteTarget}
+                  />
+                )}
+              </section>
+            </section>
+          )}
+
+          {skillsRoute.kind === "list" && (
+            <section className="skill-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>{panelTitle(selectedAgent, normalizedSearchQuery)}</h2>
+                  <p>{panelSubtitle(state, visibleSkills.length, normalizedSearchQuery)}</p>
+                </div>
+                <div className="phase6-list-actions">
+                  {selectedAgent && !normalizedSearchQuery && (
+                    <button
+                      className="ghost-button compact"
+                      data-testid={`check-agent-updates-${selectedAgent.agent_id}`}
+                      disabled={actionBusy === `agent-check:${selectedAgent.agent_id}`}
+                      onClick={() => handleCheckAgentUpdates(selectedAgent.agent_id)}
+                    >
+                      {actionBusy === `agent-check:${selectedAgent.agent_id}`
+                        ? "检查中"
+                        : `检查 ${selectedAgent.agent_name} 全部更新`}
+                    </button>
+                  )}
+                  <button className="compact" data-testid="open-add-skill" onClick={() => setSkillsRoute({ kind: "add" })}>
+                    + 添加 Skill
+                  </button>
+                  {warnings.length > 0 && (
+                    <span className="warning-pill">{warnings.length} 条 warning</span>
+                  )}
+                </div>
+              </div>
+              <div className="agent-filter-bar" aria-label="Agent 筛选">
+                <button
+                  aria-pressed={!selectedAgentId}
+                  className={`agent-filter-pill ${!selectedAgentId ? "active" : ""}`}
+                  data-testid="agent-filter-all"
+                  onClick={() => setSelectedAgentId(null)}
+                >
+                  全部 <span>{skills.length}</span>
+                </button>
+                {groupedSkills.map((agent) => (
+                  <button
+                    aria-label={`查看 Agent ${agent.agent_id}`}
+                    aria-pressed={selectedAgentId === agent.agent_id}
+                    className={`agent-filter-pill ${selectedAgentId === agent.agent_id ? "active" : ""} ${
+                      agent.skills.length === 0 ? "empty" : ""
+                    }`}
+                    data-testid={`agent-filter-${agent.agent_id}`}
+                    key={agent.agent_id}
+                    onClick={() => setSelectedAgentId(agent.agent_id)}
+                  >
+                    {agent.agent_name} <span>{agent.skills.length}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="skill-search-bar">
+                <input
+                  data-testid="skill-search-input"
+                  placeholder="搜索本机 skill、Agent、路径或来源"
+                  value={skillSearchQuery}
+                  onChange={(event) => setSkillSearchQuery(event.target.value)}
+                />
+                {skillSearchQuery && (
+                  <button className="ghost-button compact" onClick={() => setSkillSearchQuery("")}>
+                    清空
+                  </button>
+                )}
+              </div>
+              <div className="agent-detail-summary">
+                <SummaryMetric label="全部" value={visibleSkills.length.toString()} />
+                <SummaryMetric
+                  label="已最新"
+                  value={visibleSkills
+                    .filter((skill) => updateResults[skill.id]?.status === "UpToDate")
+                    .length.toString()}
+                />
+                <SummaryMetric label="待更新" value={visibleUpdateAvailableCount.toString()} />
+                <SummaryMetric label="已修改" value={visibleModifiedCount.toString()} />
+              </div>
+              {selectedAgent && !normalizedSearchQuery && (
+                <div
+                  className="agent-detail-summary"
+                  data-testid={`agent-detail-${selectedAgent.agent_id}`}
+                >
+                  <SummaryMetric label="此 Agent skills" value={visibleSkills.length.toString()} />
+                  <SummaryMetric label="已绑定来源" value={visibleBoundCount.toString()} />
+                  <SummaryMetric label="本地修改" value={visibleModifiedCount.toString()} />
+                  <SummaryMetric label="待更新" value={visibleUpdateAvailableCount.toString()} />
+                </div>
               )}
-              {remoteInstallResult && (
-                <div className="remote-install-result">
-                  {remoteInstallResult.targets.map((target) => (
-                    <span key={`${target.agent_id}:${target.install_path}`}>
-                      {agentNameFromId(target.agent_id)}：{target.status}
-                      {target.reason ? ` (${target.reason})` : ""}
-                    </span>
+
+              {state === "loading" && <LoadingState />}
+              {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
+              {state === "loaded" && visibleSkills.length === 0 && (
+                <EmptyState onOpenSettings={() => setActiveWorkspace("settings")} onScan={handleScan} />
+              )}
+              {state === "loaded" && visibleSkills.length > 0 && (
+                <div className="skill-list">
+                  {visibleSkills.map((skill) => (
+                    <SkillRow
+                      key={skill.id}
+                      skill={skill}
+                      updateResult={updateResults[skill.id]}
+                      diffDetail={diffDetails[skill.id]}
+                      diffError={diffError[skill.id]}
+                      backups={backups[skill.id] ?? []}
+                      backupOpen={backupPanels[skill.id] ?? false}
+                      backupError={backupError[skill.id]}
+                      isBinding={bindingSkillId === skill.id}
+                      bindDraft={bindDraft}
+                      busyKey={actionBusy}
+                      onOpenDetail={() => setSkillsRoute({ kind: "detail", skillId: skill.id })}
+                      onOpenBind={() => openBindForm(skill)}
+                      onCancelBind={() => setBindingSkillId(null)}
+                      onDraftChange={setBindDraft}
+                      onBind={() => handleBindSource(skill.id)}
+                      onUnbind={() => handleUnbindSource(skill.id)}
+                      onCheck={() => handleCheckUpdates([skill.id])}
+                      onToggleDiff={() => handleToggleDiff(skill.id)}
+                      onApplyUpdate={() => handleApplyUpdate(skill.id)}
+                      onToggleBackups={() => handleToggleBackups(skill.id)}
+                      onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
+                    />
                   ))}
                 </div>
               )}
             </section>
-            {selectedAgent && !normalizedSearchQuery && (
-              <div
-                className="agent-detail-summary"
-                data-testid={`agent-detail-${selectedAgent.agent_id}`}
-              >
-                <SummaryMetric label="此 Agent skills" value={visibleSkills.length.toString()} />
-                <SummaryMetric label="已绑定来源" value={visibleBoundCount.toString()} />
-                <SummaryMetric label="本地修改" value={visibleModifiedCount.toString()} />
-                <SummaryMetric label="待更新" value={visibleUpdateAvailableCount.toString()} />
-              </div>
-            )}
-
-            {state === "loading" && <LoadingState />}
-            {state === "error" && <ErrorState message={error} onRetry={handleScan} />}
-            {state === "loaded" && visibleSkills.length === 0 && (
-              <EmptyState onOpenSettings={() => setActiveWorkspace("settings")} onScan={handleScan} />
-            )}
-            {state === "loaded" && visibleSkills.length > 0 && (
-              <div className="skill-list">
-                {visibleSkills.map((skill) => (
-                  <SkillRow
-                    key={skill.id}
-                    skill={skill}
-                    updateResult={updateResults[skill.id]}
-                    diffDetail={diffDetails[skill.id]}
-                    diffError={diffError[skill.id]}
-                    backups={backups[skill.id] ?? []}
-                    backupOpen={backupPanels[skill.id] ?? false}
-                    backupError={backupError[skill.id]}
-                    isBinding={bindingSkillId === skill.id}
-                    bindDraft={bindDraft}
-                    busyKey={actionBusy}
-                    onOpenBind={() => openBindForm(skill)}
-                    onCancelBind={() => setBindingSkillId(null)}
-                    onDraftChange={setBindDraft}
-                    onBind={() => handleBindSource(skill.id)}
-                    onUnbind={() => handleUnbindSource(skill.id)}
-                    onCheck={() => handleCheckUpdates([skill.id])}
-                    onToggleDiff={() => handleToggleDiff(skill.id)}
-                    onApplyUpdate={() => handleApplyUpdate(skill.id)}
-                    onToggleBackups={() => handleToggleBackups(skill.id)}
-                    onRestoreBackup={(backupId) => handleRestoreBackup(skill.id, backupId)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+          )}
         </main>
       )}
 
@@ -1606,6 +1781,7 @@ function SkillRow({
   isBinding,
   bindDraft,
   busyKey,
+  onOpenDetail,
   onOpenBind,
   onCancelBind,
   onDraftChange,
@@ -1627,6 +1803,7 @@ function SkillRow({
   isBinding: boolean;
   bindDraft: BindDraft;
   busyKey: string | null;
+  onOpenDetail?: () => void;
   onOpenBind: () => void;
   onCancelBind: () => void;
   onDraftChange: (draft: BindDraft) => void;
@@ -1648,7 +1825,17 @@ function SkillRow({
   const canApplyUpdate = canShowDiff && !updateResult?.local_modified;
 
   return (
-    <article className="skill-row" data-testid={`skill-row-${skill.id}`}>
+    <article
+      className="skill-row"
+      data-testid={`skill-row-${skill.id}`}
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest("button, input, textarea, label, a")) {
+          return;
+        }
+        onOpenDetail?.();
+      }}
+    >
       <div className="skill-row-main">
         <div className="skill-main">
           <div className="skill-title">
@@ -1778,6 +1965,106 @@ function SkillRow({
         />
       )}
     </article>
+  );
+}
+
+function CrossAgentTargetMatrix({
+  currentAgentId,
+  error,
+  installResult,
+  loading,
+  selectedTargetIds,
+  targets,
+  title,
+  onInstall,
+  onRefresh,
+  onToggleTarget,
+}: {
+  currentAgentId: string | null;
+  error?: DesktopError;
+  installResult?: DesktopInstallRemoteSkillResult;
+  loading: boolean;
+  selectedTargetIds: string[];
+  targets: DesktopSkillTarget[];
+  title: string;
+  onInstall: () => void;
+  onRefresh: () => void;
+  onToggleTarget: (target: DesktopSkillTarget) => void;
+}) {
+  const selectedCount = selectedTargetIds.length;
+
+  return (
+    <section className="target-matrix" aria-label={title}>
+      <div className="target-matrix-header">
+        <div>
+          <h3>{title}</h3>
+          <p>同一远端 source 在各 Agent 根目录下的安装与更新状态。</p>
+        </div>
+        <button className="ghost-button compact" disabled={loading} onClick={onRefresh}>
+          {loading ? "检查中" : "重新检查状态"}
+        </button>
+      </div>
+      {error && <InlineError error={error} />}
+      {loading && targets.length === 0 && <p className="matrix-muted">正在检查跨 Agent 状态</p>}
+      {!loading && !error && targets.length === 0 && (
+        <p className="matrix-muted">没有可用安装目标</p>
+      )}
+      {targets.length > 0 && (
+        <div className="remote-target-list">
+          {targets.map((target) => {
+            const id = remoteTargetId(target);
+            const selectable = isRemoteTargetSelectable(target);
+            const isCurrent = currentAgentId === target.agent_id;
+            return (
+              <label
+                className={`remote-target-row ${isCurrent ? "current" : ""}`}
+                data-testid={`target-row-${target.agent_id}`}
+                key={id}
+              >
+                <input
+                  data-testid={`target-checkbox-${target.agent_id}`}
+                  type="checkbox"
+                  checked={selectedTargetIds.includes(id)}
+                  disabled={!selectable}
+                  onChange={() => onToggleTarget(target)}
+                />
+                <span>
+                  <strong>
+                    {target.agent_name}
+                    {isCurrent && <em>当前查看</em>}
+                  </strong>
+                  <small>{target.install_path}</small>
+                </span>
+                <b>{remoteTargetStatusLabel(target)}</b>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {targets.length > 0 && (
+        <div className="target-action-bar">
+          <span>已选 {selectedCount} 个 Agent</span>
+          <button
+            className="compact"
+            data-testid="install-selected-targets"
+            disabled={loading || selectedCount === 0}
+            onClick={onInstall}
+          >
+            安装/更新选中
+          </button>
+        </div>
+      )}
+      {installResult && (
+        <div className="remote-install-result">
+          {installResult.targets.map((target) => (
+            <span key={`${target.agent_id}:${target.install_path}`}>
+              {agentNameFromId(target.agent_id)}：{target.status}
+              {target.reason ? ` (${target.reason})` : ""}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -2051,18 +2338,24 @@ function remoteTargetId(target: DesktopSkillTarget) {
 }
 
 function isRemoteTargetSelectable(target: DesktopSkillTarget) {
-  return ["NotInstalled", "InstalledUnbound", "UpdateAvailable"].includes(target.status);
+  if (target.status === "UpdateAvailable") {
+    return target.local_modified !== true;
+  }
+  return ["NotInstalled", "InstalledUnbound"].includes(target.status);
 }
 
 function remoteTargetStatusLabel(target: DesktopSkillTarget) {
+  if (target.status === "UpdateAvailable" && target.local_modified) {
+    return "本地已修改，跳过更新";
+  }
   const labels: Record<string, string> = {
     NotInstalled: "未安装",
-    InstalledUnbound: "未绑定",
+    InstalledUnbound: "可绑定并更新",
     InstalledBound: "已绑定",
-    UpToDate: "已最新",
+    UpToDate: "最新",
     UpdateAvailable: "可更新",
     ConflictNonSkill: "冲突",
-    AgentRootUnavailable: "root 不可用",
+    AgentRootUnavailable: "不可用",
   };
   return labels[target.status] ?? target.status;
 }
