@@ -1515,6 +1515,7 @@ description: {description}
         )
         .expect("update check should succeed");
 
+        drop(store);
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert_eq!(results.len(), 1);
@@ -1586,6 +1587,7 @@ description: {description}
         )
         .expect("update check should return status results");
 
+        drop(store);
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert_eq!(results[0].status, "CheckFailed");
@@ -1719,6 +1721,7 @@ description: {description}
             export_environment_report_for_state(&state).expect("environment report should export");
         let json = serde_json::to_string(&report).expect("report should serialize");
 
+        drop(store);
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert_eq!(report.total_skills, 1);
@@ -1813,6 +1816,7 @@ description: {description}
         let diff = get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
             .expect("diff should load");
 
+        drop(store);
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert_eq!(diff.current_commit, "aaa111");
