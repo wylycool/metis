@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test:e2e": "vitest run --config vite.config.ts --environment jsdom src/App.e2e.test.tsx",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:build:mac-universal": "tauri build --target universal-apple-darwin --bundles dmg"
@@ -17,10 +18,14 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4",
+    "jsdom": "^29.1.1",
     "typescript": "^5",
-    "vite": "^6"
+    "vite": "^6",
+    "vitest": "^4.1.9"
   }
 }

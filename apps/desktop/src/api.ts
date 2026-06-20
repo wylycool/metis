@@ -5,6 +5,7 @@ import type {
   DesktopBackupSummary,
   DesktopBindSourceRequest,
   DesktopDiffDetail,
+  DesktopEnvironmentReport,
   DesktopRestoreBackupRequest,
   DesktopRestoreBackupResult,
   DesktopScanResponse,
@@ -67,4 +68,8 @@ export function restoreSkillBackup(
   request: DesktopRestoreBackupRequest,
 ): Promise<DesktopRestoreBackupResult> {
   return invoke("restore_skill_backup", { request });
+}
+
+export function exportEnvironmentReport(): Promise<DesktopEnvironmentReport> {
+  return invoke("export_environment_report");
 }

@@ -196,6 +196,52 @@ h1 {
   margin-bottom: 14px;
 }
 
+.beta-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(25, 29, 35, 0.9);
+  padding: 13px 14px;
+}
+
+.beta-panel h2 {
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.beta-panel p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.beta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.environment-report-preview {
+  grid-column: 1 / -1;
+  max-height: 260px;
+  margin: 0;
+  border: 1px solid #323b45;
+  border-radius: 7px;
+  padding: 10px;
+  color: #d7dfdc;
+  background: #101216;
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
 .settings-panel {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -432,6 +478,56 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.inline-error p {
+  margin: 6px 0 0;
+}
+
+.error-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-heading strong {
+  color: #ffd0d0;
+}
+
+.error-heading span {
+  border: 1px solid rgba(224, 95, 95, 0.45);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #f4b4b4;
+  background: rgba(224, 95, 95, 0.12);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.error-suggestion {
+  color: #f4d0d0;
+}
+
+.inline-error details {
+  margin-top: 8px;
+}
+
+.inline-error summary {
+  cursor: pointer;
+  color: #f3bbbb;
+  font-weight: 700;
+}
+
+.inline-error code {
+  display: block;
+  margin-top: 6px;
+  border: 1px solid rgba(224, 95, 95, 0.28);
+  border-radius: 6px;
+  padding: 7px 8px;
+  color: #ffd8d8;
+  background: rgba(18, 20, 24, 0.7);
+  white-space: pre-wrap;
+}
+
 .inline-success {
   margin-bottom: 12px;
   border: 1px solid rgba(97, 195, 139, 0.45);
@@ -549,20 +645,35 @@ h1 {
 
 .source-line span,
 .source-line em,
-.source-line small {
+.source-line small,
+.source-policy {
   overflow-wrap: anywhere;
 }
 
 .source-line em,
-.source-line small {
+.source-policy {
   grid-column: 2;
+}
+
+.source-line em {
   color: var(--subtle);
   font-style: normal;
 }
 
-.source-line small::before {
-  content: "credential: ";
-  color: var(--muted);
+.source-policy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.source-policy small {
+  border: 1px solid #39424d;
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #cad2d8;
+  background: rgba(167, 176, 184, 0.08);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .update-summary {
@@ -843,6 +954,7 @@ h1 {
 
 @media (max-width: 860px) {
   .summary-strip,
+  .beta-panel,
   .workspace,
   .skill-row-main,
   .source-form,
@@ -856,6 +968,10 @@ h1 {
   }
 
   .backup-meta {
+    justify-content: flex-start;
+  }
+
+  .beta-actions {
     justify-content: flex-start;
   }
 }

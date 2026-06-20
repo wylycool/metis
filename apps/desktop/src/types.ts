@@ -146,3 +146,43 @@ export interface DesktopScanResponse {
   skills: DesktopSkill[];
   warnings: DesktopScanWarning[];
 }
+
+export interface DesktopEnvironmentReport {
+  generated_at: string;
+  total_skills: number;
+  bound_sources: number;
+  trusted_sources: number;
+  auto_update_sources: number;
+  local_modified_skills: number;
+  agents: DesktopAgentStatus[];
+  skills: DesktopEnvironmentSkill[];
+}
+
+export interface DesktopEnvironmentSkill {
+  id: string;
+  name: string;
+  agent_id: string;
+  install_path: string;
+  metadata_status: string;
+  local_modified?: boolean | null;
+  source?: DesktopEnvironmentSource | null;
+}
+
+export interface DesktopEnvironmentSource {
+  url: string;
+  repo_path: string;
+  ref_: string;
+  current_commit?: string | null;
+  remote_commit?: string | null;
+  trusted: boolean;
+  auto_update: boolean;
+  has_credential_ref: boolean;
+}
+
+export interface DesktopError {
+  category: string;
+  title: string;
+  message: string;
+  suggestion: string;
+  debug_detail?: string | null;
+}

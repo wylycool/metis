@@ -19,6 +19,22 @@ pub struct GitCommandOutput {
 
 pub trait GitCommandRunner {
     fn run_git(&self, args: &[&str]) -> Result<GitCommandOutput, GitProviderError>;
+
+    fn run_git_in(
+        &self,
+        cwd: Option<&str>,
+        args: &[&str],
+    ) -> Result<GitCommandOutput, GitProviderError> {
+        if let Some(cwd) = cwd {
+            let mut scoped_args = Vec::with_capacity(args.len() + 2);
+            scoped_args.push("-C");
+            scoped_args.push(cwd);
+            scoped_args.extend_from_slice(args);
+            self.run_git(&scoped_args)
+        } else {
+            self.run_git(args)
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -34,6 +50,9 @@ pub enum GitProviderError {
 
     #[error("invalid git output: {output}")]
     InvalidOutput { output: String },
+
+    #[error("path not found: {path}")]
+    PathNotFound { path: String },
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -64,15 +83,30 @@ impl GitCommandRunner for SystemGitRunner {
 #[derive(Debug, Clone)]
 pub struct GitCliProvider<R> {
     runner: R,
+    cache_root: Option<String>,
 }
 
 impl<R: GitCommandRunner> GitCliProvider<R> {
     pub fn new(runner: R) -> Self {
-        Self { runner }
+        Self {
+            runner,
+            cache_root: None,
+        }
+    }
+
+    pub fn with_cache_root(runner: R, cache_root: impl Into<String>) -> Self {
+        Self {
+            runner,
+            cache_root: Some(cache_root.into()),
+        }
     }
 
     pub fn runner(&self) -> &R {
         &self.runner
+    }
+
+    pub fn cache_root(&self) -> Option<&str> {
+        self.cache_root.as_deref()
     }
 
     pub fn check_git_available(&self) -> Result<(), GitProviderError> {

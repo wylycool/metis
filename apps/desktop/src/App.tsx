@@ -3,6 +3,7 @@ import {
   applySkillUpdate,
   bindSkillSource,
   checkSkillUpdates,
+  exportEnvironmentReport,
   getSkillDiff,
   getDesktopSettings,
   listSkillBackups,
@@ -17,6 +18,8 @@ import type {
   DesktopAgentStatus,
   DesktopBackupSummary,
   DesktopDiffDetail,
+  DesktopError,
+  DesktopEnvironmentReport,
   DesktopScanWarning,
   DesktopSettings,
   DesktopSkill,
@@ -39,10 +42,10 @@ function App() {
   const [warnings, setWarnings] = useState<DesktopScanWarning[]>([]);
   const [updateResults, setUpdateResults] = useState<Record<string, DesktopUpdateCheckResult>>({});
   const [diffDetails, setDiffDetails] = useState<Record<string, DesktopDiffDetail>>({});
-  const [diffError, setDiffError] = useState<Record<string, string>>({});
+  const [diffError, setDiffError] = useState<Record<string, DesktopError>>({});
   const [backupPanels, setBackupPanels] = useState<Record<string, boolean>>({});
   const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
-  const [backupError, setBackupError] = useState<Record<string, string>>({});
+  const [backupError, setBackupError] = useState<Record<string, DesktopError>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [settings, setSettings] = useState<DesktopSettings>({ custom_scan_paths: [] });
   const [settingsDraft, setSettingsDraft] = useState("");
@@ -50,9 +53,9 @@ function App() {
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
   const [actionBusy, setActionBusy] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<DesktopError | null>(null);
   const [state, setState] = useState<LoadState>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DesktopError | null>(null);
   const didBootstrap = useRef(false);
 
   const groupedSkills = useMemo(() => {
@@ -68,6 +71,14 @@ function App() {
   );
   const modifiedCount = skills.filter((skill) => skill.local_modified).length;
   const boundCount = skills.filter((skill) => skill.source).length;
+  const trustedSourceCount = skills.filter((skill) => skill.source?.trusted).length;
+  const autoUpdateCount = skills.filter((skill) => skill.source?.auto_update).length;
+  const trustedAutoUpdateSkills = skills.filter(
+    (skill) => skill.source?.trusted && skill.source.auto_update && skill.local_modified !== true,
+  );
+  const [environmentReport, setEnvironmentReport] = useState<DesktopEnvironmentReport | null>(
+    null,
+  );
 
   useEffect(() => {
     if (didBootstrap.current) {
@@ -103,7 +114,7 @@ function App() {
       setWarnings(scanResult.warnings);
       setState("loaded");
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(desktopError(caught));
       setState("error");
     }
   }
@@ -127,7 +138,7 @@ function App() {
       setBackupError({});
       setState("loaded");
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(desktopError(caught));
       setState("error");
     }
   }
@@ -150,7 +161,7 @@ function App() {
         setAgents(await listAgents());
       }
     } catch (caught) {
-      setActionError(errorMessage(caught));
+      setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -225,7 +236,7 @@ function App() {
         return next;
       });
     } catch (caught) {
-      setActionError(errorMessage(caught));
+      setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -265,7 +276,7 @@ function App() {
         return next;
       });
     } catch (caught) {
-      setActionError(errorMessage(caught));
+      setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -292,7 +303,79 @@ function App() {
       setDiffError({});
       await refreshIndexedSkills();
     } catch (caught) {
-      setActionError(errorMessage(caught));
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleExportEnvironmentReport() {
+    setActionBusy("environment-report");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const report = await exportEnvironmentReport();
+      setEnvironmentReport(report);
+      setActionMessage("环境报告已生成");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleRunAutoUpdate() {
+    setActionBusy("auto-update");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const candidateIds = trustedAutoUpdateSkills.map((skill) => skill.id);
+      const skippedByPolicy = skills.filter(
+        (skill) =>
+          skill.source?.auto_update &&
+          (!skill.source.trusted || skill.local_modified === true),
+      ).length;
+
+      if (candidateIds.length === 0) {
+        setActionMessage(`受控自动更新完成：已更新 0 个，跳过 ${skippedByPolicy} 个`);
+        return;
+      }
+
+      const results = await checkSkillUpdates({ skill_ids: candidateIds });
+      setUpdateResults((current) => {
+        const next = { ...current };
+        for (const result of results) {
+          next[result.skill_id] = result;
+        }
+        return next;
+      });
+
+      let applied = 0;
+      let failed = 0;
+      for (const result of results) {
+        if (result.status !== "UpdateAvailable" || result.local_modified) {
+          continue;
+        }
+        try {
+          await applySkillUpdate(result.skill_id);
+          applied += 1;
+          clearSkillRuntimeState(result.skill_id);
+        } catch {
+          failed += 1;
+        }
+      }
+
+      await refreshIndexedSkills();
+      const skipped =
+        skippedByPolicy +
+        results.filter((result) => result.status !== "UpdateAvailable" || result.local_modified)
+          .length;
+      const failureText = failed > 0 ? `，失败 ${failed} 个` : "";
+      setActionMessage(`受控自动更新完成：已更新 ${applied} 个，跳过 ${skipped} 个${failureText}`);
+    } catch (caught) {
+      setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -321,7 +404,7 @@ function App() {
       const detail = await getSkillDiff(skillId);
       setDiffDetails((current) => ({ ...current, [skillId]: detail }));
     } catch (caught) {
-      setDiffError((current) => ({ ...current, [skillId]: errorMessage(caught) }));
+      setDiffError((current) => ({ ...current, [skillId]: desktopError(caught) }));
     } finally {
       setActionBusy(null);
     }
@@ -340,7 +423,7 @@ function App() {
       const result = await listSkillBackups(skillId);
       setBackups((current) => ({ ...current, [skillId]: result }));
     } catch (caught) {
-      setBackupError((current) => ({ ...current, [skillId]: errorMessage(caught) }));
+      setBackupError((current) => ({ ...current, [skillId]: desktopError(caught) }));
     } finally {
       setActionBusy(null);
     }
@@ -373,7 +456,7 @@ function App() {
       await refreshIndexedSkills();
       await loadBackups(skillId);
     } catch (caught) {
-      setActionError(errorMessage(caught));
+      setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -394,7 +477,7 @@ function App() {
       await refreshIndexedSkills();
       await loadBackups(skillId);
     } catch (caught) {
-      setActionError(errorMessage(caught));
+      setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -444,6 +527,39 @@ function App() {
         <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
         <SummaryMetric label="存在的路径" value={totalExistingPaths.toString()} />
         <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
+      </section>
+
+      <section className="beta-panel" aria-label="Beta 稳定化">
+        <div>
+          <h2>Beta 稳定化</h2>
+          <p>
+            Trusted source {trustedSourceCount} 个，Auto update {autoUpdateCount} 个，候选{" "}
+            {trustedAutoUpdateSkills.length} 个。
+          </p>
+        </div>
+        <div className="beta-actions">
+          <button
+            className="ghost-button compact"
+            data-testid="export-environment-report"
+            disabled={actionBusy === "environment-report"}
+            onClick={handleExportEnvironmentReport}
+          >
+            {actionBusy === "environment-report" ? "生成中" : "导出环境报告"}
+          </button>
+          <button
+            className="compact"
+            data-testid="run-auto-update"
+            disabled={actionBusy === "auto-update" || skills.length === 0}
+            onClick={handleRunAutoUpdate}
+          >
+            {actionBusy === "auto-update" ? "更新中" : "受控自动更新"}
+          </button>
+        </div>
+        {environmentReport && (
+          <pre className="environment-report-preview">
+            {JSON.stringify(environmentReport, null, 2)}
+          </pre>
+        )}
       </section>
 
       <section className="settings-panel" aria-label="设置">
@@ -509,11 +625,11 @@ function App() {
             <div className="settings-section credential-section">
               <div>
                 <h3>凭据引用</h3>
-                <p>在来源绑定中填写引用名，Metis 只保存名称；真实 token 仍交给本机 Git、SSH agent 或后续 Keychain 接入。</p>
+                <p>在来源绑定中填写引用名，Metis 只保存名称；真实认证由本机 Git、SSH agent 或 Git credential helper 处理。</p>
               </div>
               <div className="credential-note">
                 <code>github-main</code>
-                <code>work-gitlab-token</code>
+                <code>work-gitlab</code>
               </div>
             </div>
           </div>
@@ -550,7 +666,7 @@ function App() {
             )}
           </div>
 
-          {actionError && <div className="inline-error">{actionError}</div>}
+          {actionError && <InlineError error={actionError} />}
           {actionMessage && <div className="inline-success">{actionMessage}</div>}
 
           {state === "loading" && <LoadingState />}
@@ -637,10 +753,10 @@ function SkillRow({
   skill: DesktopSkill;
   updateResult?: DesktopUpdateCheckResult;
   diffDetail?: DesktopDiffDetail;
-  diffError?: string;
+  diffError?: DesktopError;
   backups: DesktopBackupSummary[];
   backupOpen: boolean;
-  backupError?: string;
+  backupError?: DesktopError;
   isBinding: boolean;
   bindDraft: BindDraft;
   busyKey: string | null;
@@ -665,7 +781,7 @@ function SkillRow({
   const canApplyUpdate = canShowDiff && !updateResult?.local_modified;
 
   return (
-    <article className="skill-row">
+    <article className="skill-row" data-testid={`skill-row-${skill.id}`}>
       <div className="skill-row-main">
         <div className="skill-main">
           <div className="skill-title">
@@ -679,7 +795,11 @@ function SkillRow({
               <strong>{skill.source.ref_}</strong>
               <span>{skill.source.url}</span>
               <em>{skill.source.repo_path}</em>
-              {skill.source.credential_ref && <small>{skill.source.credential_ref}</small>}
+              <div className="source-policy">
+                <small>{skill.source.trusted ? "trusted source" : "untrusted source"}</small>
+                <small>{skill.source.auto_update ? "auto update on" : "auto update off"}</small>
+                {skill.source.credential_ref && <small>已配置凭据引用</small>}
+              </div>
             </div>
           )}
         </div>
@@ -711,17 +831,28 @@ function SkillRow({
       <div className="skill-actions">
         {skill.source ? (
           <>
-            <button className="ghost-button compact" disabled={checkingBusy} onClick={onCheck}>
+            <button
+              className="ghost-button compact"
+              data-testid={`check-updates-${skill.id}`}
+              disabled={checkingBusy}
+              onClick={onCheck}
+            >
               {checkingBusy ? "检查中" : "检查更新"}
             </button>
             {canShowDiff && (
-              <button className="ghost-button compact" disabled={diffBusy} onClick={onToggleDiff}>
+              <button
+                className="ghost-button compact"
+                data-testid={`toggle-diff-${skill.id}`}
+                disabled={diffBusy}
+                onClick={onToggleDiff}
+              >
                 {diffBusy ? "加载中" : diffDetail ? "收起 diff" : "查看 diff"}
               </button>
             )}
             {canShowDiff && (
               <button
                 className="compact"
+                data-testid={`apply-update-${skill.id}`}
                 disabled={applyBusy || !canApplyUpdate}
                 onClick={onApplyUpdate}
               >
@@ -731,7 +862,11 @@ function SkillRow({
             <button className="ghost-button compact" disabled={backupsBusy} onClick={onToggleBackups}>
               {backupsBusy ? "加载中" : backupOpen ? "收起备份" : "备份/回滚"}
             </button>
-            <button className="ghost-button compact" onClick={onOpenBind}>
+            <button
+              className="ghost-button compact"
+              data-testid={`open-bind-source-${skill.id}`}
+              onClick={onOpenBind}
+            >
               编辑来源
             </button>
             <button
@@ -743,17 +878,22 @@ function SkillRow({
             </button>
           </>
         ) : (
-          <button className="ghost-button compact" onClick={onOpenBind}>
+          <button
+            className="ghost-button compact"
+            data-testid={`open-bind-source-${skill.id}`}
+            onClick={onOpenBind}
+          >
             绑定来源
           </button>
         )}
       </div>
 
-      {diffError && <div className="inline-error">{diffError}</div>}
+      {diffError && <InlineError error={diffError} />}
       {diffDetail && <DiffPanel detail={diffDetail} />}
-      {backupError && <div className="inline-error">{backupError}</div>}
+      {backupError && <InlineError error={backupError} />}
       {backupOpen && (
         <BackupPanel
+          skillId={skill.id}
           backups={backups}
           busyKey={busyKey}
           onRestoreBackup={onRestoreBackup}
@@ -762,6 +902,7 @@ function SkillRow({
 
       {isBinding && (
         <BindSourceForm
+          skillId={skill.id}
           draft={bindDraft}
           busy={bindingBusy}
           onChange={onDraftChange}
@@ -774,10 +915,12 @@ function SkillRow({
 }
 
 function BackupPanel({
+  skillId,
   backups,
   busyKey,
   onRestoreBackup,
 }: {
+  skillId: string;
   backups: DesktopBackupSummary[];
   busyKey: string | null;
   onRestoreBackup: (backupId: string) => void;
@@ -808,6 +951,7 @@ function BackupPanel({
                 </div>
                 <button
                   className="danger-button compact"
+                  data-testid={`restore-backup-${skillId}-${backup.backup_id}`}
                   disabled={restoring}
                   onClick={() => onRestoreBackup(backup.backup_id)}
                 >
@@ -853,12 +997,14 @@ function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
 }
 
 function BindSourceForm({
+  skillId,
   draft,
   busy,
   onChange,
   onCancel,
   onSubmit,
 }: {
+  skillId: string;
   draft: BindDraft;
   busy: boolean;
   onChange: (draft: BindDraft) => void;
@@ -872,6 +1018,7 @@ function BindSourceForm({
       <label>
         <span>Git URL</span>
         <input
+          data-testid={`bind-url-${skillId}`}
           value={draft.url}
           placeholder="https://github.com/org/repo.git"
           onChange={(event) => onChange({ ...draft, url: event.target.value })}
@@ -880,6 +1027,7 @@ function BindSourceForm({
       <label>
         <span>Repo Path</span>
         <input
+          data-testid={`bind-repo-path-${skillId}`}
           value={draft.repo_path}
           placeholder="skills/example"
           onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
@@ -888,6 +1036,7 @@ function BindSourceForm({
       <label>
         <span>Ref</span>
         <input
+          data-testid={`bind-ref-${skillId}`}
           value={draft.ref_}
           placeholder="main"
           onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
@@ -896,6 +1045,7 @@ function BindSourceForm({
       <label>
         <span>Credential Ref</span>
         <input
+          data-testid={`bind-credential-ref-${skillId}`}
           value={draft.credential_ref}
           placeholder="github-main"
           onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
@@ -922,7 +1072,9 @@ function BindSourceForm({
           取消
         </button>
         <button className="compact" disabled={disabled} onClick={onSubmit}>
-          {busy ? "保存中" : "保存来源"}
+          <span data-testid={`submit-bind-source-${skillId}`}>
+            {busy ? "保存中" : "保存来源"}
+          </span>
         </button>
       </div>
     </div>
@@ -948,11 +1100,30 @@ function LoadingState() {
   );
 }
 
-function ErrorState({ message, onRetry }: { message: string | null; onRetry: () => void }) {
+function InlineError({ error }: { error: DesktopError }) {
+  return (
+    <div className="inline-error" data-error-category={error.category}>
+      <div className="error-heading">
+        <strong>{error.title}</strong>
+        <span>{error.category}</span>
+      </div>
+      <p>{error.message}</p>
+      <p className="error-suggestion">{error.suggestion}</p>
+      {error.debug_detail && (
+        <details>
+          <summary>调试详情</summary>
+          <code>{error.debug_detail}</code>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: DesktopError | null; onRetry: () => void }) {
   return (
     <div className="state-block error-state">
       <h3>扫描失败</h3>
-      <p>{message ?? "未知错误"}</p>
+      {message ? <InlineError error={message} /> : <p>未知错误</p>}
       <button onClick={onRetry}>重试扫描</button>
     </div>
   );
@@ -1076,14 +1247,56 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function errorMessage(caught: unknown) {
-  if (caught instanceof Error) {
-    return caught.message;
-  }
-  if (typeof caught === "string") {
+function desktopError(caught: unknown): DesktopError {
+  if (isDesktopError(caught)) {
     return caught;
   }
-  return "桌面后端返回了无法识别的错误";
+  if (typeof caught === "string") {
+    const parsed = parseDesktopError(caught);
+    if (parsed) {
+      return parsed;
+    }
+    return unknownDesktopError(caught);
+  }
+  if (caught instanceof Error) {
+    return unknownDesktopError(caught.message);
+  }
+  return unknownDesktopError("桌面后端返回了无法识别的错误");
+}
+
+function parseDesktopError(raw: string): DesktopError | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isDesktopError(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isDesktopError(value: unknown): value is DesktopError {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.category === "string" &&
+    typeof candidate.title === "string" &&
+    typeof candidate.message === "string" &&
+    typeof candidate.suggestion === "string" &&
+    (candidate.debug_detail === undefined ||
+      candidate.debug_detail === null ||
+      typeof candidate.debug_detail === "string")
+  );
+}
+
+function unknownDesktopError(detail: string): DesktopError {
+  return {
+    category: "unknown",
+    title: "操作失败",
+    message: detail,
+    suggestion: "请确认目标目录、Git source 和本地数据库状态后重试。",
+    debug_detail: detail,
+  };
 }
 
 export default App;

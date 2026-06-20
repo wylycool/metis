@@ -27,6 +27,7 @@ use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub struct DesktopAppState {
@@ -260,6 +261,56 @@ pub struct DesktopScanWarning {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopEnvironmentReport {
+    pub generated_at: String,
+    pub total_skills: usize,
+    pub bound_sources: usize,
+    pub trusted_sources: usize,
+    pub auto_update_sources: usize,
+    pub local_modified_skills: usize,
+    pub agents: Vec<DesktopAgentStatus>,
+    pub skills: Vec<DesktopEnvironmentSkill>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopEnvironmentSkill {
+    pub id: String,
+    pub name: String,
+    pub agent_id: String,
+    pub install_path: String,
+    pub metadata_status: String,
+    pub local_modified: Option<bool>,
+    pub source: Option<DesktopEnvironmentSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopEnvironmentSource {
+    pub url: String,
+    pub repo_path: String,
+    pub ref_: String,
+    pub current_commit: Option<String>,
+    pub remote_commit: Option<String>,
+    pub trusted: bool,
+    pub auto_update: bool,
+    pub has_credential_ref: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopError {
+    pub category: String,
+    pub title: String,
+    pub message: String,
+    pub suggestion: String,
+    pub debug_detail: Option<String>,
+}
+
+impl DesktopError {
+    fn wire_string(self) -> String {
+        serde_json::to_string(&self).unwrap_or(self.message)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopScanResponse {
     pub skills: Vec<DesktopSkill>,
     pub warnings: Vec<DesktopScanWarning>,
@@ -383,7 +434,7 @@ pub fn get_skill_diff_for_state_with_checker<C: RemoteCommitChecker>(
     let store = state.open_store()?;
     core_get_diff(&skill_id, &store, checker)
         .map(desktop_diff_detail)
-        .map_err(|error| friendly_desktop_error(&error.to_string()))
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
 pub fn apply_skill_update_for_state_with_checker<C: RemoteCommitChecker>(
@@ -402,7 +453,7 @@ pub fn apply_skill_update_for_state_with_checker<C: RemoteCommitChecker>(
         checker,
     )
     .map(desktop_apply_update_result)
-    .map_err(|error| friendly_desktop_error(&error.to_string()))
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
 pub fn list_skill_backups_for_state(
@@ -412,7 +463,7 @@ pub fn list_skill_backups_for_state(
     let store = state.open_store()?;
     core_list_backups(&skill_id, &store)
         .map(|backups| backups.into_iter().map(desktop_backup_summary).collect())
-        .map_err(|error| error.to_string())
+        .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
 pub fn restore_skill_backup_for_state(
@@ -429,7 +480,73 @@ pub fn restore_skill_backup_for_state(
         &mut store,
     )
     .map(desktop_restore_backup_result)
-    .map_err(|error| error.to_string())
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
+pub fn export_environment_report_for_state(
+    state: &DesktopAppState,
+) -> Result<DesktopEnvironmentReport, String> {
+    let store = state.open_store()?;
+    let agents = list_agents_for_state(state)?;
+    let skills = list_indexed_skills_from_store(&store)?;
+    let mut report_skills = Vec::new();
+    let mut bound_sources = 0;
+    let mut trusted_sources = 0;
+    let mut auto_update_sources = 0;
+    let mut local_modified_skills = 0;
+
+    for skill in skills {
+        if skill.local_modified == Some(true) {
+            local_modified_skills += 1;
+        }
+        let source = skill.source.map(|source| {
+            bound_sources += 1;
+            if source.trusted {
+                trusted_sources += 1;
+            }
+            if source.auto_update {
+                auto_update_sources += 1;
+            }
+            DesktopEnvironmentSource {
+                url: source.url,
+                repo_path: source.repo_path,
+                ref_: source.ref_,
+                current_commit: source.current_commit,
+                remote_commit: source.remote_commit,
+                trusted: source.trusted,
+                auto_update: source.auto_update,
+                has_credential_ref: source.credential_ref.is_some(),
+            }
+        });
+        report_skills.push(DesktopEnvironmentSkill {
+            id: skill.id,
+            name: skill.name,
+            agent_id: skill.agent_id,
+            install_path: skill.install_path,
+            metadata_status: skill.metadata_status,
+            local_modified: skill.local_modified,
+            source,
+        });
+    }
+
+    Ok(DesktopEnvironmentReport {
+        generated_at: current_timestamp_string(),
+        total_skills: report_skills.len(),
+        bound_sources,
+        trusted_sources,
+        auto_update_sources,
+        local_modified_skills,
+        agents,
+        skills: report_skills,
+    })
+}
+
+fn current_timestamp_string() -> String {
+    let seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default();
+    format!("unix:{seconds}")
 }
 
 #[tauri::command]
@@ -487,7 +604,7 @@ fn check_skill_updates(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopUpdateCheckRequest,
 ) -> Result<Vec<DesktopUpdateCheckResult>, String> {
-    let checker = SystemGitCliProvider::default();
+    let checker = system_git_checker_for_state(&state);
     check_skill_updates_for_state_with_checker(&state, request, &checker)
 }
 
@@ -496,7 +613,7 @@ fn get_skill_diff(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopDiffDetail, String> {
-    let checker = SystemGitCliProvider::default();
+    let checker = system_git_checker_for_state(&state);
     get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -505,7 +622,7 @@ fn apply_skill_update(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopApplyUpdateResult, String> {
-    let checker = SystemGitCliProvider::default();
+    let checker = system_git_checker_for_state(&state);
     apply_skill_update_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -523,6 +640,13 @@ fn restore_skill_backup(
     request: DesktopRestoreBackupRequest,
 ) -> Result<DesktopRestoreBackupResult, String> {
     restore_skill_backup_for_state(&state, request)
+}
+
+#[tauri::command]
+fn export_environment_report(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopEnvironmentReport, String> {
+    export_environment_report_for_state(&state)
 }
 
 fn desktop_scan_response(
@@ -543,6 +667,13 @@ fn desktop_scan_response(
             })
             .collect(),
     })
+}
+
+fn system_git_checker_for_state(state: &DesktopAppState) -> SystemGitCliProvider {
+    SystemGitCliProvider::with_cache_root(
+        metis_git_provider::fetch::SystemGitRunner,
+        state.cache_root().to_string_lossy().to_string(),
+    )
 }
 
 fn normalize_paths(paths: Vec<String>) -> Vec<String> {
@@ -633,7 +764,7 @@ fn desktop_update_check_result(result: UpdateCheckResult) -> DesktopUpdateCheckR
         UpdateStatus::NoSource => ("NoSource".to_string(), None),
         UpdateStatus::CheckFailed { reason } => (
             "CheckFailed".to_string(),
-            Some(friendly_desktop_error(&reason)),
+            Some(friendly_desktop_error(&reason).message),
         ),
     };
 
@@ -763,8 +894,29 @@ fn normalize_optional_text(value: Option<String>) -> Option<String> {
     })
 }
 
-fn friendly_desktop_error(message: &str) -> String {
+fn friendly_desktop_error(message: &str) -> DesktopError {
     let lower = message.to_ascii_lowercase();
+
+    if lower.contains("apply failed and rollback succeeded") {
+        return desktop_error(
+            "apply_rollback_succeeded",
+            "更新失败，已自动回滚",
+            "应用更新时发生错误，Metis 已恢复到更新前备份。",
+            "确认本地目录可写、磁盘空间充足后重新检查更新；如问题重复，请保留调试详情。",
+            message,
+        );
+    }
+
+    if lower.contains("apply failed and rollback failed") {
+        return desktop_error(
+            "apply_rollback_failed",
+            "更新失败，自动回滚也失败",
+            "应用更新和自动回滚都没有完成，本地 skill 可能处于不完整状态。",
+            "请先不要继续更新，使用备份面板或备份目录手动恢复，并保留调试详情排查。",
+            message,
+        );
+    }
+
     if lower.contains("auth")
         || lower.contains("authentication")
         || lower.contains("permission denied")
@@ -772,10 +924,99 @@ fn friendly_desktop_error(message: &str) -> String {
         || lower.contains("repository not found")
         || lower.contains("access denied")
     {
-        return "认证失败：请检查该 source 的凭据引用、SSH agent 或 Git 访问权限。".to_string();
+        return desktop_error(
+            "authentication",
+            "认证失败",
+            "无法访问该 Git source，请确认本机 Git 认证可以正常读取仓库。",
+            "检查仓库权限、SSH agent 或 Git credential helper；凭据引用只作为备注名保存，Metis 不会读取 Keychain/token。",
+            message,
+        );
     }
 
-    message.to_string()
+    if lower.contains("local modified") || lower.contains("本地修改") {
+        return desktop_error(
+            "local_modified",
+            "本地修改阻断",
+            "当前 skill 目录存在本地修改，Metis 已停止自动覆盖。",
+            "先查看本地改动并决定保留或备份，再重新执行更新。",
+            message,
+        );
+    }
+
+    if lower.contains("security blocked") || lower.contains("security findings") {
+        return desktop_error(
+            "security_blocked",
+            "安全检查阻断",
+            "更新内容触发 High 风险安全检查，Metis 没有覆盖本地文件。",
+            "请人工检查 diff 和安全发现，确认可信后再考虑手动处理。",
+            message,
+        );
+    }
+
+    if lower.contains("sqlite") || lower.contains("database") || lower.contains("sql") {
+        return desktop_error(
+            "sqlite",
+            "本地数据库错误",
+            "Metis 无法读取或写入本地 SQLite 索引。",
+            "确认应用数据目录可写，必要时备份后重启应用再试。",
+            message,
+        );
+    }
+
+    if lower.contains("no such file or directory")
+        || lower.contains("not a directory")
+        || lower.contains("path")
+        || lower.contains("不可读")
+        || lower.contains("不可写")
+    {
+        return desktop_error(
+            "path",
+            "本地路径错误",
+            "Metis 无法访问需要的本地路径。",
+            "确认 skill 目录、扫描路径或备份目录存在且当前用户有读写权限。",
+            message,
+        );
+    }
+
+    if lower.contains("source check failed")
+        || lower.contains("checkout failed")
+        || lower.contains("missing current commit")
+        || lower.contains("missing remote commit")
+        || lower.contains("no source")
+        || lower.contains("repo_path")
+    {
+        return desktop_error(
+            "git_source",
+            "Git source 错误",
+            "Metis 无法根据当前来源信息完成 Git 检查或 checkout。",
+            "检查 Git URL、ref、repo path 和本机 Git 是否可正常访问该仓库。",
+            message,
+        );
+    }
+
+    desktop_error(
+        "unknown",
+        "操作失败",
+        "桌面后端返回了暂未分类的错误。",
+        "请保留调试详情，并在重试前确认当前操作目标没有被其他进程占用。",
+        message,
+    )
+}
+
+fn desktop_error(
+    category: &str,
+    title: &str,
+    message: &str,
+    suggestion: &str,
+    debug_detail: &str,
+) -> DesktopError {
+    DesktopError {
+        category: category.to_string(),
+        title: title.to_string(),
+        message: message.to_string(),
+        suggestion: suggestion.to_string(),
+        debug_detail: Some(debug_detail.to_string()),
+    }
 }
 
 fn agent_name(agent_id: &str) -> &str {
@@ -809,7 +1050,8 @@ pub fn run() {
             get_skill_diff,
             apply_skill_update,
             list_skill_backups,
-            restore_skill_backup
+            restore_skill_backup,
+            export_environment_report
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1273,6 +1515,7 @@ description: {description}
         )
         .expect("update check should succeed");
 
+        drop(store);
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert_eq!(results.len(), 1);
@@ -1344,13 +1587,156 @@ description: {description}
         )
         .expect("update check should return status results");
 
+        drop(store);
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert_eq!(results[0].status, "CheckFailed");
         assert_eq!(
             results[0].failure_reason.as_deref(),
-            Some("认证失败：请检查该 source 的凭据引用、SSH agent 或 Git 访问权限。")
+            Some("无法访问该 Git source，请确认本机 Git 认证可以正常读取仓库。")
         );
+    }
+
+    #[test]
+    fn desktop_error_classifies_auth_failure_with_user_suggestion_and_debug_detail() {
+        let error = friendly_desktop_error(
+            "authentication failed: could not read Username for 'https://github.com'",
+        );
+
+        assert_eq!(error.category, "authentication");
+        assert_eq!(error.title, "认证失败");
+        assert_eq!(
+            error.message,
+            "无法访问该 Git source，请确认本机 Git 认证可以正常读取仓库。"
+        );
+        assert_eq!(
+            error.suggestion,
+            "检查仓库权限、SSH agent 或 Git credential helper；凭据引用只作为备注名保存，Metis 不会读取 Keychain/token。"
+        );
+        assert_eq!(
+            error.debug_detail.as_deref(),
+            Some("authentication failed: could not read Username for 'https://github.com'")
+        );
+    }
+
+    #[test]
+    fn desktop_error_classifies_common_phase3_failure_modes() {
+        let cases = [
+            (
+                "local modified",
+                "local_modified",
+                "本地修改阻断",
+                "当前 skill 目录存在本地修改，Metis 已停止自动覆盖。",
+            ),
+            (
+                "security blocked",
+                "security_blocked",
+                "安全检查阻断",
+                "更新内容触发 High 风险安全检查，Metis 没有覆盖本地文件。",
+            ),
+            (
+                "apply failed and rollback succeeded: permission denied",
+                "apply_rollback_succeeded",
+                "更新失败，已自动回滚",
+                "应用更新时发生错误，Metis 已恢复到更新前备份。",
+            ),
+            (
+                "apply failed and rollback failed: apply=no such file, rollback=permission denied",
+                "apply_rollback_failed",
+                "更新失败，自动回滚也失败",
+                "应用更新和自动回滚都没有完成，本地 skill 可能处于不完整状态。",
+            ),
+            (
+                "sqlite error: database is locked",
+                "sqlite",
+                "本地数据库错误",
+                "Metis 无法读取或写入本地 SQLite 索引。",
+            ),
+            (
+                "checkout failed: missing remote commit",
+                "git_source",
+                "Git source 错误",
+                "Metis 无法根据当前来源信息完成 Git 检查或 checkout。",
+            ),
+        ];
+
+        for (raw, category, title, message) in cases {
+            let error = friendly_desktop_error(raw);
+            assert_eq!(error.category, category);
+            assert_eq!(error.title, title);
+            assert_eq!(error.message, message);
+            assert_eq!(error.debug_detail.as_deref(), Some(raw));
+        }
+    }
+
+    #[test]
+    fn export_environment_report_summarizes_beta_state_without_credential_values() {
+        let workspace = temp_dir("environment-report");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let store = state.open_store().expect("store should open");
+        store
+            .upsert_source(&SourceRecord {
+                id: "source-trusted".to_string(),
+                source_type: "git".to_string(),
+                url: "file:///tmp/metis-trusted".to_string(),
+                repo_path: "skills/trusted".to_string(),
+                ref_: "main".to_string(),
+                current_commit: Some("aaa111".to_string()),
+                remote_commit: Some("bbb222".to_string()),
+                last_checked_at: Some("2026-06-20T10:00:00Z".to_string()),
+                trusted: true,
+                auto_update: true,
+                credential_ref: Some("secret-token".to_string()),
+                created_at: None,
+                updated_at: None,
+            })
+            .expect("source should insert");
+        store
+            .upsert_skill(&SkillRecord {
+                id: "trusted-skill".to_string(),
+                agent_id: "generic".to_string(),
+                name: "Trusted Skill".to_string(),
+                description: Some("Trusted beta skill".to_string()),
+                version: None,
+                author: None,
+                license: None,
+                tags: Vec::new(),
+                category: None,
+                install_path: workspace
+                    .join("skills/trusted-skill")
+                    .to_string_lossy()
+                    .to_string(),
+                scope: "custom".to_string(),
+                metadata_path: None,
+                metadata_status: "found".to_string(),
+                metadata_error: None,
+                source_id: Some("source-trusted".to_string()),
+                local_fingerprint: None,
+                local_modified: Some(false),
+                last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+            })
+            .expect("skill should insert");
+
+        let report =
+            export_environment_report_for_state(&state).expect("environment report should export");
+        let json = serde_json::to_string(&report).expect("report should serialize");
+
+        drop(store);
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(report.total_skills, 1);
+        assert_eq!(report.bound_sources, 1);
+        assert_eq!(report.trusted_sources, 1);
+        assert_eq!(report.auto_update_sources, 1);
+        assert_eq!(report.local_modified_skills, 0);
+        assert!(
+            report.skills[0]
+                .source
+                .as_ref()
+                .expect("source summary should exist")
+                .has_credential_ref
+        );
+        assert!(!json.contains("secret-token"));
     }
 
     #[test]
@@ -1430,6 +1816,7 @@ description: {description}
         let diff = get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
             .expect("diff should load");
 
+        drop(store);
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert_eq!(diff.current_commit, "aaa111");

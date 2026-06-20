@@ -8,9 +8,23 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 > 用户本机已经有很多 skills，如何让它们可见、可追踪、可更新、可回滚、可审计。
 
+## 下载 Beta
+
+最新 Beta：[`desktop-v0.1.0-beta.1`](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.1)
+
+| 系统 | 下载 |
+| --- | --- |
+| macOS | [`Metis_0.1.0_universal.dmg`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_universal.dmg) |
+| Windows | [`Metis_0.1.0_x64-setup.exe`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_x64-setup.exe) |
+| Linux deb | [`Metis_0.1.0_amd64.deb`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_amd64.deb) |
+| Linux AppImage | [`Metis_0.1.0_amd64.AppImage`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/Metis_0.1.0_amd64.AppImage) |
+| 校验文件 | [`SHA256SUMS`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.1/SHA256SUMS) |
+
+当前 Beta 包未做系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。完整发布页见 [GitHub Releases](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.1)。
+
 ## 当前阶段
 
-项目处于 **Phase 2 Desktop MVP 完成点**：Phase 1 的 Core Engine 本地管理闭环已经完成，桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板和凭据引用入口，并已完成 macOS 本机 `.dmg` 预览包验证。Windows/Linux 预览包由已准备好的 GitHub Actions workflow 承接到后续稳定化阶段实跑。
+项目处于 **Phase 3 Beta 稳定化完成点**：Phase 1 的 Core Engine 本地管理闭环、Phase 2 Desktop MVP 和 Phase 3 Beta 稳定化已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出和受控自动更新。macOS 本机 `.dmg` 预览包已验证；macOS/Windows/Linux 预览包已由 GitHub Actions workflow 实跑生成。
 
 ## 技术栈
 
@@ -18,7 +32,7 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 - **前端**：TypeScript
 - **核心引擎**：Rust（独立于 UI，可供 CLI 复用）
 - **数据库**：SQLite
-- **凭据存储**：系统 Keychain / Credential Manager
+- **凭据处理**：Metis 当前不存储凭据；Git 认证依赖系统 Git、SSH agent 或 Git credential helper
 - **版本管理**：Git
 - **分发**：macOS / Windows / Linux，通过 GitHub Releases
 
@@ -61,8 +75,10 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 - 更新前自动备份。
 - 更新失败自动回滚。
 - 支持查看更新 diff。
-- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称，真实凭据仍由本机 Git / SSH agent 或后续 Keychain 接入管理。
+- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称作为引用名/备注名，真实认证由本机 Git、SSH agent 或 Git credential helper 完成，Metis 不读取 Keychain 或 token。
 - 支持导出和导入团队 skill 清单。
+- 支持导出本机环境报告；报告只包含 skill/source/agent 摘要，不包含 token 或 `credential_ref` 值。
+- 支持受控自动更新：只处理用户同时标记为 trusted 和 auto update、且本地未修改的 source。
 
 ## 本地验证
 
@@ -74,7 +90,18 @@ cd apps/desktop && pnpm tauri build
 cd apps/desktop && pnpm tauri:build:mac-universal
 ```
 
-macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已准备好，可在进入默认分支后构建 macOS universal、Windows 和 Linux artifact。当前 Phase 2 不把 Windows/Linux artifact 实跑作为阻塞项，也不做代码签名、公证或自动发布 GitHub Release。
+macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已在 run `27862207405` 成功构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
+
+## 安装提示
+
+Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。首个 Beta tag 为 `desktop-v0.1.0-beta.1`。
+
+- macOS：下载 universal `.dmg`，挂载后拖拽或启动 Metis。当前包未签名和公证，首次启动可能需要右键打开，或到系统设置中允许打开。
+- Windows：下载 Windows installer。当前包未做 Authenticode 签名，SmartScreen 可能提示未知发布者，需要选择继续运行。
+- Linux：下载 `.deb` 或 `.AppImage`；AppImage 如无执行权限，可先执行 `chmod +x <file>.AppImage`。
+- 校验：Release 中的 `SHA256SUMS` 可用于核对下载文件完整性，macOS/Linux 可运行 `shasum -a 256 -c SHA256SUMS`。
+
+签名、公证和 Windows Authenticode 属于后续可选信任增强，不阻塞开源 Beta 通过 GitHub Releases 分发。
 
 ## 暂不进入 MVP
 
@@ -98,7 +125,7 @@ macOS 面向下载的首选预览包是 universal DMG，输出在 `target/univer
 - Desktop App：Tauri
 - UI：TypeScript 前端
 - Core Engine：Rust core，保持独立可复用
-- Storage：SQLite、lock 文件、系统 keychain、本地备份目录
+- Storage：SQLite、lock 文件、本地备份目录；当前不保存 token 或 secret
 - Git：支持公开仓库和私有仓库
 - Distribution：macOS、Windows、Linux，后续通过 GitHub Releases 发布
 
@@ -114,11 +141,13 @@ macOS 面向下载的首选预览包是 universal DMG，输出在 `target/univer
 - [docs/design/core-engine-api.md](docs/design/core-engine-api.md)：Core Engine API 接口规格。
 - [docs/design/adapter-interface.md](docs/design/adapter-interface.md)：Adapter trait 接口设计。
 - [docs/design/database-schema.md](docs/design/database-schema.md)：SQLite 数据库 Schema 设计。
+- [docs/design/phase3-stabilization-plan.md](docs/design/phase3-stabilization-plan.md)：Phase 3 Beta 稳定化计划。
+- [docs/beta-release-checklist.md](docs/beta-release-checklist.md)：Beta 发布工程检查清单。
 
 ## 项目原则
 
 - 本地优先：默认不依赖云端账号或远程服务。
-- 安全优先：默认只检测更新，不自动更新。
+- 安全优先：默认只检测更新；受控自动更新只允许 trusted source，并继续执行安全检查。
 - 来源透明：每个可管理 skill 都应能追踪来源和版本。
 - 可回滚：任何覆盖式更新都必须先备份。
 - 适配器化：每个 Agent 运行时通过独立 adapter 接入。

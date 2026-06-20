@@ -157,9 +157,9 @@ impl SkillIndexStore {
                 metadata_path = excluded.metadata_path,
                 metadata_status = excluded.metadata_status,
                 metadata_error = excluded.metadata_error,
-                source_id = excluded.source_id,
-                local_fingerprint = excluded.local_fingerprint,
-                local_modified = excluded.local_modified,
+                source_id = COALESCE(excluded.source_id, source_id),
+                local_fingerprint = COALESCE(excluded.local_fingerprint, local_fingerprint),
+                local_modified = COALESCE(excluded.local_modified, local_modified),
                 last_scanned_at = excluded.last_scanned_at,
                 updated_at = datetime('now')
             ",
@@ -290,6 +290,17 @@ impl SkillIndexStore {
             )
             .optional()
             .map_err(StorageError::from)
+    }
+
+    pub fn delete_skill(&self, skill_id: &str) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            DELETE FROM skills
+            WHERE id = ?1
+            ",
+            params![skill_id],
+        )?;
+        Ok(())
     }
 
     pub fn upsert_source(&self, source: &SourceRecord) -> Result<(), StorageError> {

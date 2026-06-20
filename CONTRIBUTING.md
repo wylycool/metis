@@ -24,7 +24,6 @@ metis/
     security/              # 静态安全检查
   apps/
     desktop/               # Tauri 桌面应用 (Phase 2)
-  tests/                   # 集成测试
 ```
 
 ## 行为准则
@@ -78,6 +77,7 @@ metis/
 7. **编写测试**：
    - Core Engine 的改动必须有单元测试
    - 新增 adapter 必须覆盖路径发现和元数据解析
+   - 桌面交互改动必须覆盖 `cd apps/desktop && pnpm test:e2e`
 8. **确保测试通过**：`cargo test`
 9. **提交 Pull Request**：
    - 清楚描述改动内容和原因
@@ -131,6 +131,8 @@ pnpm tauri dev
 - **单元测试**：每个 crate 内的单元测试。
 - **集成测试**：Core Engine + Adapter + Storage 的集成测试。
 - **端到端测试**：模拟真实 skill 安装、更新、回滚流程（Phase 2+）。
+- **GUI Harness**：桌面主链路和错误路径通过 `apps/desktop/src/App.e2e.test.tsx` 覆盖。
+- **发布验证**：预览包和安装 smoke 参见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
 
 CI 会对每个 PR 运行：
 - `cargo test`
