@@ -15,6 +15,7 @@ import type {
   DesktopSource,
   DesktopAuditLogExportRequest,
   DesktopTeamComplianceReportExportRequest,
+  DesktopTeamPolicyAuditReport,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceRequest,
   DesktopTeamPolicySummary,
@@ -44,6 +45,10 @@ export function saveDesktopSettings(settings: DesktopSettings): Promise<DesktopS
 
 export function getTeamPolicySummary(): Promise<DesktopTeamPolicySummary | null> {
   return invoke("get_team_policy_summary");
+}
+
+export function getTeamPolicyAuditReport(): Promise<DesktopTeamPolicyAuditReport> {
+  return invoke("get_team_policy_audit_report");
 }
 
 export function bindSkillSource(

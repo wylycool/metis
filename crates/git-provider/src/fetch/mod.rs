@@ -60,24 +60,54 @@ pub struct SystemGitRunner;
 
 impl GitCommandRunner for SystemGitRunner {
     fn run_git(&self, args: &[&str]) -> Result<GitCommandOutput, GitProviderError> {
-        let output = Command::new("git").args(args).output().map_err(|error| {
-            GitProviderError::GitUnavailable {
-                reason: error.to_string(),
-            }
+        run_system_git(args, &[])
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct EnvironmentGitRunner {
+    environment: Vec<(String, String)>,
+}
+
+impl EnvironmentGitRunner {
+    pub fn new(environment: Vec<(String, String)>) -> Self {
+        Self { environment }
+    }
+
+    pub fn environment(&self) -> &[(String, String)] {
+        &self.environment
+    }
+}
+
+impl GitCommandRunner for EnvironmentGitRunner {
+    fn run_git(&self, args: &[&str]) -> Result<GitCommandOutput, GitProviderError> {
+        run_system_git(args, &self.environment)
+    }
+}
+
+fn run_system_git(
+    args: &[&str],
+    environment: &[(String, String)],
+) -> Result<GitCommandOutput, GitProviderError> {
+    let output = Command::new("git")
+        .args(args)
+        .envs(environment.iter().map(|(key, value)| (key, value)))
+        .output()
+        .map_err(|error| GitProviderError::GitUnavailable {
+            reason: error.to_string(),
         })?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-        if !output.status.success() {
-            return Err(GitProviderError::CommandFailed {
-                command: format!("git {}", args.join(" ")),
-                stderr,
-            });
-        }
-
-        Ok(GitCommandOutput { stdout, stderr })
+    if !output.status.success() {
+        return Err(GitProviderError::CommandFailed {
+            command: format!("git {}", args.join(" ")),
+            stderr,
+        });
     }
+
+    Ok(GitCommandOutput { stdout, stderr })
 }
 
 #[derive(Debug, Clone)]

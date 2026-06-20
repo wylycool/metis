@@ -228,6 +228,63 @@ describe("Metis desktop GUI main flow", () => {
       }),
     });
   });
+
+  test("phase4 policy audit reports existing source recommendations", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByText("设置"));
+    await user.type(screen.getByTestId("team-policy-path"), "/tmp/team-policy.json");
+    await user.click(screen.getByText("保存"));
+    expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
+    await user.click(screen.getByTestId("run-team-policy-audit"));
+
+    expect(await screen.findByText("策略审计已生成")).toBeTruthy();
+    expect(screen.getByText("已绑定来源 3 个")).toBeTruthy();
+    expect(screen.getByText("合规 1 个")).toBeTruthy();
+    expect(screen.getByText("建议标记 trusted 1 个")).toBeTruthy();
+    expect(screen.getByText("需关闭 auto update 1 个")).toBeTruthy();
+    expect(screen.getByText("Needs Trusted")).toBeTruthy();
+    expect(screen.getByText("should_mark_trusted")).toBeTruthy();
+    expect(screen.getByText("Untrusted Auto")).toBeTruthy();
+    expect(screen.getByText("auto_update_disallowed")).toBeTruthy();
+    expect(screen.queryByText("secret-token")).toBeNull();
+  });
+
+  test("phase4 enterprise network settings save proxy and certificate paths", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByText("设置"));
+    await user.type(
+      screen.getByTestId("enterprise-proxy-url"),
+      "http://proxy.corp.example:8080",
+    );
+    await user.type(
+      screen.getByTestId("enterprise-no-proxy"),
+      "localhost,127.0.0.1,.corp.example",
+    );
+    await user.type(
+      screen.getByTestId("enterprise-ca-bundle-path"),
+      "/Users/me/certs/corp-ca.pem",
+    );
+    await user.click(screen.getByText("保存"));
+
+    expect(await screen.findByText("扫描路径已保存")).toBeTruthy();
+    expect(screen.getByText("已配置企业代理")).toBeTruthy();
+    expect(screen.getByText("已配置企业 CA bundle")).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith("save_desktop_settings", {
+      settings: expect.objectContaining({
+        enterprise_network: {
+          proxy_url: "http://proxy.corp.example:8080",
+          no_proxy: "localhost,127.0.0.1,.corp.example",
+          certificate_authority_bundle_path: "/Users/me/certs/corp-ca.pem",
+        },
+      }),
+    });
+  });
 });
 
 describe("Metis desktop GUI error paths", () => {
@@ -379,6 +436,58 @@ function createMainFlowScenario() {
                 require_trusted_source: true,
               }
             : null;
+        case "get_team_policy_audit_report":
+          return {
+            generated_at: "2026-06-20T11:00:00Z",
+            total_bound_sources: 3,
+            compliant: 1,
+            should_mark_trusted: 1,
+            auto_update_disallowed: 1,
+            items: [
+              {
+                skill_id: "skill-compliant",
+                skill_name: "Compliant",
+                source_id: "source-compliant",
+                source_url: "https://github.com/example/team.git",
+                source_repo_path: "skills/compliant",
+                source_ref: "main",
+                current_trusted: true,
+                current_auto_update: true,
+                policy_trusted: true,
+                auto_update_allowed: true,
+                status: "compliant",
+                recommendation: "当前 source 与团队策略一致。",
+              },
+              {
+                skill_id: "skill-needs-trusted",
+                skill_name: "Needs Trusted",
+                source_id: "source-needs-trusted",
+                source_url: "https://github.com/example/team.git",
+                source_repo_path: "skills/needs-trusted",
+                source_ref: "main",
+                current_trusted: false,
+                current_auto_update: true,
+                policy_trusted: true,
+                auto_update_allowed: true,
+                status: "should_mark_trusted",
+                recommendation: "该 source 命中团队 trusted source，建议标记为 trusted。",
+              },
+              {
+                skill_id: "skill-untrusted-auto",
+                skill_name: "Untrusted Auto",
+                source_id: "source-untrusted-auto",
+                source_url: "https://github.com/example/personal.git",
+                source_repo_path: "skills/untrusted",
+                source_ref: "main",
+                current_trusted: false,
+                current_auto_update: true,
+                policy_trusted: false,
+                auto_update_allowed: false,
+                status: "auto_update_disallowed",
+                recommendation: "关闭 auto update，或将该 source 加入团队 trusted_sources。",
+              },
+            ],
+          };
         case "scan_skills":
           indexedSkills = [skill];
           return { skills: [skill], warnings: [] };

@@ -234,6 +234,11 @@ h1 {
   align-items: center;
 }
 
+.network-field-grid {
+  display: grid;
+  gap: 8px;
+}
+
 .environment-report-preview {
   grid-column: 1 / -1;
   max-height: 260px;
@@ -461,6 +466,34 @@ h1 {
   background: rgba(16, 18, 22, 0.68);
   font-size: 12px;
   font-weight: 700;
+}
+
+.policy-audit-result {
+  display: grid;
+  gap: 10px;
+}
+
+.policy-audit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.policy-audit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #323b45;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(16, 18, 22, 0.62);
+}
+
+.policy-recommendation {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .credential-note code {
@@ -1100,6 +1133,7 @@ h1 {
   .source-form,
   .settings-panel,
   .team-compliance-row,
+  .policy-audit-row,
   .backup-row {
     grid-template-columns: 1fr;
   }

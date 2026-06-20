@@ -48,6 +48,13 @@ export interface DesktopSource {
 export interface DesktopSettings {
   custom_scan_paths: string[];
   team_policy_path?: string | null;
+  enterprise_network?: DesktopEnterpriseNetworkSettings | null;
+}
+
+export interface DesktopEnterpriseNetworkSettings {
+  proxy_url?: string | null;
+  no_proxy?: string | null;
+  certificate_authority_bundle_path?: string | null;
 }
 
 export interface DesktopBindSourceRequest {
@@ -190,6 +197,30 @@ export interface DesktopTeamPolicySummary {
   trusted_sources: number;
   allow_auto_update: boolean;
   require_trusted_source: boolean;
+}
+
+export interface DesktopTeamPolicyAuditReport {
+  generated_at: string;
+  total_bound_sources: number;
+  compliant: number;
+  should_mark_trusted: number;
+  auto_update_disallowed: number;
+  items: DesktopTeamPolicyAuditItem[];
+}
+
+export interface DesktopTeamPolicyAuditItem {
+  skill_id: string;
+  skill_name: string;
+  source_id: string;
+  source_url: string;
+  source_repo_path: string;
+  source_ref: string;
+  current_trusted: boolean;
+  current_auto_update: boolean;
+  policy_trusted: boolean;
+  auto_update_allowed: boolean;
+  status: string;
+  recommendation: string;
 }
 
 export interface DesktopTeamManifestComplianceRequest {

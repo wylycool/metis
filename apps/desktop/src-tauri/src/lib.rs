@@ -31,7 +31,7 @@ use metis_core::update::{
     DiffDetail as CoreDiffDetail, DiffStatus as CoreDiffStatus, DiffSummary, RemoteCommitChecker,
     UpdateCheckOptions, UpdateCheckResult, UpdateStatus,
 };
-use metis_git_provider::fetch::SystemGitCliProvider;
+use metis_git_provider::fetch::{EnvironmentGitRunner, GitCliProvider};
 use metis_security::findings::{SecurityFinding, SecuritySeverity};
 use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
 use serde::{Deserialize, Serialize};
@@ -165,6 +165,18 @@ pub struct DesktopSettings {
     pub custom_scan_paths: Vec<String>,
     #[serde(default)]
     pub team_policy_path: Option<String>,
+    #[serde(default)]
+    pub enterprise_network: DesktopEnterpriseNetworkSettings,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopEnterpriseNetworkSettings {
+    #[serde(default)]
+    pub proxy_url: Option<String>,
+    #[serde(default)]
+    pub no_proxy: Option<String>,
+    #[serde(default)]
+    pub certificate_authority_bundle_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -358,6 +370,32 @@ pub struct DesktopTeamPolicySummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamPolicyAuditReport {
+    pub generated_at: String,
+    pub total_bound_sources: usize,
+    pub compliant: usize,
+    pub should_mark_trusted: usize,
+    pub auto_update_disallowed: usize,
+    pub items: Vec<DesktopTeamPolicyAuditItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopTeamPolicyAuditItem {
+    pub skill_id: String,
+    pub skill_name: String,
+    pub source_id: String,
+    pub source_url: String,
+    pub source_repo_path: String,
+    pub source_ref: String,
+    pub current_trusted: bool,
+    pub current_auto_update: bool,
+    pub policy_trusted: bool,
+    pub auto_update_allowed: bool,
+    pub status: String,
+    pub recommendation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopFileExportResult {
     pub output_path: String,
     pub bytes_written: u64,
@@ -471,6 +509,7 @@ pub fn save_desktop_settings_for_state(
     let normalized = DesktopSettings {
         custom_scan_paths: normalize_paths(settings.custom_scan_paths),
         team_policy_path: normalize_optional_text(settings.team_policy_path),
+        enterprise_network: normalize_enterprise_network_settings(settings.enterprise_network),
     };
     let contents = serde_json::to_string_pretty(&normalized).map_err(|error| error.to_string())?;
     fs::write(state.settings_path(), contents).map_err(|error| error.to_string())?;
@@ -505,6 +544,60 @@ pub fn get_team_policy_summary_for_state(
     state: &DesktopAppState,
 ) -> Result<Option<DesktopTeamPolicySummary>, String> {
     Ok(load_team_policy_for_state(state)?.map(desktop_team_policy_summary))
+}
+
+pub fn get_team_policy_audit_report_for_state(
+    state: &DesktopAppState,
+) -> Result<DesktopTeamPolicyAuditReport, String> {
+    let policy = load_team_policy_for_state(state)?;
+    let store = state.open_store()?;
+    let skills = store.list_skills().map_err(|error| error.to_string())?;
+    let mut items = Vec::new();
+
+    for skill in skills {
+        let Some(source_id) = skill.source_id.as_deref() else {
+            continue;
+        };
+        let Some(source) = store
+            .get_source(source_id)
+            .map_err(|error| error.to_string())?
+        else {
+            continue;
+        };
+        let evaluation = policy
+            .as_ref()
+            .map(|policy| {
+                evaluate_source_policy(policy, &source.url, &source.repo_path, &source.ref_)
+            })
+            .unwrap_or(metis_core::config::SourcePolicyEvaluation {
+                trusted: false,
+                auto_update_allowed: false,
+                matched_source_url: None,
+            });
+        items.push(desktop_team_policy_audit_item(skill, source, evaluation));
+    }
+
+    let compliant = items
+        .iter()
+        .filter(|item| item.status == "compliant")
+        .count();
+    let should_mark_trusted = items
+        .iter()
+        .filter(|item| item.status == "should_mark_trusted")
+        .count();
+    let auto_update_disallowed = items
+        .iter()
+        .filter(|item| item.status == "auto_update_disallowed")
+        .count();
+
+    Ok(DesktopTeamPolicyAuditReport {
+        generated_at: current_timestamp_string(),
+        total_bound_sources: items.len(),
+        compliant,
+        should_mark_trusted,
+        auto_update_disallowed,
+        items,
+    })
 }
 
 fn apply_team_policy_to_bind_request(
@@ -809,6 +902,13 @@ fn get_team_policy_summary(
 }
 
 #[tauri::command]
+fn get_team_policy_audit_report(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopTeamPolicyAuditReport, String> {
+    get_team_policy_audit_report_for_state(&state)
+}
+
+#[tauri::command]
 fn bind_skill_source(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopBindSourceRequest,
@@ -829,7 +929,7 @@ fn check_skill_updates(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopUpdateCheckRequest,
 ) -> Result<Vec<DesktopUpdateCheckResult>, String> {
-    let checker = system_git_checker_for_state(&state);
+    let checker = system_git_checker_for_state(&state)?;
     check_skill_updates_for_state_with_checker(&state, request, &checker)
 }
 
@@ -838,7 +938,7 @@ fn get_skill_diff(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopDiffDetail, String> {
-    let checker = system_git_checker_for_state(&state);
+    let checker = system_git_checker_for_state(&state)?;
     get_skill_diff_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -847,7 +947,7 @@ fn apply_skill_update(
     state: tauri::State<'_, DesktopAppState>,
     skill_id: String,
 ) -> Result<DesktopApplyUpdateResult, String> {
-    let checker = system_git_checker_for_state(&state);
+    let checker = system_git_checker_for_state(&state)?;
     apply_skill_update_for_state_with_checker(&state, skill_id, &checker)
 }
 
@@ -934,11 +1034,14 @@ fn desktop_scan_response(
     })
 }
 
-fn system_git_checker_for_state(state: &DesktopAppState) -> SystemGitCliProvider {
-    SystemGitCliProvider::with_cache_root(
-        metis_git_provider::fetch::SystemGitRunner,
+fn system_git_checker_for_state(
+    state: &DesktopAppState,
+) -> Result<GitCliProvider<EnvironmentGitRunner>, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    Ok(GitCliProvider::with_cache_root(
+        EnvironmentGitRunner::new(git_environment_for_settings(&settings)),
         state.cache_root().to_string_lossy().to_string(),
-    )
+    ))
 }
 
 fn normalize_paths(paths: Vec<String>) -> Vec<String> {
@@ -951,6 +1054,37 @@ fn normalize_paths(paths: Vec<String>) -> Vec<String> {
         normalized.push(trimmed.to_string());
     }
     normalized
+}
+
+fn normalize_enterprise_network_settings(
+    settings: DesktopEnterpriseNetworkSettings,
+) -> DesktopEnterpriseNetworkSettings {
+    DesktopEnterpriseNetworkSettings {
+        proxy_url: normalize_optional_text(settings.proxy_url),
+        no_proxy: normalize_optional_text(settings.no_proxy),
+        certificate_authority_bundle_path: normalize_optional_text(
+            settings.certificate_authority_bundle_path,
+        ),
+    }
+}
+
+fn git_environment_for_settings(settings: &DesktopSettings) -> Vec<(String, String)> {
+    let mut environment = Vec::new();
+    if let Some(proxy_url) = settings.enterprise_network.proxy_url.as_ref() {
+        environment.push(("HTTPS_PROXY".to_string(), proxy_url.clone()));
+        environment.push(("HTTP_PROXY".to_string(), proxy_url.clone()));
+    }
+    if let Some(no_proxy) = settings.enterprise_network.no_proxy.as_ref() {
+        environment.push(("NO_PROXY".to_string(), no_proxy.clone()));
+    }
+    if let Some(ca_bundle_path) = settings
+        .enterprise_network
+        .certificate_authority_bundle_path
+        .as_ref()
+    {
+        environment.push(("GIT_SSL_CAINFO".to_string(), ca_bundle_path.clone()));
+    }
+    environment
 }
 
 fn list_indexed_skills_from_store(store: &SkillIndexStore) -> Result<Vec<DesktopSkill>, String> {
@@ -1078,6 +1212,41 @@ fn desktop_team_policy_summary(policy: CoreTeamPolicy) -> DesktopTeamPolicySumma
         trusted_sources: policy.trusted_sources.len(),
         allow_auto_update: policy.update_policy.allow_auto_update,
         require_trusted_source: policy.update_policy.require_trusted_source,
+    }
+}
+
+fn desktop_team_policy_audit_item(
+    skill: SkillRecord,
+    source: SourceRecord,
+    evaluation: metis_core::config::SourcePolicyEvaluation,
+) -> DesktopTeamPolicyAuditItem {
+    let (status, recommendation) = if source.auto_update && !evaluation.auto_update_allowed {
+        (
+            "auto_update_disallowed",
+            "关闭 auto update，或将该 source 加入团队 trusted_sources。",
+        )
+    } else if evaluation.trusted && !source.trusted {
+        (
+            "should_mark_trusted",
+            "该 source 命中团队 trusted source，建议标记为 trusted。",
+        )
+    } else {
+        ("compliant", "当前 source 与团队策略一致。")
+    };
+
+    DesktopTeamPolicyAuditItem {
+        skill_id: skill.id,
+        skill_name: skill.name,
+        source_id: source.id,
+        source_url: source.url,
+        source_repo_path: source.repo_path,
+        source_ref: source.ref_,
+        current_trusted: source.trusted,
+        current_auto_update: source.auto_update,
+        policy_trusted: evaluation.trusted,
+        auto_update_allowed: evaluation.auto_update_allowed,
+        status: status.to_string(),
+        recommendation: recommendation.to_string(),
     }
 }
 
@@ -1383,6 +1552,7 @@ pub fn run() {
             get_desktop_settings,
             save_desktop_settings,
             get_team_policy_summary,
+            get_team_policy_audit_report,
             bind_skill_source,
             unbind_skill_source,
             check_skill_updates,
@@ -1630,6 +1800,7 @@ description: {description}
             DesktopSettings {
                 custom_scan_paths: vec![custom_root.to_string_lossy().to_string()],
                 team_policy_path: None,
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");
@@ -1665,6 +1836,7 @@ description: {description}
                     "/tmp/metis/other".to_string(),
                 ],
                 team_policy_path: Some("  /tmp/metis/team-policy.json  ".to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");
@@ -1681,6 +1853,68 @@ description: {description}
         assert_eq!(
             loaded.team_policy_path.as_deref(),
             Some("/tmp/metis/team-policy.json")
+        );
+    }
+
+    #[test]
+    fn enterprise_network_settings_normalize_and_build_git_environment() {
+        let workspace = temp_dir("enterprise-network-settings");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+
+        let saved = save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: None,
+                enterprise_network: DesktopEnterpriseNetworkSettings {
+                    proxy_url: Some("  http://proxy.corp.example:8080  ".to_string()),
+                    no_proxy: Some("  localhost,127.0.0.1,.corp.example  ".to_string()),
+                    certificate_authority_bundle_path: Some(
+                        "  /Users/me/certs/corp-ca.pem  ".to_string(),
+                    ),
+                },
+            },
+        )
+        .expect("settings should save");
+        let environment = git_environment_for_settings(&saved);
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(
+            saved.enterprise_network.proxy_url.as_deref(),
+            Some("http://proxy.corp.example:8080")
+        );
+        assert_eq!(
+            saved.enterprise_network.no_proxy.as_deref(),
+            Some("localhost,127.0.0.1,.corp.example")
+        );
+        assert_eq!(
+            saved
+                .enterprise_network
+                .certificate_authority_bundle_path
+                .as_deref(),
+            Some("/Users/me/certs/corp-ca.pem")
+        );
+        assert_eq!(
+            environment,
+            vec![
+                (
+                    "HTTPS_PROXY".to_string(),
+                    "http://proxy.corp.example:8080".to_string()
+                ),
+                (
+                    "HTTP_PROXY".to_string(),
+                    "http://proxy.corp.example:8080".to_string()
+                ),
+                (
+                    "NO_PROXY".to_string(),
+                    "localhost,127.0.0.1,.corp.example".to_string()
+                ),
+                (
+                    "GIT_SSL_CAINFO".to_string(),
+                    "/Users/me/certs/corp-ca.pem".to_string()
+                ),
+            ]
         );
     }
 
@@ -1714,6 +1948,7 @@ description: {description}
             DesktopSettings {
                 custom_scan_paths: Vec::new(),
                 team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");
@@ -1764,6 +1999,7 @@ description: {description}
             DesktopSettings {
                 custom_scan_paths: Vec::new(),
                 team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");
@@ -1826,6 +2062,139 @@ description: {description}
     }
 
     #[test]
+    fn policy_audit_reports_existing_source_recommendations_without_mutating_sources() {
+        let workspace = temp_dir("policy-audit");
+        let policy_path = workspace.join("policy/team-policy.json");
+        fs::create_dir_all(policy_path.parent().expect("policy should have parent"))
+            .expect("policy parent should be created");
+        fs::write(
+            &policy_path,
+            r#"{
+                "version": "1",
+                "trusted_sources": [
+                    {"url": "https://github.com/example/team.git", "repo_path": "skills/compliant", "ref": "main"},
+                    {"url": "https://github.com/example/team.git", "repo_path": "skills/needs-trusted", "ref": "main"}
+                ],
+                "update_policy": {
+                    "allow_auto_update": true,
+                    "require_trusted_source": true
+                }
+            }"#,
+        )
+        .expect("policy should write");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_scan_paths: Vec::new(),
+                team_policy_path: Some(policy_path.to_string_lossy().to_string()),
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+            },
+        )
+        .expect("settings should save");
+        let store = state.open_store().expect("store should open");
+        for (skill_id, name, source_id, repo_path, trusted, auto_update) in [
+            (
+                "skill-compliant",
+                "Compliant",
+                "source-compliant",
+                "skills/compliant",
+                true,
+                true,
+            ),
+            (
+                "skill-needs-trusted",
+                "Needs Trusted",
+                "source-needs-trusted",
+                "skills/needs-trusted",
+                false,
+                true,
+            ),
+            (
+                "skill-untrusted-auto",
+                "Untrusted Auto",
+                "source-untrusted-auto",
+                "skills/untrusted",
+                false,
+                true,
+            ),
+        ] {
+            store
+                .upsert_source(&SourceRecord {
+                    id: source_id.to_string(),
+                    source_type: "git".to_string(),
+                    url: if repo_path == "skills/untrusted" {
+                        "https://github.com/example/personal.git".to_string()
+                    } else {
+                        "https://github.com/example/team.git".to_string()
+                    },
+                    repo_path: repo_path.to_string(),
+                    ref_: "main".to_string(),
+                    current_commit: Some("aaa111".to_string()),
+                    remote_commit: Some("bbb222".to_string()),
+                    last_checked_at: Some("2026-06-20T10:00:00Z".to_string()),
+                    trusted,
+                    auto_update,
+                    credential_ref: Some("secret-token".to_string()),
+                    created_at: None,
+                    updated_at: None,
+                })
+                .expect("source should insert");
+            store
+                .upsert_skill(&SkillRecord {
+                    id: skill_id.to_string(),
+                    agent_id: "generic".to_string(),
+                    name: name.to_string(),
+                    description: Some("Policy audit skill".to_string()),
+                    version: None,
+                    author: None,
+                    license: None,
+                    tags: Vec::new(),
+                    category: None,
+                    install_path: workspace
+                        .join(format!("skills/{skill_id}"))
+                        .to_string_lossy()
+                        .to_string(),
+                    scope: "custom".to_string(),
+                    metadata_path: None,
+                    metadata_status: "found".to_string(),
+                    metadata_error: None,
+                    source_id: Some(source_id.to_string()),
+                    local_fingerprint: None,
+                    local_modified: Some(false),
+                    last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+                })
+                .expect("skill should insert");
+        }
+
+        let report =
+            get_team_policy_audit_report_for_state(&state).expect("policy audit should load");
+        let json = serde_json::to_string(&report).expect("report should serialize");
+        let sources = store.list_sources().expect("sources should remain");
+
+        drop(store);
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(report.total_bound_sources, 3);
+        assert_eq!(report.compliant, 1);
+        assert_eq!(report.should_mark_trusted, 1);
+        assert_eq!(report.auto_update_disallowed, 1);
+        assert!(report.items.iter().any(|item| item.status == "compliant"));
+        assert!(report
+            .items
+            .iter()
+            .any(|item| item.status == "should_mark_trusted"));
+        assert!(report
+            .items
+            .iter()
+            .any(|item| item.status == "auto_update_disallowed"));
+        assert!(sources.iter().any(|source| {
+            source.id == "source-needs-trusted" && !source.trusted && source.auto_update
+        }));
+        assert!(!json.contains("secret-token"));
+    }
+
+    #[test]
     fn scan_skills_for_state_uses_saved_custom_scan_paths() {
         let workspace = temp_dir("settings-scan");
         let skill_root = workspace.join("custom-skills");
@@ -1837,6 +2206,7 @@ description: {description}
             DesktopSettings {
                 custom_scan_paths: vec![skill_root.to_string_lossy().to_string()],
                 team_policy_path: None,
+                enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
         )
         .expect("settings should save");

@@ -10,6 +10,7 @@ import {
   exportTeamComplianceReportToFile,
   getSkillDiff,
   getDesktopSettings,
+  getTeamPolicyAuditReport,
   getTeamPolicySummary,
   listSkillBackups,
   listAgents,
@@ -31,6 +32,8 @@ import type {
   DesktopSkill,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceItem,
+  DesktopTeamPolicyAuditReport,
+  DesktopTeamPolicyAuditItem,
   DesktopTeamPolicySummary,
   DesktopUpdateCheckResult,
   LoadState,
@@ -59,12 +62,18 @@ function App() {
   const [settings, setSettings] = useState<DesktopSettings>({
     custom_scan_paths: [],
     team_policy_path: null,
+    enterprise_network: emptyEnterpriseNetworkSettings(),
   });
   const [settingsDraft, setSettingsDraft] = useState("");
   const [teamPolicyPathDraft, setTeamPolicyPathDraft] = useState("");
+  const [enterpriseProxyUrlDraft, setEnterpriseProxyUrlDraft] = useState("");
+  const [enterpriseNoProxyDraft, setEnterpriseNoProxyDraft] = useState("");
+  const [enterpriseCaBundlePathDraft, setEnterpriseCaBundlePathDraft] = useState("");
   const [teamPolicySummary, setTeamPolicySummary] = useState<DesktopTeamPolicySummary | null>(
     null,
   );
+  const [teamPolicyAuditReport, setTeamPolicyAuditReport] =
+    useState<DesktopTeamPolicyAuditReport | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
@@ -125,6 +134,7 @@ function App() {
       setSettings(settingsResult);
       setSettingsDraft(settingsResult.custom_scan_paths.join("\n"));
       setTeamPolicyPathDraft(settingsResult.team_policy_path ?? "");
+      syncEnterpriseNetworkDrafts(settingsResult);
 
       if (indexedResult.length > 0) {
         setSkills(indexedResult);
@@ -141,6 +151,25 @@ function App() {
       setError(desktopError(caught));
       setState("error");
     }
+  }
+
+  function settingsRequestFromDrafts(): DesktopSettings {
+    return {
+      custom_scan_paths: settingsDraft.split("\n"),
+      team_policy_path: teamPolicyPathDraft.trim() || null,
+      enterprise_network: {
+        proxy_url: enterpriseProxyUrlDraft.trim() || null,
+        no_proxy: enterpriseNoProxyDraft.trim() || null,
+        certificate_authority_bundle_path: enterpriseCaBundlePathDraft.trim() || null,
+      },
+    };
+  }
+
+  function syncEnterpriseNetworkDrafts(nextSettings: DesktopSettings) {
+    const network = nextSettings.enterprise_network ?? emptyEnterpriseNetworkSettings();
+    setEnterpriseProxyUrlDraft(network.proxy_url ?? "");
+    setEnterpriseNoProxyDraft(network.no_proxy ?? "");
+    setEnterpriseCaBundlePathDraft(network.certificate_authority_bundle_path ?? "");
   }
 
   async function handleScan() {
@@ -174,13 +203,14 @@ function App() {
 
     try {
       const saved = await saveDesktopSettings({
-        custom_scan_paths: settingsDraft.split("\n"),
-        team_policy_path: teamPolicyPathDraft.trim() || null,
+        ...settingsRequestFromDrafts(),
       });
       setSettings(saved);
       setSettingsDraft(saved.custom_scan_paths.join("\n"));
       setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+      syncEnterpriseNetworkDrafts(saved);
       setTeamPolicySummary(null);
+      setTeamPolicyAuditReport(null);
       setActionMessage("扫描路径已保存");
       if (scanAfterSave) {
         await handleScan();
@@ -197,7 +227,7 @@ function App() {
   function removeCustomPath(path: string) {
     const nextPaths = settings.custom_scan_paths.filter((item) => item !== path);
     const nextDraft = nextPaths.join("\n");
-    setSettings({ custom_scan_paths: nextPaths });
+    setSettings({ ...settings, custom_scan_paths: nextPaths });
     setSettingsDraft(nextDraft);
   }
 
@@ -222,16 +252,42 @@ function App() {
     try {
       if (teamPolicyPathDraft.trim() !== (settings.team_policy_path ?? "")) {
         const saved = await saveDesktopSettings({
-          custom_scan_paths: settingsDraft.split("\n"),
-          team_policy_path: teamPolicyPathDraft.trim() || null,
+          ...settingsRequestFromDrafts(),
         });
         setSettings(saved);
         setSettingsDraft(saved.custom_scan_paths.join("\n"));
         setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+        syncEnterpriseNetworkDrafts(saved);
       }
       const summary = await getTeamPolicySummary();
       setTeamPolicySummary(summary);
+      setTeamPolicyAuditReport(null);
       setActionMessage(summary ? "团队策略已载入" : "未配置团队策略文件");
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleRunTeamPolicyAudit() {
+    setActionBusy("team-policy-audit");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      if (teamPolicyPathDraft.trim() !== (settings.team_policy_path ?? "")) {
+        const saved = await saveDesktopSettings({
+          ...settingsRequestFromDrafts(),
+        });
+        setSettings(saved);
+        setSettingsDraft(saved.custom_scan_paths.join("\n"));
+        setTeamPolicyPathDraft(saved.team_policy_path ?? "");
+        syncEnterpriseNetworkDrafts(saved);
+      }
+      const report = await getTeamPolicyAuditReport();
+      setTeamPolicyAuditReport(report);
+      setActionMessage("策略审计已生成");
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -856,6 +912,12 @@ function App() {
         <div className="settings-summary">
           <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
           <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
+          <span>{settings.enterprise_network?.proxy_url ? "已配置企业代理" : "未配置企业代理"}</span>
+          <span>
+            {settings.enterprise_network?.certificate_authority_bundle_path
+              ? "已配置企业 CA bundle"
+              : "未配置企业 CA bundle"}
+          </span>
           <span>凭据使用本机 Git / SSH 配置</span>
         </div>
         {settingsOpen && (
@@ -927,6 +989,16 @@ function App() {
                 >
                   {actionBusy === "team-policy" ? "读取中" : "预览策略"}
                 </button>
+                <button
+                  className="ghost-button compact"
+                  data-testid="run-team-policy-audit"
+                  disabled={
+                    actionBusy === "team-policy-audit" || teamPolicyPathDraft.trim().length === 0
+                  }
+                  onClick={handleRunTeamPolicyAudit}
+                >
+                  {actionBusy === "team-policy-audit" ? "审计中" : "审计现有来源"}
+                </button>
               </div>
               {teamPolicySummary && (
                 <div className="policy-summary">
@@ -942,6 +1014,60 @@ function App() {
                   </span>
                 </div>
               )}
+              {teamPolicyAuditReport && (
+                <div className="policy-audit-result">
+                  <div className="policy-summary">
+                    <span>已绑定来源 {teamPolicyAuditReport.total_bound_sources} 个</span>
+                    <span>合规 {teamPolicyAuditReport.compliant} 个</span>
+                    <span>建议标记 trusted {teamPolicyAuditReport.should_mark_trusted} 个</span>
+                    <span>需关闭 auto update {teamPolicyAuditReport.auto_update_disallowed} 个</span>
+                  </div>
+                  <div className="policy-audit-list">
+                    {teamPolicyAuditReport.items.map((item) => (
+                      <PolicyAuditRow key={`${item.skill_id}:${item.source_id}`} item={item} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="settings-section">
+              <div>
+                <h3>企业网络</h3>
+                <p>代理和企业 CA bundle 仅用于 Metis 发起的 Git 子进程。</p>
+              </div>
+              <div className="network-field-grid">
+                <input
+                  data-testid="enterprise-proxy-url"
+                  value={enterpriseProxyUrlDraft}
+                  placeholder="http://proxy.corp.example:8080"
+                  onChange={(event) => setEnterpriseProxyUrlDraft(event.target.value)}
+                />
+                <input
+                  data-testid="enterprise-no-proxy"
+                  value={enterpriseNoProxyDraft}
+                  placeholder="localhost,127.0.0.1,.corp.example"
+                  onChange={(event) => setEnterpriseNoProxyDraft(event.target.value)}
+                />
+                <input
+                  data-testid="enterprise-ca-bundle-path"
+                  value={enterpriseCaBundlePathDraft}
+                  placeholder="/Users/me/certs/corp-ca.pem"
+                  onChange={(event) => setEnterpriseCaBundlePathDraft(event.target.value)}
+                />
+              </div>
+              <div className="policy-summary">
+                <span>
+                  {settings.enterprise_network?.proxy_url ? "企业代理已配置" : "企业代理未配置"}
+                </span>
+                <span>
+                  {settings.enterprise_network?.no_proxy ? "NO_PROXY 已配置" : "NO_PROXY 未配置"}
+                </span>
+                <span>
+                  {settings.enterprise_network?.certificate_authority_bundle_path
+                    ? "企业 CA bundle 已配置"
+                    : "企业 CA bundle 未配置"}
+                </span>
+              </div>
             </div>
             <div className="settings-section credential-section">
               <div>
@@ -1068,6 +1194,30 @@ function TeamComplianceRow({ item }: { item: DesktopTeamManifestComplianceItem }
         </div>
       </div>
       <span className={`status-badge ${teamComplianceTone(item.status)}`}>{item.status}</span>
+    </article>
+  );
+}
+
+function PolicyAuditRow({ item }: { item: DesktopTeamPolicyAuditItem }) {
+  return (
+    <article className="policy-audit-row">
+      <div>
+        <div className="skill-title compact-title">
+          <h3>{item.skill_name}</h3>
+          <span>{item.source_ref}</span>
+        </div>
+        <div className="team-compliance-meta">
+          <span>{item.current_trusted ? "trusted" : "untrusted"}</span>
+          <span>{item.current_auto_update ? "auto update on" : "auto update off"}</span>
+          <span>{item.policy_trusted ? "policy trusted" : "policy untrusted"}</span>
+        </div>
+        <div className="team-compliance-source">
+          <code>{item.source_url}</code>
+          <code>{item.source_repo_path}</code>
+        </div>
+        <p className="policy-recommendation">{item.recommendation}</p>
+      </div>
+      <span className={`status-badge ${policyAuditTone(item.status)}`}>{item.status}</span>
     </article>
   );
 }
@@ -1554,6 +1704,19 @@ function teamComplianceTone(status: string): "good" | "danger" | "warning" | "mu
   return "muted";
 }
 
+function policyAuditTone(status: string): "good" | "danger" | "warning" | "muted" {
+  if (status === "compliant") {
+    return "good";
+  }
+  if (status === "auto_update_disallowed") {
+    return "danger";
+  }
+  if (status === "should_mark_trusted") {
+    return "warning";
+  }
+  return "muted";
+}
+
 function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
   if (result?.local_modified) {
     return "本地修改，先处理";
@@ -1581,6 +1744,14 @@ function emptyBindDraft(): BindDraft {
     credential_ref: "",
     trusted: false,
     auto_update: false,
+  };
+}
+
+function emptyEnterpriseNetworkSettings() {
+  return {
+    proxy_url: null,
+    no_proxy: null,
+    certificate_authority_bundle_path: null,
   };
 }
 
