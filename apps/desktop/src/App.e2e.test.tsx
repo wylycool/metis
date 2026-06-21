@@ -68,6 +68,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByText("+1")).toBeTruthy();
     expect(screen.getByText("~1")).toBeTruthy();
     expect(screen.getByText("2 commits behind")).toBeTruthy();
+    expect(await screen.findByTestId("apply-update-e2e-skill")).toBeTruthy();
 
     await user.click(screen.getByTestId("toggle-diff-e2e-skill"));
 
@@ -78,7 +79,8 @@ describe("Metis desktop GUI main flow", () => {
       screen.getByText((content) => content.includes("+description: Updated skill")),
     ).toBeTruthy();
 
-    await user.click(screen.getByTestId("toggle-backups-e2e-skill"));
+    await user.click(screen.getByTestId("apply-update-e2e-skill"));
+    expect(await screen.findByText(/更新完成：aaa111 -> bbb222/)).toBeTruthy();
     expect(await screen.findByText("pre-update")).toBeTruthy();
 
     await user.click(screen.getByTestId("restore-backup-e2e-skill-backup-pre-update"));
@@ -628,7 +630,7 @@ describe("Metis desktop GUI error paths", () => {
     invokeMock.mockReset();
   });
 
-  test("does not expose the removed apply update action from skill detail", async () => {
+  test("exposes the apply update action only after an update is available", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario();
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -640,12 +642,44 @@ describe("Metis desktop GUI error paths", () => {
     await user.click(await screen.findByTestId("skill-row-e2e-skill"));
     expect(await screen.findByTestId("skill-detail-e2e-skill")).toBeTruthy();
     expect(screen.queryByTestId("apply-update-e2e-skill")).toBeNull();
-    expect(screen.queryByText("应用更新")).toBeNull();
+
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+
+    expect(await screen.findByTestId("apply-update-e2e-skill")).toBeTruthy();
+  });
+
+  test("keeps manual apply update available when local files are modified", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ localModifiedAfterCheck: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+
+    const applyButton = await screen.findByTestId("apply-update-e2e-skill");
+    expect(screen.getByText("本地修改，先处理")).toBeTruthy();
+    expect((applyButton as HTMLButtonElement).disabled).toBe(false);
+
+    await user.click(applyButton);
+    expect(await screen.findByText(/更新完成：aaa111 -> bbb222/)).toBeTruthy();
+    expect(await screen.findByText("pre-update")).toBeTruthy();
   });
 });
 
 function createMainFlowScenario(
-  options: { slowBind?: boolean; slowDiff?: boolean } = {},
+  options: { localModifiedAfterCheck?: boolean; slowBind?: boolean; slowDiff?: boolean } = {},
 ) {
   let source: DesktopSource = {
     id: "source-e2e-skill",
@@ -856,12 +890,37 @@ function createMainFlowScenario(
             ],
           };
         case "check_skill_updates":
-          return [updateResult(skill, source)];
+          return [updateResult(skill, source, options.localModifiedAfterCheck === true)];
         case "get_skill_diff":
           if (options.slowDiff) {
             await delay(80);
           }
           return diffDetail();
+        case "apply_skill_update": {
+          const result: DesktopApplyUpdateResult = {
+            skill_id: "e2e-skill",
+            previous_commit: "aaa111",
+            new_commit: "bbb222",
+            backup_id: "backup-pre-update",
+            security_findings: [],
+            warnings: [],
+          };
+          source = {
+            ...source,
+            current_commit: "bbb222",
+            remote_commit: "bbb222",
+          };
+          skill = {
+            ...skill,
+            description: "Updated skill",
+            source_id: source.id,
+            source,
+            local_modified: false,
+          };
+          backups = [backup("backup-pre-update", "pre-update", "aaa111")];
+          indexedSkills = [skill];
+          return result;
+        }
         case "list_skill_backups":
           return backups;
         case "restore_skill_backup":
@@ -1498,13 +1557,17 @@ function betaSkill(id: string, name: string, source: DesktopSource): DesktopSkil
   };
 }
 
-function updateResult(skill: DesktopSkill, source: DesktopSource): DesktopUpdateCheckResult {
+function updateResult(
+  skill: DesktopSkill,
+  source: DesktopSource,
+  localModified = false,
+): DesktopUpdateCheckResult {
   return {
     skill_id: skill.id,
     skill_name: skill.name,
     status: "UpdateAvailable",
     failure_reason: null,
-    local_modified: false,
+    local_modified: localModified,
     commits_behind: 2,
     diff_summary: {
       files_added: 1,

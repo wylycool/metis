@@ -241,6 +241,7 @@ export function SkillsWorkspace({
           onCheck={() => onCheckDetailUpdates(routedDetailSkill)}
           onDraftChange={onDraftChange}
           onInstallDetailTargets={() => onInstallDetailTargets(routedDetailSkill)}
+          onApplyUpdate={() => onApplyUpdate(routedDetailSkill.id)}
           onOpenBind={() => onOpenBind(routedDetailSkill)}
           onRefreshDetailTargets={() => onLoadDetailTargets(routedDetailSkill)}
           onRestoreBackup={(backupId) => onRestoreBackup(routedDetailSkill.id, backupId)}

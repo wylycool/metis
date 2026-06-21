@@ -41,6 +41,7 @@ export function SkillDetailPage({
   onCheck,
   onDraftChange,
   onInstallDetailTargets,
+  onApplyUpdate,
   onOpenBind,
   onRestoreBackup,
   onToggleBackups,
@@ -69,6 +70,7 @@ export function SkillDetailPage({
   onCheck: () => void;
   onDraftChange: (draft: BindDraft) => void;
   onInstallDetailTargets: () => void;
+  onApplyUpdate: () => void;
   onOpenBind: () => void;
   onRestoreBackup: (backupId: string) => void;
   onToggleBackups: () => void;
@@ -83,6 +85,10 @@ export function SkillDetailPage({
   const unbindBusy = actionBusy === `unbind:${skill.id}`;
   const diffBusy = actionBusy === `diff:${skill.id}`;
   const backupBusy = actionBusy === `backups:${skill.id}`;
+  const applyBusy = actionBusy === `apply:${skill.id}`;
+  const canApplyUpdate =
+    source &&
+    updateResult?.status === "UpdateAvailable";
   const showLocalModifiedStatus = skill.local_modified === true || updateResult?.local_modified;
   const showUpdateStatus =
     updateResult?.status === "UpToDate" ||
@@ -189,6 +195,16 @@ export function SkillDetailPage({
             >
               {diffBusy ? "加载 diff" : diffDetail ? "隐藏 diff" : "查看 diff"}
             </button>
+            {updateResult?.status === "UpdateAvailable" && (
+              <button
+                className="operation-button compact"
+                data-testid={`apply-update-${skill.id}`}
+                disabled={!canApplyUpdate || applyBusy}
+                onClick={onApplyUpdate}
+              >
+                {applyBusy ? "更新中" : "应用更新"}
+              </button>
+            )}
             <button
               className="operation-button compact"
               data-testid={`toggle-backups-${skill.id}`}

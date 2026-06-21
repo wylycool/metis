@@ -514,11 +514,8 @@ pub fn apply_update<C: RemoteCommitChecker>(
         .clone()
         .ok_or_else(|| ApplyUpdateError::SourceCheckFailed("missing remote commit".to_string()))?;
 
-    let local_state = check_local_modification(&skill.id, store)
+    check_local_modification(&skill.id, store)
         .map_err(|error| ApplyUpdateError::SourceCheckFailed(error.to_string()))?;
-    if local_state.local_modified {
-        return Err(ApplyUpdateError::LocalModified);
-    }
 
     let backup = create_backup(
         CreateBackupOptions {
@@ -1207,6 +1204,67 @@ mod tests {
             .expect("source lookup should succeed")
             .expect("source should exist");
         assert_eq!(source.current_commit.as_deref(), Some("def456"));
+        let skill = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        assert_eq!(skill.local_modified, Some(false));
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn apply_update_allows_manual_overwrite_when_local_files_changed() {
+        let root = temp_dir("apply-local-modified");
+        let skill_dir = root.join("skill");
+        let candidate_dir = root.join("candidate");
+        let backup_root = root.join("backups");
+        write_file(&skill_dir.join("SKILL.md"), "# Old\n");
+        write_file(&candidate_dir.join("SKILL.md"), "# Remote\n");
+        let mut store = store_with_skill_and_optional_source(&skill_dir, Some("abc123"));
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        write_file(&skill_dir.join("SKILL.md"), "# Local accidental edit\n");
+        let local_state =
+            check_local_modification("skill-1", &mut store).expect("local state should refresh");
+        assert!(local_state.local_modified);
+        store
+            .update_source_check_result(
+                "source-1",
+                Some("abc123"),
+                Some("def456"),
+                "2026-06-19T12:00:00Z",
+            )
+            .expect("source check should update");
+        let checker = FakeRemoteChecker::with_all(
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::from([(
+                "source-1".to_string(),
+                Ok(CheckoutResult {
+                    checkout_dir: root.join("checkout").to_string_lossy().to_string(),
+                    skill_dir: candidate_dir.to_string_lossy().to_string(),
+                }),
+            )]),
+        );
+
+        let result = apply_update(
+            ApplyUpdateOptions {
+                skill_id: "skill-1".to_string(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+                cache_dir: root.join("cache").to_string_lossy().to_string(),
+            },
+            &mut store,
+            &checker,
+        )
+        .expect("manual update should overwrite local changes after backup");
+
+        assert_eq!(result.previous_commit, "abc123");
+        assert_eq!(result.new_commit, "def456");
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("SKILL.md")).expect("updated skill should read"),
+            "# Remote\n"
+        );
         let skill = store
             .get_skill("skill-1")
             .expect("skill lookup should succeed")
