@@ -42,20 +42,27 @@ export function AddSkillPage({
         <span aria-hidden="true">←</span>
         <span>Skills / 添加 Skill</span>
       </button>
+      <section className="skill-detail-header add-skill-header">
+        <div>
+          <span className="status-kicker">Remote source</span>
+          <h2>添加 Skill</h2>
+          <p>预览远端 Git skill，然后安装或更新到选中的本机 Agent。</p>
+        </div>
+        <button
+          className="compact"
+          data-testid="add-skill-preview"
+          disabled={actionBusy === "remote-sync-preview" || draft.url.trim().length === 0}
+          onClick={onPreview}
+        >
+          {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
+        </button>
+      </section>
       <section className="remote-sync-panel" aria-label="添加 Skill">
         <div className="remote-sync-header">
           <div>
-            <h2>添加 Skill</h2>
-            <p>预览远端 Git skill，然后安装或更新到选中的本机 Agent。</p>
+            <h3>远端信息</h3>
+            <p>填写仓库 URL、Skill 目录和 ref，先预览再选择安装目标。</p>
           </div>
-          <button
-            className="compact"
-            data-testid="add-skill-preview"
-            disabled={actionBusy === "remote-sync-preview" || draft.url.trim().length === 0}
-            onClick={onPreview}
-          >
-            {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
-          </button>
         </div>
         <div className="remote-sync-form">
           <input
