@@ -1754,8 +1754,12 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
 
     if lower.contains("source check failed")
         || lower.contains("checkout failed")
+        || lower.contains("git operation failed")
+        || lower.contains("git command failed")
+        || lower.contains("could not fetch")
         || lower.contains("missing current commit")
         || lower.contains("missing remote commit")
+        || lower.contains("promisor remote")
         || lower.contains("no source")
     {
         return desktop_error(
@@ -2933,6 +2937,12 @@ description: {description}
             ),
             (
                 "checkout failed: missing remote commit",
+                "git_source",
+                "Git source 错误",
+                "Metis 无法根据当前来源信息完成 Git 检查或 checkout。",
+            ),
+            (
+                "git operation failed: git command failed: git -C /tmp/cache checkout abc123: fatal: could not fetch deadbeef from promisor remote",
                 "git_source",
                 "Git source 错误",
                 "Metis 无法根据当前来源信息完成 Git 检查或 checkout。",
