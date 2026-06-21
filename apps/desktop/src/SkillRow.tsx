@@ -18,25 +18,7 @@ export interface BindDraft {
 export function SkillRow({
   skill,
   updateResult,
-  diffDetail,
-  diffError,
-  backups,
-  backupOpen,
-  backupError,
-  isBinding,
-  bindDraft,
-  busyKey,
   onOpenDetail,
-  onOpenBind,
-  onCancelBind,
-  onDraftChange,
-  onBind,
-  onUnbind,
-  onCheck,
-  onToggleDiff,
-  onApplyUpdate,
-  onToggleBackups,
-  onRestoreBackup,
 }: {
   skill: DesktopSkill;
   updateResult?: DesktopUpdateCheckResult;
@@ -60,15 +42,6 @@ export function SkillRow({
   onToggleBackups: () => void;
   onRestoreBackup: (backupId: string) => void;
 }) {
-  const bindingBusy = busyKey === `bind:${skill.id}`;
-  const unbindingBusy = busyKey === `unbind:${skill.id}`;
-  const checkingBusy = busyKey === "check-updates";
-  const diffBusy = busyKey === `diff:${skill.id}`;
-  const applyBusy = busyKey === `apply:${skill.id}`;
-  const backupsBusy = busyKey === `backups:${skill.id}`;
-  const canShowDiff = updateResult?.status === "UpdateAvailable";
-  const canApplyUpdate = canShowDiff && !updateResult?.local_modified;
-
   return (
     <article
       className="skill-row"
@@ -81,32 +54,17 @@ export function SkillRow({
         onOpenDetail?.();
       }}
     >
+      <span className="skill-row-marker" aria-hidden="true" />
       <div className="skill-row-main">
         <div className="skill-main">
           <div className="skill-title">
             <h3>{skill.name}</h3>
-            <span>{skill.agent_name}</span>
           </div>
           {skill.description && <p>{skill.description}</p>}
           <code>{skill.install_path}</code>
-          {skill.source && (
-            <div className="source-line">
-              <strong>{skill.source.ref_}</strong>
-              <span>{skill.source.url}</span>
-              <em>{skill.source.repo_path}</em>
-              <div className="source-policy">
-                <small>{skill.source.trusted ? "trusted source" : "untrusted source"}</small>
-                <small>{skill.source.auto_update ? "auto update on" : "auto update off"}</small>
-                {skill.source.credential_ref && <small>已配置凭据引用</small>}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="skill-status">
-          <StatusBadge tone={metadataTone(skill.metadata_status)}>
-            metadata: {metadataLabel(skill.metadata_status)}
-          </StatusBadge>
           <StatusBadge tone={skill.local_modified ? "danger" : "muted"}>
             {localModifiedLabel(skill.local_modified)}
           </StatusBadge>
@@ -126,94 +84,11 @@ export function SkillRow({
           )}
         </div>
       )}
-
-      <div className="skill-actions">
-        {skill.source ? (
-          <>
-            <button
-              className="ghost-button compact"
-              data-testid={`check-updates-${skill.id}`}
-              disabled={checkingBusy}
-              onClick={onCheck}
-            >
-              {checkingBusy ? "检查中" : "检查更新"}
-            </button>
-            {canShowDiff && (
-              <button
-                className="ghost-button compact"
-                data-testid={`toggle-diff-${skill.id}`}
-                disabled={diffBusy}
-                onClick={onToggleDiff}
-              >
-                {diffBusy ? "加载中" : diffDetail ? "收起 diff" : "查看 diff"}
-              </button>
-            )}
-            {canShowDiff && (
-              <button
-                className="compact"
-                data-testid={`apply-update-${skill.id}`}
-                disabled={applyBusy || !canApplyUpdate}
-                onClick={onApplyUpdate}
-              >
-                {applyBusy ? "更新中" : "应用更新"}
-              </button>
-            )}
-            <button className="ghost-button compact" disabled={backupsBusy} onClick={onToggleBackups}>
-              {backupsBusy ? "加载中" : backupOpen ? "收起备份" : "备份/回滚"}
-            </button>
-            <button
-              className="ghost-button compact"
-              data-testid={`open-bind-source-${skill.id}`}
-              onClick={onOpenBind}
-            >
-              编辑来源
-            </button>
-            <button
-              className="danger-button compact"
-              disabled={unbindingBusy}
-              onClick={onUnbind}
-            >
-              {unbindingBusy ? "解绑中" : "解绑"}
-            </button>
-          </>
-        ) : (
-          <button
-            className="ghost-button compact"
-            data-testid={`open-bind-source-${skill.id}`}
-            onClick={onOpenBind}
-          >
-            绑定来源
-          </button>
-        )}
-      </div>
-
-      {diffError && <InlineError error={diffError} />}
-      {diffDetail && <DiffPanel detail={diffDetail} />}
-      {backupError && <InlineError error={backupError} />}
-      {backupOpen && (
-        <BackupPanel
-          skillId={skill.id}
-          backups={backups}
-          busyKey={busyKey}
-          onRestoreBackup={onRestoreBackup}
-        />
-      )}
-
-      {isBinding && (
-        <BindSourceForm
-          skillId={skill.id}
-          draft={bindDraft}
-          busy={bindingBusy}
-          onChange={onDraftChange}
-          onCancel={onCancelBind}
-          onSubmit={onBind}
-        />
-      )}
     </article>
   );
 }
 
-function BackupPanel({
+export function BackupPanel({
   skillId,
   backups,
   busyKey,
@@ -265,7 +140,11 @@ function BackupPanel({
   );
 }
 
-function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
+export function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
+  const patches = detail.files
+    .map((file) => file.patch || `${file.status}: ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}`)
+    .join("\n\n");
+
   return (
     <div className="diff-panel">
       <div className="diff-heading">
@@ -274,28 +153,12 @@ function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
         <span>{shortCommit(detail.target_commit)}</span>
         <b>{detail.files.length} files</b>
       </div>
-      <div className="diff-file-list">
-        {detail.files.map((file) => (
-          <article className="diff-file" key={`${file.status}-${file.old_path ?? ""}-${file.path}`}>
-            <div className="diff-file-heading">
-              <StatusBadge tone={file.status === "Deleted" ? "danger" : "muted"}>
-                {file.status}
-              </StatusBadge>
-              <code>{file.old_path ? `${file.old_path} → ${file.path}` : file.path}</code>
-            </div>
-            {file.patch ? (
-              <pre>{file.patch}</pre>
-            ) : (
-              <p className="no-patch">这个文件没有可展示的 patch 文本。</p>
-            )}
-          </article>
-        ))}
-      </div>
+      <pre className="simple-diff">{patches || "暂无可展示的 diff 文本。"}</pre>
     </div>
   );
 }
 
-function BindSourceForm({
+export function BindSourceForm({
   skillId,
   draft,
   busy,
@@ -382,12 +245,14 @@ function BindSourceForm({
   );
 }
 
-function StatusBadge({
+export type StatusBadgeTone = "good" | "danger" | "warning" | "muted";
+
+export function StatusBadge({
   children,
   tone,
 }: {
   children: React.ReactNode;
-  tone: "good" | "danger" | "muted";
+  tone: StatusBadgeTone;
 }) {
   return <span className={`status-badge ${tone}`}>{children}</span>;
 }
@@ -411,11 +276,11 @@ export function InlineError({ error }: { error: DesktopError }) {
   );
 }
 
-function metadataTone(status: string) {
+export function metadataTone(status: string): StatusBadgeTone {
   return status === "found" ? "good" : "danger";
 }
 
-function metadataLabel(status: string) {
+export function metadataLabel(status: string) {
   if (status === "found") {
     return "found";
   }
@@ -425,7 +290,7 @@ function metadataLabel(status: string) {
   return status;
 }
 
-function localModifiedLabel(value: boolean | null | undefined) {
+export function localModifiedLabel(value: boolean | null | undefined) {
   if (value === true) {
     return "本地已修改";
   }
@@ -435,18 +300,18 @@ function localModifiedLabel(value: boolean | null | undefined) {
   return "未检测修改";
 }
 
-function updateTone(
+export function updateTone(
   result: DesktopUpdateCheckResult | undefined,
   skill: DesktopSkill,
-): "good" | "danger" | "muted" {
-  if (result?.local_modified || result?.status === "CheckFailed") {
+): StatusBadgeTone {
+  if (result?.status === "CheckFailed") {
     return "danger";
+  }
+  if (result?.local_modified || result?.status === "UpdateAvailable") {
+    return "warning";
   }
   if (result?.status === "UpToDate") {
     return "good";
-  }
-  if (result?.status === "UpdateAvailable") {
-    return "danger";
   }
   if (!skill.source) {
     return "muted";
@@ -454,15 +319,15 @@ function updateTone(
   return "muted";
 }
 
-function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
+export function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
   if (result?.local_modified) {
     return "本地修改，先处理";
   }
   if (result?.status === "UpToDate") {
-    return "已最新";
+    return "无需更新";
   }
   if (result?.status === "UpdateAvailable") {
-    return "有更新";
+    return "待更新";
   }
   if (result?.status === "CheckFailed") {
     return `检查失败${result.failure_reason ? `: ${result.failure_reason}` : ""}`;

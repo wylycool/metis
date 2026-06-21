@@ -31,7 +31,7 @@ export function CrossAgentTargetMatrix({
   const selectedCount = selectedTargetIds.length;
 
   return (
-    <section className="target-matrix" aria-label={title}>
+    <section className="target-matrix cross-agent-matrix" aria-label={title}>
       <div className="target-matrix-header">
         <div>
           <h3>{title}</h3>

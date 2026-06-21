@@ -900,55 +900,92 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Metis Desktop MVP</p>
-          <h1>本机 Skills</h1>
-        </div>
-        <div className="topbar-actions">
-          <button
-            className="ghost-button"
-            disabled={state === "loading" || actionBusy === "check-updates" || skills.length === 0}
-            onClick={() => handleCheckUpdates(skills.map((skill) => skill.id))}
-          >
-            {actionBusy === "check-updates" ? "检查中" : "检查更新"}
-          </button>
-          <button className="scan-button" disabled={state === "loading"} onClick={handleScan}>
-            {state === "loading" ? "扫描中" : "重新扫描"}
-          </button>
-        </div>
-      </header>
+    <div className="metis-window">
+      <div className="metis-shell">
+        <div className="app-shell">
+          <header className="topbar">
+            <button
+              className="metis-brand"
+              data-testid="metis-brand-home"
+              aria-label="返回首页"
+              onClick={() => setActiveWorkspace("skills")}
+            >
+              <span className="metis-brand-mark" aria-hidden="true">M</span>
+              <strong>Metis</strong>
+            </button>
+            <div className="topbar-actions">
+              {activeWorkspace === "skills" && (
+                <label className="topbar-search" aria-label="搜索 skills">
+                  <span aria-hidden="true" />
+                  <input
+                    data-testid="skill-search-input"
+                    placeholder="搜索 skill、路径或来源"
+                    value={skillSearchQuery}
+                    onChange={(event) => setSkillSearchQuery(event.target.value)}
+                  />
+                </label>
+              )}
+              <button
+                className="ghost-button topbar-secondary-action"
+                data-testid="check-all-updates"
+                disabled={
+                  state === "loading" || actionBusy === "check-updates" || skills.length === 0
+                }
+                onClick={() => handleCheckUpdates(skills.map((skill) => skill.id))}
+              >
+                {actionBusy === "check-updates" ? "检查中" : "检查更新"}
+              </button>
+              <button
+                className="scan-button"
+                data-testid="scan-skills"
+                disabled={state === "loading"}
+                onClick={handleScan}
+              >
+                {state === "loading" ? "扫描中" : "重新扫描"}
+              </button>
+              <button
+                aria-label="Settings"
+                aria-pressed={activeWorkspace === "settings"}
+                className="settings-icon-button"
+                data-testid="workspace-tab-settings"
+                onClick={() => setActiveWorkspace("settings")}
+              >
+                <span aria-hidden="true" />
+              </button>
+            </div>
+          </header>
 
-      <nav className="workspace-tabs" aria-label="工作区导航">
-        <WorkspaceTab
-          active={activeWorkspace === "skills"}
-          count={skills.length}
-          label="Skills"
-          testId="workspace-tab-skills"
-          onClick={() => setActiveWorkspace("skills")}
-        />
-        <WorkspaceTab
-          active={activeWorkspace === "governance"}
-          count={boundCount}
-          label="Governance"
-          testId="workspace-tab-governance"
-          onClick={() => setActiveWorkspace("governance")}
-        />
-        <WorkspaceTab
-          active={activeWorkspace === "settings"}
-          label="Settings"
-          testId="workspace-tab-settings"
-          onClick={() => setActiveWorkspace("settings")}
-        />
-      </nav>
+          <nav className="workspace-tabs" aria-hidden="true" hidden>
+            <WorkspaceTab
+              active={activeWorkspace === "skills"}
+              count={skills.length}
+              label="Skills"
+              testId="workspace-tab-skills-legacy"
+              onClick={() => setActiveWorkspace("skills")}
+            />
+            <WorkspaceTab
+              active={activeWorkspace === "governance"}
+              count={boundCount}
+              label="Governance"
+              testId="workspace-tab-governance-legacy"
+              onClick={() => setActiveWorkspace("governance")}
+            />
+            <WorkspaceTab
+              active={activeWorkspace === "settings"}
+              label="Settings"
+              testId="workspace-tab-settings-legacy"
+              onClick={() => setActiveWorkspace("settings")}
+            />
+          </nav>
 
-      <section className="summary-strip" aria-label="扫描摘要">
-        <SummaryMetric label="已发现 skills" value={skills.length.toString()} />
-        <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
-        <SummaryMetric label="存在的路径" value={totalExistingPaths.toString()} />
-        <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
-      </section>
+      {activeWorkspace !== "skills" && (
+        <section className="summary-strip" aria-label="扫描摘要">
+          <SummaryMetric label="已发现 skills" value={skills.length.toString()} />
+          <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
+          <SummaryMetric label="存在的路径" value={totalExistingPaths.toString()} />
+          <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
+        </section>
+      )}
 
       {actionError && <InlineError error={actionError} />}
       {actionMessage && <div className="inline-success">{actionMessage}</div>}
@@ -1157,7 +1194,7 @@ function App() {
             <span>凭据使用本机 Git / SSH 配置</span>
           </div>
           <div className="settings-editor">
-            <div className="settings-section">
+            <div className="settings-section" data-testid="settings-section-scan-paths">
               <div>
                 <h3>扫描路径</h3>
                 <p>每行一个额外 Generic Agent Skills 根目录。</p>
@@ -1204,7 +1241,7 @@ function App() {
                 </button>
               </div>
             </div>
-            <div className="settings-section">
+            <div className="settings-section" data-testid="settings-section-team-policy">
               <div>
                 <h3>团队策略</h3>
                 <p>本地 JSON 策略可预配置 trusted source，并限制未信任来源自动更新。</p>
@@ -1265,7 +1302,7 @@ function App() {
                 </div>
               )}
             </div>
-            <div className="settings-section">
+            <div className="settings-section" data-testid="settings-section-enterprise-network">
               <div>
                 <h3>企业网络</h3>
                 <p>代理和企业 CA bundle 仅用于 Metis 发起的 Git 子进程。</p>
@@ -1360,7 +1397,6 @@ function App() {
           onPreviewRemoteSync={handlePreviewRemoteSync}
           onRestoreBackup={handleRestoreBackup}
           onScan={handleScan}
-          onSearchChange={setSkillSearchQuery}
           onSelectAgent={setSelectedAgentId}
           onSetRemoteSyncDraft={setRemoteSyncDraft}
           onToggleDetailTarget={toggleDetailTarget}
@@ -1381,6 +1417,8 @@ function App() {
           ))}
         </section>
       )}
+        </div>
+      </div>
     </div>
   );
 }

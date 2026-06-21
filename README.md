@@ -152,7 +152,8 @@ Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 
 - [docs/design/core-engine-api.md](docs/design/core-engine-api.md)：Core Engine API 接口规格。
 - [docs/design/adapter-interface.md](docs/design/adapter-interface.md)：Adapter trait 接口设计。
 - [docs/design/database-schema.md](docs/design/database-schema.md)：SQLite 数据库 Schema 设计。
-- [docs/design/phase3-stabilization-plan.md](docs/design/phase3-stabilization-plan.md)：Phase 3 Beta 稳定化计划。
+- [docs/design/desktop-command-api.md](docs/design/desktop-command-api.md)：Tauri 桌面 Command 和 DTO 设计。
+- [docs/design/git-provider.md](docs/design/git-provider.md)：Git source、更新检测、diff 和 checkout cache 设计。
 - [docs/design/cross-agent-skill-sync.md](docs/design/cross-agent-skill-sync.md)：跨 Agent Git skill 同步设计。
 - [docs/beta-release-checklist.md](docs/beta-release-checklist.md)：Beta 发布工程检查清单。
 
