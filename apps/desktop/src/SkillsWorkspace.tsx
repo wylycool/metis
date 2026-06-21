@@ -12,6 +12,7 @@ import type {
   DesktopRemoteSkillPreview,
   DesktopScanWarning,
   DesktopSkill,
+  DesktopSource,
   DesktopSkillTarget,
   DesktopUpdateCheckResult,
   LoadState,
@@ -47,10 +48,12 @@ export function SkillsWorkspace({
   updateResults,
   warnings,
   onApplyUpdate,
+  onBackupsDetailToggle,
   onBackupsToggle,
   onBind,
   onCancelBind,
   onCheckAgentUpdates,
+  onCheckDetailUpdates,
   onCheckUpdates,
   onDraftChange,
   onInstallDetailTargets,
@@ -64,6 +67,7 @@ export function SkillsWorkspace({
   onSelectAgent,
   onSetRemoteSyncDraft,
   onToggleDetailTarget,
+  onToggleDetailDiff,
   onToggleDiff,
   onToggleRemoteTarget,
   onUnbind,
@@ -94,10 +98,12 @@ export function SkillsWorkspace({
   updateResults: Record<string, DesktopUpdateCheckResult>;
   warnings: DesktopScanWarning[];
   onApplyUpdate: (skillId: string) => void;
+  onBackupsDetailToggle: (skill: DesktopSkill) => void;
   onBackupsToggle: (skillId: string) => void;
   onBind: (skillId: string) => void;
   onCancelBind: () => void;
   onCheckAgentUpdates: (agentId: string) => void;
+  onCheckDetailUpdates: (skill: DesktopSkill) => void;
   onCheckUpdates: (skillIds: string[]) => void;
   onDraftChange: (draft: BindDraft) => void;
   onInstallDetailTargets: (skill: DesktopSkill) => void;
@@ -111,6 +117,7 @@ export function SkillsWorkspace({
   onSelectAgent: (agentId: string | null) => void;
   onSetRemoteSyncDraft: (draft: RemoteSyncDraft) => void;
   onToggleDetailTarget: (skillId: string, target: DesktopSkillTarget) => void;
+  onToggleDetailDiff: (skill: DesktopSkill) => void;
   onToggleDiff: (skillId: string) => void;
   onToggleRemoteTarget: (target: DesktopSkillTarget) => void;
   onUnbind: (skillId: string) => void;
@@ -176,6 +183,10 @@ export function SkillsWorkspace({
       route.kind === "detail" ? skills.find((skill) => skill.id === route.skillId) ?? null : null,
     [route, skills],
   );
+  const routedDetailSkill = useMemo(
+    () => (routedSkill ? skillWithEffectiveSource(routedSkill, skills) : null),
+    [routedSkill, skills],
+  );
   const visibleModifiedCount = baseVisibleSkills.filter((skill) => skill.local_modified).length;
   const visibleUpdateAvailableCount = baseVisibleSkills.filter(
     (skill) => updateResults[skill.id]?.status === "UpdateAvailable",
@@ -183,58 +194,60 @@ export function SkillsWorkspace({
   const visibleUpToDateCount = baseVisibleSkills.filter(
     (skill) => updateResults[skill.id]?.status === "UpToDate",
   ).length;
-  const detailTargetsLoaded = routedSkill ? Boolean(detailTargets[routedSkill.id]) : false;
-  const detailTargetsFailed = routedSkill ? Boolean(detailTargetErrors[routedSkill.id]) : false;
+  const detailTargetsLoaded = routedDetailSkill ? Boolean(detailTargets[routedDetailSkill.id]) : false;
+  const detailTargetsFailed = routedDetailSkill
+    ? Boolean(detailTargetErrors[routedDetailSkill.id])
+    : false;
 
   useEffect(() => {
-    if (route.kind !== "detail" || !routedSkill?.source) {
+    if (route.kind !== "detail" || !routedDetailSkill?.source) {
       return;
     }
     if (detailTargetsLoaded || detailTargetsFailed) {
       return;
     }
-    onLoadDetailTargets(routedSkill);
+    onLoadDetailTargets(routedDetailSkill);
   }, [
     detailTargetsFailed,
     detailTargetsLoaded,
-    routedSkill?.id,
-    routedSkill?.source?.ref_,
-    routedSkill?.source?.repo_path,
-    routedSkill?.source?.url,
+    routedDetailSkill?.id,
+    routedDetailSkill?.source?.ref_,
+    routedDetailSkill?.source?.repo_path,
+    routedDetailSkill?.source?.url,
     route.kind,
   ]);
 
   return (
     <main className="workspace workspace-pane phase6-workspace" data-testid="workspace-skills">
-      {route.kind === "detail" && routedSkill && (
+      {route.kind === "detail" && routedDetailSkill && (
         <SkillDetailPage
           actionBusy={actionBusy}
-          backupError={backupError[routedSkill.id]}
-          backupOpen={backupPanels[routedSkill.id] ?? false}
-          backups={backups[routedSkill.id] ?? []}
+          backupError={backupError[routedDetailSkill.id]}
+          backupOpen={backupPanels[routedDetailSkill.id] ?? false}
+          backups={backups[routedDetailSkill.id] ?? []}
           bindDraft={bindDraft}
-          detailInstallResult={detailInstallResults[routedSkill.id]}
-          detailTargetError={detailTargetErrors[routedSkill.id]}
-          detailTargets={detailTargets[routedSkill.id] ?? []}
-          diffDetail={diffDetails[routedSkill.id]}
-          diffError={diffError[routedSkill.id]}
-          isBinding={bindingSkillId === routedSkill.id}
-          selectedDetailTargetIds={selectedDetailTargetIds[routedSkill.id] ?? []}
-          skill={routedSkill}
-          updateResult={updateResults[routedSkill.id]}
+          detailInstallResult={detailInstallResults[routedDetailSkill.id]}
+          detailTargetError={detailTargetErrors[routedDetailSkill.id]}
+          detailTargets={detailTargets[routedDetailSkill.id] ?? []}
+          diffDetail={diffDetails[routedDetailSkill.id]}
+          diffError={diffError[routedDetailSkill.id]}
+          isBinding={bindingSkillId === routedDetailSkill.id}
+          selectedDetailTargetIds={selectedDetailTargetIds[routedDetailSkill.id] ?? []}
+          skill={routedDetailSkill}
+          updateResult={updateResults[routedDetailSkill.id]}
           onBack={() => setRoute({ kind: "list" })}
-          onBind={() => onBind(routedSkill.id)}
+          onBind={() => onBind(routedDetailSkill.id)}
           onCancelBind={onCancelBind}
-          onCheck={() => onCheckUpdates([routedSkill.id])}
+          onCheck={() => onCheckDetailUpdates(routedDetailSkill)}
           onDraftChange={onDraftChange}
-          onInstallDetailTargets={() => onInstallDetailTargets(routedSkill)}
-          onOpenBind={() => onOpenBind(routedSkill)}
-          onRefreshDetailTargets={() => onLoadDetailTargets(routedSkill)}
-          onRestoreBackup={(backupId) => onRestoreBackup(routedSkill.id, backupId)}
-          onToggleBackups={() => onBackupsToggle(routedSkill.id)}
-          onToggleDetailTarget={(target) => onToggleDetailTarget(routedSkill.id, target)}
-          onToggleDiff={() => onToggleDiff(routedSkill.id)}
-          onUnbind={() => onUnbind(routedSkill.id)}
+          onInstallDetailTargets={() => onInstallDetailTargets(routedDetailSkill)}
+          onOpenBind={() => onOpenBind(routedDetailSkill)}
+          onRefreshDetailTargets={() => onLoadDetailTargets(routedDetailSkill)}
+          onRestoreBackup={(backupId) => onRestoreBackup(routedDetailSkill.id, backupId)}
+          onToggleBackups={() => onBackupsDetailToggle(routedDetailSkill)}
+          onToggleDetailTarget={(target) => onToggleDetailTarget(routedDetailSkill.id, target)}
+          onToggleDiff={() => onToggleDetailDiff(routedDetailSkill)}
+          onUnbind={() => onUnbind(routedDetailSkill.id)}
         />
       )}
 
@@ -491,6 +504,36 @@ function skillIdentityKey(skill: DesktopSkill) {
     ].join("\u0000");
   }
   return `name\u0000${skill.name.trim().toLocaleLowerCase()}`;
+}
+
+function skillWithEffectiveSource(skill: DesktopSkill, skills: DesktopSkill[]): DesktopSkill {
+  const source = skill.source ?? reusableSourceForSkill(skill, skills);
+  if (!source) {
+    return skill;
+  }
+  return {
+    ...skill,
+    source_id: skill.source_id ?? source.id,
+    source,
+  };
+}
+
+function reusableSourceForSkill(
+  skill: DesktopSkill,
+  skills: DesktopSkill[],
+): DesktopSource | null {
+  if (skill.source) {
+    return skill.source;
+  }
+  return (
+    skills.find(
+      (candidate) =>
+        candidate.id !== skill.id &&
+        candidate.name === skill.name &&
+        candidate.source !== null &&
+        candidate.source !== undefined,
+    )?.source ?? null
+  );
 }
 
 export { remoteTargetId };

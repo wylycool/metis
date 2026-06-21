@@ -316,4 +316,15 @@ describe("Phase 6 light workspace contrast", () => {
       "background: linear-gradient(180deg, var(--skill-marker-start), var(--skill-marker-end));",
     );
   });
+
+  test("renders cross-agent target statuses as colored badges with a spinner affordance", () => {
+    expect(stylesheet).toContain(".target-status-badge");
+    expect(stylesheet).toContain(".target-status-good");
+    expect(stylesheet).toContain(".target-status-warning");
+    expect(stylesheet).toContain(".target-status-danger");
+    expect(stylesheet).toContain(".target-status-muted");
+    expect(stylesheet).toContain(".target-matrix-spinner");
+    expect(latestBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
+    expect(latestBlockFor(".target-matrix-spinner")).toContain("animation:");
+  });
 });
