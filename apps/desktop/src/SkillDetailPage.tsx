@@ -88,7 +88,7 @@ export function SkillDetailPage({
   const applyBusy = actionBusy === `apply:${skill.id}`;
   const canApplyUpdate =
     source &&
-    updateResult?.status === "UpdateAvailable";
+    (updateResult?.status === "UpdateAvailable" || updateResult?.local_modified === true);
   const showLocalModifiedStatus = skill.local_modified === true || updateResult?.local_modified;
   const showUpdateStatus =
     updateResult?.status === "UpToDate" ||
@@ -195,7 +195,7 @@ export function SkillDetailPage({
             >
               {diffBusy ? "加载 diff" : diffDetail ? "隐藏 diff" : "查看 diff"}
             </button>
-            {updateResult?.status === "UpdateAvailable" && (
+            {canApplyUpdate && (
               <button
                 className="operation-button compact"
                 data-testid={`apply-update-${skill.id}`}

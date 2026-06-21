@@ -511,6 +511,7 @@ describe("Metis desktop GUI main flow", () => {
 
     expect((await screen.findByTestId("target-status-codex")).textContent).toContain("本地已修改");
     expect(screen.getByTestId("target-status-codex").className).toContain("target-status-warning");
+    expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).disabled).toBe(false);
 
     await user.click(refreshButton);
 
@@ -669,17 +670,46 @@ describe("Metis desktop GUI error paths", () => {
     await user.click(await screen.findByTestId("check-updates-e2e-skill"));
 
     const applyButton = await screen.findByTestId("apply-update-e2e-skill");
-    expect(screen.getByText("本地修改，先处理")).toBeTruthy();
+    expect(screen.getByText("本地修改，可手动覆盖")).toBeTruthy();
     expect((applyButton as HTMLButtonElement).disabled).toBe(false);
 
     await user.click(applyButton);
     expect(await screen.findByText(/更新完成：aaa111 -> bbb222/)).toBeTruthy();
     expect(await screen.findByText("pre-update")).toBeTruthy();
   });
+
+  test("shows manual apply update when remote is current but local files are modified", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({
+      localModifiedAfterCheck: true,
+      upToDateAfterCheck: true,
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+
+    const applyButton = await screen.findByTestId("apply-update-e2e-skill");
+    expect(screen.getByText("本地修改，可手动覆盖")).toBeTruthy();
+    expect((applyButton as HTMLButtonElement).disabled).toBe(false);
+  });
 });
 
 function createMainFlowScenario(
-  options: { localModifiedAfterCheck?: boolean; slowBind?: boolean; slowDiff?: boolean } = {},
+  options: {
+    localModifiedAfterCheck?: boolean;
+    slowBind?: boolean;
+    slowDiff?: boolean;
+    upToDateAfterCheck?: boolean;
+  } = {},
 ) {
   let source: DesktopSource = {
     id: "source-e2e-skill",
@@ -890,7 +920,14 @@ function createMainFlowScenario(
             ],
           };
         case "check_skill_updates":
-          return [updateResult(skill, source, options.localModifiedAfterCheck === true)];
+          return [
+            updateResult(
+              skill,
+              source,
+              options.localModifiedAfterCheck === true,
+              options.upToDateAfterCheck === true ? "UpToDate" : "UpdateAvailable",
+            ),
+          ];
         case "get_skill_diff":
           if (options.slowDiff) {
             await delay(80);
@@ -1561,23 +1598,27 @@ function updateResult(
   skill: DesktopSkill,
   source: DesktopSource,
   localModified = false,
+  status: DesktopUpdateCheckResult["status"] = "UpdateAvailable",
 ): DesktopUpdateCheckResult {
   return {
     skill_id: skill.id,
     skill_name: skill.name,
-    status: "UpdateAvailable",
+    status,
     failure_reason: null,
     local_modified: localModified,
-    commits_behind: 2,
-    diff_summary: {
-      files_added: 1,
-      files_modified: 1,
-      files_deleted: 0,
-      total_changes: 2,
-    },
+    commits_behind: status === "UpdateAvailable" ? 2 : null,
+    diff_summary:
+      status === "UpdateAvailable"
+        ? {
+            files_added: 1,
+            files_modified: 1,
+            files_deleted: 0,
+            total_changes: 2,
+          }
+        : null,
     source: {
       ...source,
-      remote_commit: "bbb222",
+      remote_commit: status === "UpdateAvailable" ? "bbb222" : source.current_commit,
     },
   };
 }

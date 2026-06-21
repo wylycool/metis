@@ -100,17 +100,6 @@ fn try_install_one_target<C: RemoteCommitChecker>(
     let existing_skill = store
         .get_skill_by_agent_and_path(&target.agent_id, &target.install_path)
         .map_err(|error| error.to_string())?;
-    if existing_skill
-        .as_ref()
-        .and_then(|skill| skill.local_modified)
-        .unwrap_or(false)
-    {
-        return Ok(skipped(
-            target,
-            "local_modified",
-            existing_skill.as_ref().map(|skill| skill.id.clone()),
-        ));
-    }
     if let Some(existing_skill) = existing_skill.as_ref() {
         if let Some(source_id) = existing_skill.source_id.as_deref() {
             let source = store
@@ -401,7 +390,7 @@ mod tests {
     }
 
     #[test]
-    fn install_remote_skill_to_targets_skips_local_modified_existing_skill() {
+    fn install_remote_skill_to_targets_overwrites_local_modified_existing_skill_after_backup() {
         let workspace = temp_dir("install-local-modified");
         let checkout_skill = write_skill(&workspace.join("checkout"), "remote", "Remote Skill");
         let install_path = write_skill(&workspace.join("codex-skills"), "remote", "Old Skill");
@@ -456,15 +445,26 @@ mod tests {
         )
         .expect("install batch should continue");
 
-        assert_eq!(result.targets[0].status, InstallTargetStatus::Skipped);
-        assert_eq!(result.targets[0].reason.as_deref(), Some("local_modified"));
+        assert_eq!(result.targets[0].status, InstallTargetStatus::Updated);
+        assert_eq!(result.targets[0].reason, None);
+        assert!(result.targets[0].backup_id.is_some());
         assert_eq!(
-            fs::read_to_string(install_path.join("SKILL.md")).expect("old file should remain"),
+            fs::read_to_string(install_path.join("SKILL.md")).expect("new file should replace old"),
             "---
-name: Old Skill
+name: Remote Skill
 ---
 "
         );
+        let stored = store
+            .get_skill("skill-codex-remote")
+            .expect("skill lookup should succeed")
+            .expect("skill should remain indexed");
+        assert_eq!(stored.local_modified, Some(false));
+        let backups = store
+            .list_backups("skill-codex-remote")
+            .expect("backup list should load");
+        assert_eq!(backups.len(), 1);
+        assert_eq!(backups[0].reason, "pre-sync");
 
         fs::remove_dir_all(workspace).expect("workspace should be removed");
     }

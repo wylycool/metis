@@ -321,7 +321,7 @@ export function updateTone(
 
 export function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
   if (result?.local_modified) {
-    return "本地修改，先处理";
+    return "本地修改，可手动覆盖";
   }
   if (result?.status === "UpToDate") {
     return "无需更新";
