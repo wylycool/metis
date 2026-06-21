@@ -745,7 +745,7 @@ pub fn get_skill_targets_for_source_for_state(
     state: &DesktopAppState,
     request: DesktopSkillTargetsRequest,
 ) -> Result<Vec<DesktopSkillTarget>, String> {
-    let store = state.open_store()?;
+    let mut store = state.open_store()?;
     core_get_skill_targets_for_source(
         SkillTargetSource {
             url: request.url,
@@ -754,7 +754,7 @@ pub fn get_skill_targets_for_source_for_state(
             commit: request.commit,
             install_name: request.install_name,
         },
-        &store,
+        &mut store,
     )
     .map(|targets| targets.into_iter().map(desktop_skill_target).collect())
     .map_err(|error| friendly_desktop_error(&error).wire_string())

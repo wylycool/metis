@@ -1,3 +1,4 @@
+use crate::local_state::check_local_modification;
 use metis_adapters::registry::AdapterRegistry;
 use metis_adapters::traits::SkillInstallRootStatus;
 use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
@@ -63,7 +64,7 @@ pub struct TargetPathClassification {
 
 pub fn get_skill_targets_for_source(
     source: SkillTargetSource,
-    store: &SkillIndexStore,
+    store: &mut SkillIndexStore,
 ) -> Result<Vec<SkillTarget>, String> {
     let registry = AdapterRegistry::default();
     let sources = store.list_sources().map_err(|error| error.to_string())?;
@@ -92,7 +93,8 @@ pub fn get_skill_targets_for_source(
         let has_skill_md = path.join("SKILL.md").is_file();
         let indexed = stored_skill
             .as_ref()
-            .map(|skill| indexed_state_from_skill(skill, stored_source));
+            .map(|skill| refreshed_indexed_state_from_skill(skill, stored_source, store))
+            .transpose()?;
         let classification = classify_target_path(TargetPathEvaluation {
             root_available: matches!(root.status, SkillInstallRootStatus::Available),
             path_exists,
@@ -187,6 +189,20 @@ fn indexed_state_from_skill(
     }
 }
 
+fn refreshed_indexed_state_from_skill(
+    skill: &SkillRecord,
+    source: Option<&SourceRecord>,
+    store: &mut SkillIndexStore,
+) -> Result<IndexedTargetState, String> {
+    let local_modified = check_local_modification(&skill.id, store)
+        .map(|result| result.local_modified)
+        .unwrap_or_else(|_| skill.local_modified.unwrap_or(false));
+    let mut indexed = indexed_state_from_skill(skill, source);
+    indexed.local_modified = local_modified;
+
+    Ok(indexed)
+}
+
 fn source_record_matches(record: &SourceRecord, source: &SkillTargetSource) -> bool {
     record.url == source.url && record.repo_path == source.repo_path && record.ref_ == source.ref_
 }
@@ -204,6 +220,11 @@ fn root_status_to_string(status: &SkillInstallRootStatus) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::local_state::capture_local_baseline;
+    use metis_storage::db::{SkillIndexStore, SourceRecord};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn classify_target_reports_agent_root_unavailable_first() {
@@ -310,5 +331,90 @@ mod tests {
             source_matches: true,
         });
         assert_eq!(update_available.status, SkillTargetStatus::UpdateAvailable);
+    }
+
+    #[test]
+    fn refreshed_indexed_state_detects_local_modification_before_classifying_target() {
+        let root = temp_dir("sync-local-modified");
+        let skill_dir = root.join("skill");
+        write_file(&skill_dir.join("SKILL.md"), "# Example\n");
+
+        let mut store = SkillIndexStore::open_in_memory().expect("store should open");
+        let source = sample_source("source-1", "new");
+        store.upsert_source(&source).expect("source should upsert");
+        store
+            .upsert_skill(&sample_skill("skill-1", &skill_dir, Some("source-1")))
+            .expect("skill should upsert");
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        write_file(&skill_dir.join("notes.md"), "local edit");
+
+        let skill = store
+            .get_skill("skill-1")
+            .expect("skill lookup should work")
+            .expect("skill should exist");
+        let refreshed = refreshed_indexed_state_from_skill(&skill, Some(&source), &mut store)
+            .expect("indexed state should refresh");
+
+        fs::remove_dir_all(root).expect("workspace should be removed");
+        assert!(refreshed.local_modified);
+        assert_eq!(refreshed.current_commit.as_deref(), Some("new"));
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("metis-core-sync-{}-{}", name, suffix));
+        fs::create_dir_all(&root).expect("temp directory should be created");
+        root
+    }
+
+    fn write_file(path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("parent should be created");
+        }
+        fs::write(path, contents).expect("file should write");
+    }
+
+    fn sample_source(id: &str, current_commit: &str) -> SourceRecord {
+        SourceRecord {
+            id: id.to_string(),
+            source_type: "git".to_string(),
+            url: "file:///tmp/metis-sync.git".to_string(),
+            repo_path: "skills/example".to_string(),
+            ref_: "main".to_string(),
+            current_commit: Some(current_commit.to_string()),
+            remote_commit: Some(current_commit.to_string()),
+            last_checked_at: None,
+            trusted: true,
+            auto_update: false,
+            credential_ref: None,
+            created_at: None,
+            updated_at: None,
+        }
+    }
+
+    fn sample_skill(id: &str, install_path: &Path, source_id: Option<&str>) -> SkillRecord {
+        SkillRecord {
+            id: id.to_string(),
+            agent_id: "codex".to_string(),
+            name: "Example".to_string(),
+            description: Some("Example skill".to_string()),
+            version: None,
+            author: None,
+            license: None,
+            tags: Vec::new(),
+            category: None,
+            install_path: install_path.to_string_lossy().to_string(),
+            scope: "user".to_string(),
+            metadata_path: Some(install_path.join("SKILL.md").to_string_lossy().to_string()),
+            metadata_status: "found".to_string(),
+            metadata_error: None,
+            source_id: source_id.map(ToOwned::to_owned),
+            local_fingerprint: None,
+            local_modified: None,
+            last_scanned_at: "2026-06-21T10:00:00Z".to_string(),
+        }
     }
 }

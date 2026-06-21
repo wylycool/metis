@@ -37,7 +37,14 @@ export function CrossAgentTargetMatrix({
           <h3>{title}</h3>
           <p>同一远端 source 在各 Agent 根目录下的安装与更新状态。</p>
         </div>
-        <button className="ghost-button compact" disabled={loading} onClick={onRefresh}>
+        <button
+          aria-busy={loading}
+          className="ghost-button compact"
+          data-testid="refresh-target-matrix"
+          disabled={loading}
+          onClick={onRefresh}
+        >
+          {loading && <span className="target-matrix-spinner" data-testid="target-matrix-spinner" />}
           {loading ? "检查中" : "重新检查状态"}
         </button>
       </div>
@@ -72,7 +79,12 @@ export function CrossAgentTargetMatrix({
                   </strong>
                   <small>{target.install_path}</small>
                 </span>
-                <b>{remoteTargetStatusLabel(target)}</b>
+                <b
+                  className={`target-status-badge ${remoteTargetStatusTone(target)}`}
+                  data-testid={`target-status-${target.agent_id}`}
+                >
+                  {remoteTargetStatusLabel(target)}
+                </b>
               </label>
             );
           })}
@@ -117,8 +129,8 @@ function isRemoteTargetSelectable(target: DesktopSkillTarget) {
 }
 
 function remoteTargetStatusLabel(target: DesktopSkillTarget) {
-  if (target.status === "UpdateAvailable" && target.local_modified) {
-    return "本地已修改，跳过更新";
+  if (target.local_modified) {
+    return "本地已修改";
   }
   const labels: Record<string, string> = {
     NotInstalled: "未安装",
@@ -130,6 +142,22 @@ function remoteTargetStatusLabel(target: DesktopSkillTarget) {
     AgentRootUnavailable: "不可用",
   };
   return labels[target.status] ?? target.status;
+}
+
+function remoteTargetStatusTone(target: DesktopSkillTarget) {
+  if (target.local_modified) {
+    return "target-status-warning";
+  }
+  if (["UpToDate", "InstalledBound"].includes(target.status)) {
+    return "target-status-good";
+  }
+  if (["UpdateAvailable", "InstalledUnbound"].includes(target.status)) {
+    return "target-status-warning";
+  }
+  if (["ConflictNonSkill", "AgentRootUnavailable"].includes(target.status)) {
+    return "target-status-danger";
+  }
+  return "target-status-muted";
 }
 
 function agentNameFromId(agentId: string) {

@@ -495,6 +495,86 @@ describe("Metis desktop GUI main flow", () => {
     );
   });
 
+  test("cross-agent matrix gives refresh feedback and prioritizes local modified status", async () => {
+    const user = userEvent.setup();
+    const scenario = createAgentDetailScenario({ slowTargets: true, codexLocalModified: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-codex-planner"));
+    const refreshButton = await screen.findByTestId("refresh-target-matrix");
+
+    expect((await screen.findByTestId("target-status-codex")).textContent).toContain("本地已修改");
+    expect(screen.getByTestId("target-status-codex").className).toContain("target-status-warning");
+
+    await user.click(refreshButton);
+
+    expect(refreshButton.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByTestId("target-matrix-spinner")).toBeTruthy();
+    expect(screen.getByTestId("target-status-codex").textContent).toContain("本地已修改");
+
+    await screen.findByText("重新检查状态");
+  });
+
+  test("reuses an existing source when opening the same skill from another agent", async () => {
+    const user = userEvent.setup();
+    const scenario = createAgentDetailScenario({ includeUnboundDuplicate: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("agent-filter-claude-code"));
+    await user.click(await screen.findByTestId("skill-row-claude-codex-planner"));
+
+    expect(await screen.findByTestId("skill-detail-claude-codex-planner")).toBeTruthy();
+    expect(screen.getByText("编辑来源")).toBeTruthy();
+    expect(await screen.findByTestId("target-row-codex")).toBeTruthy();
+
+    await user.click(screen.getByTestId("check-updates-claude-codex-planner"));
+
+    expect(scenario.boundSkillIds()).toContain("claude-codex-planner");
+    expect(scenario.checkedSkillIds()).toContainEqual(["claude-codex-planner"]);
+  });
+
+  test("keeps slow source save and diff buttons busy to prevent repeated clicks", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ slowBind: true, slowDiff: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    const saveButton = screen.getByTestId("submit-bind-source-e2e-skill").closest("button");
+
+    await user.click(saveButton as HTMLButtonElement);
+
+    expect((saveButton as HTMLButtonElement).disabled).toBe(true);
+    expect(saveButton?.textContent).toContain("保存中");
+    expect(scenario.commandCalls("bind_skill_source")).toBe(1);
+
+    expect(await screen.findByText("编辑来源")).toBeTruthy();
+    await user.click(screen.getByTestId("toggle-diff-e2e-skill"));
+    const diffButton = screen.getByTestId("toggle-diff-e2e-skill");
+
+    expect((diffButton as HTMLButtonElement).disabled).toBe(true);
+    expect(diffButton.textContent).toContain("加载 diff");
+    expect(scenario.commandCalls("get_skill_diff")).toBe(1);
+
+    expect(
+      await screen.findByText((content) => content.includes("diff --git a/SKILL.md b/SKILL.md")),
+    ).toBeTruthy();
+  });
+
   test("B direction keeps list browsing compact and opens a dedicated Push detail page", async () => {
     const user = userEvent.setup();
     const scenario = createAgentDetailScenario();
@@ -564,7 +644,9 @@ describe("Metis desktop GUI error paths", () => {
   });
 });
 
-function createMainFlowScenario() {
+function createMainFlowScenario(
+  options: { slowBind?: boolean; slowDiff?: boolean } = {},
+) {
   let source: DesktopSource = {
     id: "source-e2e-skill",
     source_type: "git",
@@ -595,6 +677,7 @@ function createMainFlowScenario() {
   };
   let backups: DesktopBackupSummary[] = [backup("backup-pre-update", "pre-update", "aaa111")];
   let indexedSkills: DesktopSkill[] = [];
+  const calls = new Map<string, number>();
 
   const agents: DesktopAgentStatus[] = [
     {
@@ -615,7 +698,9 @@ function createMainFlowScenario() {
   let settings: DesktopSettings = { custom_scan_paths: [], team_policy_path: null };
 
   return {
+    commandCalls: (command: string) => calls.get(command) ?? 0,
     async invoke(command: string, args?: unknown) {
+      calls.set(command, (calls.get(command) ?? 0) + 1);
       switch (command) {
         case "list_agents":
           return agents;
@@ -693,6 +778,9 @@ function createMainFlowScenario() {
           indexedSkills = [skill];
           return { skills: [skill], warnings: [] };
         case "bind_skill_source": {
+          if (options.slowBind) {
+            await delay(80);
+          }
           const request = args as {
             request: {
               url: string;
@@ -770,6 +858,9 @@ function createMainFlowScenario() {
         case "check_skill_updates":
           return [updateResult(skill, source)];
         case "get_skill_diff":
+          if (options.slowDiff) {
+            await delay(80);
+          }
           return diffDetail();
         case "list_skill_backups":
           return backups;
@@ -1100,7 +1191,13 @@ function createEmptyWorkspaceScenario() {
   };
 }
 
-function createAgentDetailScenario() {
+function createAgentDetailScenario(
+  options: {
+    codexLocalModified?: boolean;
+    includeUnboundDuplicate?: boolean;
+    slowTargets?: boolean;
+  } = {},
+) {
   const codexSource: DesktopSource = {
     id: "source-codex-planner",
     source_type: "git",
@@ -1131,6 +1228,15 @@ function createAgentDetailScenario() {
     agentDetailSkill("codex-planner", "codex", "Codex", codexSource),
     agentDetailSkill("claude-writer", "claude-code", "Claude Code", claudeSource),
   ];
+  if (options.includeUnboundDuplicate) {
+    skills.push({
+      ...agentDetailSkill("claude-codex-planner", "claude-code", "Claude Code", null),
+      name: "codex-planner",
+      description: "Codex managed skill",
+      install_path: "/Users/me/.claude/skills/codex-planner",
+      metadata_path: "/Users/me/.claude/skills/codex-planner/SKILL.md",
+    });
+  }
   const agents: DesktopAgentStatus[] = [
     {
       agent_id: "codex",
@@ -1162,9 +1268,11 @@ function createAgentDetailScenario() {
     },
   ];
   const checked: string[][] = [];
+  const bound: string[] = [];
 
   return {
     checkedSkillIds: () => checked,
+    boundSkillIds: () => bound,
     async invoke(command: string, args?: unknown) {
       switch (command) {
         case "list_agents":
@@ -1178,9 +1286,23 @@ function createAgentDetailScenario() {
           checked.push(request.request.skill_ids);
           return skills
             .filter((skill) => request.request.skill_ids.includes(skill.id))
-            .map((skill) => updateResult(skill, skill.source as DesktopSource));
+            .map((skill) => updateResult(skill, (skill.source ?? codexSource) as DesktopSource));
+        }
+        case "bind_skill_source": {
+          const request = args as { request: { skill_id: string } };
+          const skill = skills.find((item) => item.id === request.request.skill_id);
+          if (!skill) {
+            throw new Error(`missing skill ${request.request.skill_id}`);
+          }
+          skill.source_id = codexSource.id;
+          skill.source = codexSource;
+          bound.push(skill.id);
+          return codexSource;
         }
         case "preview_remote_skill_source":
+          if (options.slowTargets) {
+            await delay(80);
+          }
           return {
             name: "codex-planner",
             description: "Codex managed skill",
@@ -1196,7 +1318,7 @@ function createAgentDetailScenario() {
               root_path: "/Users/me/.codex/skills",
               install_path: "/Users/me/.codex/skills/codex-planner",
               status: "UpToDate",
-              local_modified: false,
+              local_modified: options.codexLocalModified === true,
               skill_id: "codex-planner",
               source_id: "source-codex-planner",
               root_available: true,
@@ -1335,7 +1457,7 @@ function agentDetailSkill(
   id: string,
   agentId: string,
   agentName: string,
-  source: DesktopSource,
+  source: DesktopSource | null,
 ): DesktopSkill {
   return {
     id,
@@ -1347,11 +1469,15 @@ function agentDetailSkill(
     metadata_path: `/Users/me/.${agentId}/skills/${id}/SKILL.md`,
     metadata_status: "found",
     metadata_error: null,
-    source_id: source.id,
+    source_id: source?.id ?? null,
     source,
     local_modified: false,
     last_scanned_at: "2026-06-20T10:00:00Z",
   };
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function betaSkill(id: string, name: string, source: DesktopSource): DesktopSkill {

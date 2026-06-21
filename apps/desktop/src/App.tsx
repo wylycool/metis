@@ -38,6 +38,7 @@ import type {
   DesktopScanWarning,
   DesktopSettings,
   DesktopSkill,
+  DesktopSource,
   DesktopSkillTarget,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceItem,
@@ -247,15 +248,16 @@ function App() {
   }
 
   function openBindForm(skill: DesktopSkill) {
+    const source = skill.source ?? reusableSourceForSkill(skill);
     setBindingSkillId(skill.id);
     setActionError(null);
     setBindDraft({
-      url: skill.source?.url ?? "",
-      repo_path: skill.source?.repo_path ?? "",
-      ref_: skill.source?.ref_ ?? "main",
-      credential_ref: skill.source?.credential_ref ?? "",
-      trusted: skill.source?.trusted ?? false,
-      auto_update: skill.source?.auto_update ?? false,
+      url: source?.url ?? "",
+      repo_path: source?.repo_path ?? "",
+      ref_: source?.ref_ ?? "main",
+      credential_ref: source?.credential_ref ?? "",
+      trusted: source?.trusted ?? false,
+      auto_update: source?.auto_update ?? false,
     });
   }
 
@@ -432,6 +434,35 @@ function App() {
     }
   }
 
+  async function handleCheckDetailUpdates(skill: DesktopSkill) {
+    setActionBusy("check-updates");
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      const readySkill = await ensureReusableSourceBound(skill);
+      if (!readySkill.source) {
+        const results = await checkSkillUpdates({ skill_ids: [skill.id] });
+        setUpdateResults((current) => ({ ...current, [skill.id]: results[0] }));
+        return;
+      }
+      const results = await checkSkillUpdates({ skill_ids: [readySkill.id] });
+      setUpdateResults((current) => {
+        const next = { ...current };
+        for (const result of results) {
+          next[result.skill_id] = result;
+        }
+        return next;
+      });
+      setDiffError({});
+      await refreshIndexedSkills();
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function handleCheckAgentUpdates(agentId: string) {
     const agentSkillIds = skills
       .filter((skill) => skill.agent_id === agentId)
@@ -472,7 +503,8 @@ function App() {
   }
 
   async function loadDetailTargets(skill: DesktopSkill) {
-    if (!skill.source) {
+    const source = skill.source ?? reusableSourceForSkill(skill);
+    if (!source) {
       return;
     }
 
@@ -485,7 +517,6 @@ function App() {
     });
 
     try {
-      const source = skill.source;
       const preview = await previewRemoteSkillSource({
         url: source.url,
         repo_path: source.repo_path,
@@ -521,7 +552,8 @@ function App() {
   }
 
   async function handleInstallDetailTargets(skill: DesktopSkill) {
-    if (!skill.source || !detailTargets[skill.id]) {
+    const source = skill.source ?? reusableSourceForSkill(skill);
+    if (!source || !detailTargets[skill.id]) {
       return;
     }
     const selectedIds = selectedDetailTargetIds[skill.id] ?? [];
@@ -537,7 +569,6 @@ function App() {
     setActionMessage(null);
 
     try {
-      const source = skill.source;
       const preview = await previewRemoteSkillSource({
         url: source.url,
         repo_path: source.repo_path,
@@ -808,6 +839,36 @@ function App() {
     }
   }
 
+  async function handleToggleDetailDiff(skill: DesktopSkill) {
+    if (diffDetails[skill.id]) {
+      setDiffDetails((current) => {
+        const next = { ...current };
+        delete next[skill.id];
+        return next;
+      });
+      return;
+    }
+
+    setActionBusy(`diff:${skill.id}`);
+    setActionError(null);
+    setActionMessage(null);
+    setDiffError((current) => {
+      const next = { ...current };
+      delete next[skill.id];
+      return next;
+    });
+
+    try {
+      await ensureReusableSourceBound(skill);
+      const detail = await getSkillDiff(skill.id);
+      setDiffDetails((current) => ({ ...current, [skill.id]: detail }));
+    } catch (caught) {
+      setDiffError((current) => ({ ...current, [skill.id]: desktopError(caught) }));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function loadBackups(skillId: string) {
     setActionBusy(`backups:${skillId}`);
     setActionError(null);
@@ -835,6 +896,75 @@ function App() {
 
     setBackupPanels((current) => ({ ...current, [skillId]: true }));
     await loadBackups(skillId);
+  }
+
+  async function handleToggleDetailBackups(skill: DesktopSkill) {
+    if (backupPanels[skill.id]) {
+      setBackupPanels((current) => ({ ...current, [skill.id]: false }));
+      return;
+    }
+
+    setBackupPanels((current) => ({ ...current, [skill.id]: true }));
+    setActionBusy(`backups:${skill.id}`);
+    setActionError(null);
+    setBackupError((current) => {
+      const next = { ...current };
+      delete next[skill.id];
+      return next;
+    });
+
+    try {
+      await ensureReusableSourceBound(skill);
+      const result = await listSkillBackups(skill.id);
+      setBackups((current) => ({ ...current, [skill.id]: result }));
+    } catch (caught) {
+      setBackupError((current) => ({ ...current, [skill.id]: desktopError(caught) }));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  function reusableSourceForSkill(skill: DesktopSkill): DesktopSource | null {
+    if (skill.source) {
+      return skill.source;
+    }
+    return (
+      skills.find(
+        (candidate) =>
+          candidate.id !== skill.id &&
+          candidate.name === skill.name &&
+          candidate.source !== null &&
+          candidate.source !== undefined,
+      )?.source ?? null
+    );
+  }
+
+  async function ensureReusableSourceBound(skill: DesktopSkill): Promise<DesktopSkill> {
+    const currentSkill = skills.find((candidate) => candidate.id === skill.id) ?? skill;
+    if (currentSkill.source) {
+      return currentSkill;
+    }
+    const source = skill.source ?? reusableSourceForSkill(currentSkill);
+    if (!source) {
+      return currentSkill;
+    }
+
+    await bindSkillSource({
+      skill_id: currentSkill.id,
+      url: source.url,
+      repo_path: source.repo_path,
+      ref_: source.ref_ || "main",
+      credential_ref: source.credential_ref ?? null,
+      trusted: source.trusted,
+      auto_update: source.auto_update,
+    });
+    await refreshIndexedSkills();
+
+    return {
+      ...currentSkill,
+      source_id: source.id,
+      source,
+    };
   }
 
   async function handleApplyUpdate(skillId: string) {
@@ -1383,11 +1513,13 @@ function App() {
           updateResults={updateResults}
           warnings={warnings}
           onApplyUpdate={handleApplyUpdate}
+          onBackupsDetailToggle={handleToggleDetailBackups}
           onBackupsToggle={handleToggleBackups}
           onBind={handleBindSource}
           onCancelBind={() => setBindingSkillId(null)}
           onCheckAgentUpdates={handleCheckAgentUpdates}
           onCheckUpdates={handleCheckUpdates}
+          onCheckDetailUpdates={handleCheckDetailUpdates}
           onDraftChange={setBindDraft}
           onInstallDetailTargets={handleInstallDetailTargets}
           onInstallRemoteTargets={handleInstallRemoteTargets}
@@ -1400,6 +1532,7 @@ function App() {
           onSelectAgent={setSelectedAgentId}
           onSetRemoteSyncDraft={setRemoteSyncDraft}
           onToggleDetailTarget={toggleDetailTarget}
+          onToggleDetailDiff={handleToggleDetailDiff}
           onToggleDiff={handleToggleDiff}
           onToggleRemoteTarget={toggleRemoteTarget}
           onUnbind={handleUnbindSource}
