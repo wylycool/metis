@@ -370,6 +370,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("redesign-rail")).toBeTruthy();
     expect(screen.getByTestId("redesign-orb").textContent).toBe("48");
     expect(screen.getByTestId("redesign-home")).toBeTruthy();
+    expect(screen.getByTestId("redesign-stage")).toBeTruthy();
+    expect(screen.getByTestId("redesign-masthead")).toBeTruthy();
+    expect(screen.getByTestId("redesign-hero-stats")).toBeTruthy();
     expect(screen.getByTestId("redesign-skill-list")).toBeTruthy();
     expect(screen.getByTestId("redesign-skill-row-memory-weaver")).toBeTruthy();
     expect(screen.queryByTestId("workspace-skills")).toBeNull();
@@ -377,6 +380,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("redesign-skill-row-memory-weaver"));
 
     expect(await screen.findByTestId("redesign-skill-detail-memory-weaver")).toBeTruthy();
+    expect(screen.getByTestId("redesign-detail-hero")).toBeTruthy();
     expect(screen.getByTestId("redesign-version-card")).toBeTruthy();
     expect(screen.getByTestId("redesign-source-card")).toBeTruthy();
     expect(screen.getByTestId("redesign-install-matrix")).toBeTruthy();

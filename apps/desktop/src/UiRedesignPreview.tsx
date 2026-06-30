@@ -206,48 +206,77 @@ function RedesignHome({ onOpenSkill }: { onOpenSkill: (skillId: string) => void 
 
   return (
     <section className="redesign-home" data-testid="redesign-home">
-      <header className="redesign-topbar">
-        <button className="redesign-search-button" aria-label="Search skills">
-          <SearchIcon />
-        </button>
-        <div className="redesign-agent-pills" aria-label="Agent filters">
-          {previewAgents.map((agent, index) => (
-            <button className={index === 0 ? "active" : ""} key={agent}>
-              <span aria-hidden="true" />
-              {agent}
-            </button>
-          ))}
-        </div>
-        <div className="redesign-status-numbers" aria-label="Status counts">
-          <span className="latest" /> {latestCount * 6 + 2}
-          <span className="update" /> {updateCount * 5}
-        </div>
-      </header>
+      <div className="redesign-stage" data-testid="redesign-stage">
+        <header className="redesign-masthead" data-testid="redesign-masthead">
+          <div>
+            <p>Local Skill Command Center</p>
+            <h1 className="redesign-masthead-title">Metis Skill Atlas</h1>
+            <span>Scan, compare, update, and govern every agent skill from one calm desktop bridge.</span>
+          </div>
+          <div className="redesign-status-numbers" aria-label="Status counts">
+            <span className="latest" /> {latestCount * 6 + 2}
+            <span className="update" /> {updateCount * 5}
+          </div>
+        </header>
 
-      <div className="redesign-home-grid">
-        <div className="redesign-orb-zone">
-          <div className="redesign-orb" data-testid="redesign-orb">
-            48
+        <div className="redesign-hero-stats" data-testid="redesign-hero-stats">
+          <div>
+            <span>Total Skills</span>
+            <strong>48</strong>
+          </div>
+          <div>
+            <span>Agents</span>
+            <strong>6</strong>
+          </div>
+          <div>
+            <span>Trusted Sources</span>
+            <strong>31</strong>
+          </div>
+          <div>
+            <span>Needs Review</span>
+            <strong>10</strong>
           </div>
         </div>
-        <div className="redesign-skill-list" data-testid="redesign-skill-list">
-          {previewSkills.map((skill) => (
-            <button
-              className="redesign-skill-row"
-              data-testid={`redesign-skill-row-${skill.id}`}
-              key={skill.id}
-              onClick={() => onOpenSkill(skill.id)}
-              style={accentStyle(skill)}
-            >
-              <span className="redesign-skill-accent" aria-hidden="true" />
-              <span className="redesign-skill-copy">
-                <strong>{skill.name}</strong>
-                <small>{skill.agent}</small>
-              </span>
-              <span className={`redesign-status-dot ${skill.status}`} aria-hidden="true" />
-            </button>
-          ))}
-          <p className="redesign-more-skills">+ 42 more</p>
+
+        <div className="redesign-topbar">
+          <button className="redesign-search-button" aria-label="Search skills">
+            <SearchIcon />
+          </button>
+          <div className="redesign-agent-pills" aria-label="Agent filters">
+            {previewAgents.map((agent, index) => (
+              <button className={index === 0 ? "active" : ""} key={agent}>
+                <span aria-hidden="true" />
+                {agent}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="redesign-home-grid">
+          <div className="redesign-orb-zone">
+            <div className="redesign-orb" data-testid="redesign-orb">
+              48
+            </div>
+          </div>
+          <div className="redesign-skill-list" data-testid="redesign-skill-list">
+            {previewSkills.map((skill) => (
+              <button
+                className="redesign-skill-row"
+                data-testid={`redesign-skill-row-${skill.id}`}
+                key={skill.id}
+                onClick={() => onOpenSkill(skill.id)}
+                style={accentStyle(skill)}
+              >
+                <span className="redesign-skill-accent" aria-hidden="true" />
+                <span className="redesign-skill-copy">
+                  <strong>{skill.name}</strong>
+                  <small>{skill.agent}</small>
+                </span>
+                <span className={`redesign-status-dot ${skill.status}`} aria-hidden="true" />
+              </button>
+            ))}
+            <p className="redesign-more-skills">+ 42 more</p>
+          </div>
         </div>
       </div>
     </section>
@@ -261,16 +290,22 @@ function RedesignDetail({ skill, onBack }: { skill: PreviewSkill; onBack: () => 
       data-testid={`redesign-skill-detail-${skill.id}`}
       style={accentStyle(skill)}
     >
-      <header className="redesign-detail-header">
-        <button className="redesign-back-button" aria-label="Back to preview home" onClick={onBack}>
-          <span aria-hidden="true">{"<"}</span>
-        </button>
-        <span className="redesign-detail-diamond" aria-hidden="true" />
-        <strong>{skill.name}</strong>
-        <small>{skill.agent}</small>
+      <header className="redesign-detail-hero" data-testid="redesign-detail-hero">
+        <div className="redesign-detail-header">
+          <button className="redesign-back-button" aria-label="Back to preview home" onClick={onBack}>
+            <span aria-hidden="true">{"<"}</span>
+          </button>
+          <span className="redesign-detail-diamond" aria-hidden="true" />
+          <strong>{skill.name}</strong>
+          <small>{skill.agent}</small>
+        </div>
         <span className={`redesign-detail-status ${skill.status}`}>
           {skill.status === "latest" ? "latest" : "update"}
         </span>
+        <div className="redesign-detail-hero-copy">
+          <p>Skill Source Bridge</p>
+          <h2>{skill.description}</h2>
+        </div>
       </header>
 
       <div className="redesign-detail-layout">

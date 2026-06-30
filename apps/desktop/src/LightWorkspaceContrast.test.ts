@@ -338,19 +338,27 @@ describe("Phase 6 light workspace contrast", () => {
       "grid-template-columns: 52px minmax(0, 1fr);",
     );
     expect(blockFor(".redesign-rail")).toContain("width: 52px;");
-    expect(latestBlockFor(".redesign-orb")).toContain("width: 68px;");
+    expect(latestBlockFor(".redesign-stage")).toContain("width: min(1180px, 100%);");
+    expect(latestBlockFor(".redesign-home-grid")).toContain(
+      "grid-template-columns: minmax(300px, 0.82fr) minmax(420px, 1fr);",
+    );
+    expect(latestBlockFor(".redesign-orb")).toContain("width: 168px;");
+    expect(latestBlockFor(".redesign-orb")).toContain("height: 168px;");
     expect(latestBlockFor(".redesign-orb::before")).toContain(
       "animation: redesignRippleOut 3s ease-out infinite;",
     );
     expect(latestBlockFor(".redesign-skill-row")).toContain(
-      "grid-template-columns: 3px minmax(0, 1fr) 14px;",
+      "grid-template-columns: 6px minmax(0, 1fr) 18px;",
     );
-    expect(latestBlockFor(".redesign-skill-accent")).toContain("height: 24px;");
+    expect(latestBlockFor(".redesign-skill-accent")).toContain("height: 38px;");
     expect(latestBlockFor(".redesign-version-card")).toContain(
       "grid-template-columns: repeat(2, minmax(0, 1fr));",
     );
     expect(latestBlockFor(".redesign-install-matrix-row")).toContain(
       "grid-template-columns: 10px minmax(0, 1fr) auto;",
+    );
+    expect(latestBlockFor(".redesign-detail-hero")).toContain(
+      "grid-template-columns: minmax(0, 1fr) auto;",
     );
   });
 
