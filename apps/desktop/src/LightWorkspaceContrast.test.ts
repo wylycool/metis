@@ -213,8 +213,8 @@ describe("Phase 6 light workspace contrast", () => {
     );
   });
 
-  test("uses compact desktop typography instead of presentation-sized controls", () => {
-    expect(declaredPx(latestBlockFor("h1"), "font-size")).toBeLessThanOrEqual(24);
+  test("uses the reference preview typography scale on the formal desktop", () => {
+    expect(declaredPx(latestBlockFor("h1"), "font-size")).toBeLessThanOrEqual(30);
     expect(declaredPx(latestBlockFor(".workspace-tab"), "font-size")).toBeLessThanOrEqual(15);
     expect(declaredPx(latestBlockFor(".metric strong"), "font-size")).toBeLessThanOrEqual(22);
     expect(declaredPx(latestBlockFor(".agent-filter-pill"), "font-size")).toBeLessThanOrEqual(13);
@@ -334,9 +334,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toContain("--redesign-violet-start: #8a68d8;");
     expect(stylesheet).toContain("@keyframes redesignRippleOut");
     expect(stylesheet).toContain("@keyframes redesignRingPulse");
-    expect(blockFor(".redesign-preview-shell")).toContain(
-      "grid-template-columns: 52px minmax(0, 1fr);",
-    );
+    expect(blockFor(".redesign-preview-shell")).toContain("grid-template-columns: 1fr;");
     expect(blockFor(".redesign-rail")).toContain("width: 52px;");
     expect(latestBlockFor(".redesign-stage")).toContain("width: min(1180px, 100%);");
     expect(latestBlockFor(".redesign-home-grid")).toContain(
@@ -428,5 +426,42 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(/\.source-drawer\s*\{[\s\S]*position:\s*fixed;/);
     expect(stylesheet).toMatch(/\.diff-panel\s*\{[\s\S]*grid-template-columns:/);
     expect(stylesheet).toMatch(/\.settings-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
+  });
+
+  test("maps the formal desktop UI onto the same redesign visual system as the preview", () => {
+    expect(stylesheet).toMatch(
+      /\.metis-window\.redesign-preview-shell\s*\{[\s\S]*padding:\s*44px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.metis-shell\.redesign-app-window\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*32px 22px;/,
+    );
+    expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*32px;/);
+    expect(stylesheet).toMatch(
+      /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*22px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-dashboard-stats\.redesign-home-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-list\.redesign-skill-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*214px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-detail-card\.redesign-detail-summary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(320px,\s*0\.48fr\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.local-operations-card\.redesign-update-workbench\s*\{[\s\S]*padding:\s*20px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.source-drawer\.redesign-source-drawer\s*\{[\s\S]*width:\s*min\(440px,\s*100vw\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.settings-agent-path-table\.redesign-agent-path-table\s*\{[\s\S]*border-radius:\s*20px;/,
+    );
   });
 });

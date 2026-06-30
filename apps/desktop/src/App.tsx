@@ -51,6 +51,14 @@ import type {
 } from "./types";
 
 type WorkspaceKey = "skills" | "governance" | "settings";
+type FormalTheme = "frost" | "sage" | "dawn" | "graphite";
+
+const formalThemes: Array<{ id: FormalTheme; label: string }> = [
+  { id: "frost", label: "Frost" },
+  { id: "sage", label: "Sage" },
+  { id: "dawn", label: "Dawn" },
+  { id: "graphite", label: "Graphite" },
+];
 
 function App() {
   if (isUiRedesignPreviewRoute()) {
@@ -93,6 +101,7 @@ function MetisApp() {
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
+  const [formalTheme, setFormalTheme] = useState<FormalTheme>("frost");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>({
@@ -1041,11 +1050,11 @@ function MetisApp() {
   const settingsAgentRows = agentPathRows(agents);
 
   return (
-    <div className="metis-window">
-      <div className="metis-shell" data-testid="metis-reference-shell">
-        <aside className="metis-sidebar" data-testid="metis-reference-sidebar">
+    <div className="metis-window redesign-preview-shell" data-theme={formalTheme}>
+      <div className="metis-shell redesign-app-window" data-testid="metis-reference-shell">
+        <aside className="metis-sidebar redesign-sidebar" data-testid="metis-reference-sidebar">
           <button
-            className="metis-sidebar-brand"
+            className="metis-sidebar-brand redesign-brand"
             data-testid="metis-brand-home"
             aria-label="打开 Metis GitHub 主页"
             onClick={() => {
@@ -1060,21 +1069,23 @@ function MetisApp() {
               }
             }}
           >
-            <span className="metis-brand-mark" aria-hidden="true">M</span>
+            <span className="metis-brand-mark redesign-logo-mark" aria-hidden="true">
+              <span>M</span>
+            </span>
             <span>
               <strong>Metis</strong>
-              <em>Skill Manager</em>
+              <small>Skill Manager</small>
             </span>
           </button>
-          <nav className="metis-sidebar-nav" aria-label="Workspace">
+          <nav className="metis-sidebar-nav redesign-side-nav" aria-label="Workspace">
             <button
               aria-pressed={activeWorkspace === "skills"}
               className={activeWorkspace === "skills" ? "active" : ""}
               data-testid="workspace-tab-skills"
               onClick={() => setActiveWorkspace("skills")}
             >
-              <span aria-hidden="true" className="sidebar-icon sidebar-icon-skills" />
-              <span>Skills</span>
+              <GridIcon />
+              Skills
               <strong>{skills.length}</strong>
             </button>
             <button
@@ -1083,8 +1094,8 @@ function MetisApp() {
               data-testid="workspace-tab-governance-sidebar"
               onClick={() => setActiveWorkspace("governance")}
             >
-              <span aria-hidden="true" className="sidebar-icon sidebar-icon-updates" />
-              <span>Updates</span>
+              <RefreshIcon />
+              Updates
               <strong>{boundCount}</strong>
             </button>
             <button
@@ -1093,35 +1104,37 @@ function MetisApp() {
               data-testid="workspace-tab-settings-sidebar"
               onClick={() => setActiveWorkspace("settings")}
             >
-              <span aria-hidden="true" className="sidebar-icon sidebar-icon-settings" />
-              <span>Settings</span>
+              <GearIcon />
+              Settings
             </button>
           </nav>
-          <div className="metis-sidebar-status">
-            <span>本地库</span>
+          <div className="metis-sidebar-status redesign-side-summary">
+            <span>Local library</span>
             <strong>{skills.length} skills</strong>
-            <em>{totalExistingPaths} 个可用路径</em>
-            <small>{trustedSourceCount} trusted sources</small>
+            <small>{agents.length} agents · {trustedSourceCount} trusted sources · {totalExistingPaths} ready paths</small>
           </div>
         </aside>
-        <div className="app-shell">
-          <header className="topbar">
+        <div className="app-shell redesign-main">
+          <FormalThemeSwitcher activeTheme={formalTheme} onChange={setFormalTheme} />
+          <header className="topbar redesign-page-topbar">
             <div className="topbar-title">
-              <span>{activeWorkspace === "settings" ? "Settings" : activeWorkspace === "governance" ? "Updates" : "Skills"}</span>
-              <strong>{activeWorkspace === "settings" ? "Agent 路径与策略" : activeWorkspace === "governance" ? "更新与治理" : "Skill 工作台"}</strong>
+              <p>{activeWorkspace === "settings" ? "Settings" : activeWorkspace === "governance" ? "Updates" : "Skill Dashboard"}</p>
+              <h1>{activeWorkspace === "settings" ? "Agent 路径设置" : activeWorkspace === "governance" ? "更新与治理" : "本机 Skill 工作台"}</h1>
             </div>
             <div className="topbar-actions">
               {activeWorkspace === "skills" && (
-                <label className="topbar-search" aria-label="搜索 skills">
-                  <span aria-hidden="true" />
+                <label className="topbar-search redesign-search-field" aria-label="搜索 skills">
+                  <SearchIcon />
                   <input
                     data-testid="skill-search-input"
                     placeholder="搜索 skill、路径或来源"
                     value={skillSearchQuery}
                     onChange={(event) => setSkillSearchQuery(event.target.value)}
                   />
+                  <span>{skills.length} results</span>
                 </label>
               )}
+              <div className="redesign-top-actions">
               <button
                 className="ghost-button topbar-secondary-action"
                 data-testid="check-all-updates"
@@ -1140,6 +1153,7 @@ function MetisApp() {
               >
                 {state === "loading" ? "扫描中" : "重新扫描"}
               </button>
+              </div>
               <button
                 aria-label="Settings"
                 aria-pressed={activeWorkspace === "settings"}
@@ -1378,25 +1392,18 @@ function MetisApp() {
       )}
 
       {activeWorkspace === "settings" && (
-        <section className="settings-panel workspace-pane" aria-label="配置" data-testid="workspace-settings">
-          <div className="settings-agent-path-table" data-testid="settings-agent-path-table">
-            <div className="settings-agent-path-head">
-              <span>Agent</span>
-              <span>路径</span>
-              <span>状态</span>
-            </div>
+        <section className="settings-panel workspace-pane redesign-settings-page" aria-label="配置" data-testid="workspace-settings">
+          <div className="settings-agent-path-table redesign-agent-path-table" data-testid="settings-agent-path-table">
             {settingsAgentRows.map((row) => (
-              <div
-                className="settings-agent-path-row"
+              <label
+                className="settings-agent-path-row redesign-agent-path-row"
                 data-testid={`settings-agent-path-${row.agent_id}`}
                 key={row.agent_id}
               >
-                <strong>{row.agent_name}</strong>
-                <code>{row.path}</code>
-                <span className={row.exists ? "path-status-good" : "path-status-muted"}>
-                  {row.exists ? "可用" : "未发现"}
-                </span>
-              </div>
+                <span className={row.exists ? "ready" : "missing"}>{row.agent_name}</span>
+                <input readOnly value={row.path} />
+                <small>{row.exists ? "可读写" : "路径不存在"}</small>
+              </label>
             ))}
           </div>
           <div className="settings-summary">
@@ -1652,6 +1659,35 @@ function isUiRedesignPreviewRoute() {
   return hash === "/ui-redesign-preview" || search.includes("preview=ui-redesign");
 }
 
+function FormalThemeSwitcher({
+  activeTheme,
+  onChange,
+}: {
+  activeTheme: FormalTheme;
+  onChange: (theme: FormalTheme) => void;
+}) {
+  return (
+    <div
+      className="redesign-theme-switcher"
+      data-testid="formal-redesign-theme-switcher"
+      aria-label="正式界面背景主题"
+    >
+      {formalThemes.map((theme) => (
+        <button
+          aria-pressed={activeTheme === theme.id}
+          className={activeTheme === theme.id ? "active" : ""}
+          data-testid={`formal-redesign-theme-${theme.id}`}
+          key={theme.id}
+          onClick={() => onChange(theme.id)}
+        >
+          <span className="redesign-theme-swatch" aria-hidden="true" />
+          {theme.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function SummaryMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="metric">
@@ -1905,6 +1941,46 @@ function unknownDesktopError(detail: string): DesktopError {
     suggestion: "请确认目标目录、Git source 和本地数据库状态后重试。",
     debug_detail: detail,
   };
+}
+
+function GridIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="6" height="6" rx="1.4" />
+      <rect x="14" y="4" width="6" height="6" rx="1.4" />
+      <rect x="4" y="14" width="6" height="6" rx="1.4" />
+      <rect x="14" y="14" width="6" height="6" rx="1.4" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M20 7v5h-5" />
+      <path d="M4 17v-5h5" />
+      <path d="M18 9a6.5 6.5 0 0 0-11-2" />
+      <path d="M6 15a6.5 6.5 0 0 0 11 2" />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M12 8.4a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Z" />
+      <path d="M12 3.4 14 5l2.5-.5 1.2 2.1-1.6 2 .4 1.4 2.2 1v2.4l-2.2 1-.4 1.4 1.6 2-1.2 2.1-2.5-.5-2 1.6-2-1.6-2.5.5-1.2-2.1 1.6-2-.4-1.4-2.2-1V11l2.2-1 .4-1.4-1.6-2 1.2-2.1L10 5l2-1.6Z" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <circle cx="10.5" cy="10.5" r="5.8" />
+      <path d="m15 15 4.4 4.4" />
+    </svg>
+  );
 }
 
 export default App;

@@ -97,14 +97,16 @@ export function SkillDetailPage({
   const installedPathRows = installedSkillPathRows(skill, detailTargets);
 
   return (
-    <section className="skill-panel skill-detail-page" data-testid={`skill-detail-${skill.id}`}>
-      <button className="breadcrumb-button" onClick={onBack}>
-        <span aria-hidden="true">←</span>
-        <span>返回</span>
+    <section
+      className="skill-panel skill-detail-page redesign-detail"
+      data-testid={`skill-detail-${skill.id}`}
+    >
+      <button className="breadcrumb-button redesign-back-button" onClick={onBack}>
+        返回
       </button>
 
       <header
-        className="skill-detail-card skill-intro-card"
+        className="skill-detail-card skill-intro-card redesign-detail-summary"
         data-testid={`skill-intro-card-${skill.id}`}
       >
         <div
@@ -112,6 +114,7 @@ export function SkillDetailPage({
           data-testid={`skill-detail-reference-summary-${skill.id}`}
         >
           <div className="skill-intro-facts">
+            <span className="redesign-detail-kicker">Skill detail</span>
             <div className="skill-intro-fact">
               <span className="skill-intro-label">Name</span>
               <strong className="skill-intro-name">{skill.name}</strong>
@@ -145,7 +148,10 @@ export function SkillDetailPage({
             </div>
           </div>
         </div>
-        <div className="intro-source-corner">
+        <div className="intro-source-corner redesign-source-summary">
+          <span>来源</span>
+          <strong>{source?.url || "未绑定来源"}</strong>
+          <small>{source?.repo_path ? `${source.repo_path} · ${source.ref_ || "main"}` : ""}</small>
           <button
             className={`source-chip-button ${source ? "bound" : "unbound"}`}
             data-testid={`open-bind-source-${skill.id}`}
@@ -171,7 +177,7 @@ export function SkillDetailPage({
 
       <div className="skill-detail-grid">
         <section
-          className="skill-detail-card local-operations-card"
+          className="skill-detail-card local-operations-card redesign-update-workbench"
           data-testid={`skill-operations-card-${skill.id}`}
         >
           <div className="detail-card-heading">
@@ -193,9 +199,9 @@ export function SkillDetailPage({
             </div>
           )}
 
-          <div className="detail-action-row local-action-row">
+          <div className="detail-action-row local-action-row redesign-operation-tabs">
             <button
-              className="operation-button compact"
+              className={`operation-button compact ${!diffDetail && !backupOpen ? "active" : ""}`}
               data-testid={`check-updates-${skill.id}`}
               disabled={!source || checkBusy}
               onClick={onCheck}
@@ -203,7 +209,7 @@ export function SkillDetailPage({
               {checkBusy ? "检查中" : "检查更新"}
             </button>
             <button
-              className="operation-button compact"
+              className={`operation-button compact ${diffDetail ? "active" : ""}`}
               data-testid={`toggle-diff-${skill.id}`}
               disabled={!source || diffBusy}
               onClick={onToggleDiff}
@@ -221,7 +227,7 @@ export function SkillDetailPage({
               </button>
             )}
             <button
-              className="operation-button compact"
+              className={`operation-button compact ${backupOpen ? "active" : ""}`}
               data-testid={`toggle-backups-${skill.id}`}
               disabled={!source || backupBusy}
               onClick={onToggleBackups}
@@ -246,10 +252,10 @@ export function SkillDetailPage({
       </div>
 
       {isBinding && (
-        <div className="source-drawer-backdrop" role="presentation" onClick={onCancelBind}>
+        <div className="source-drawer-backdrop redesign-drawer-scrim" role="presentation" onClick={onCancelBind}>
           <aside
             aria-label="修改来源信息"
-            className="source-drawer"
+            className="source-drawer redesign-source-drawer"
             data-testid={`source-drawer-${skill.id}`}
             onClick={(event) => event.stopPropagation()}
           >

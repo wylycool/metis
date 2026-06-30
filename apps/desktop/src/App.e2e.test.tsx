@@ -43,7 +43,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByText("返回")).toBeTruthy();
     expect(screen.queryByText("Skills / e2e-skill")).toBeNull();
     expect(screen.queryByText("未检测更新")).toBeNull();
-    expect(screen.queryByText("未绑定来源")).toBeNull();
+    expect(screen.getByText("未绑定来源")).toBeTruthy();
     expect(screen.queryByTestId("apply-update-e2e-skill")).toBeNull();
     expect((screen.getByTestId("check-updates-e2e-skill") as HTMLButtonElement).disabled).toBe(
       true,
@@ -330,6 +330,10 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByTestId("workspace-rail")).toBeNull();
     expect(screen.getByTestId("metis-reference-shell")).toBeTruthy();
     expect(screen.getByTestId("metis-reference-sidebar")).toBeTruthy();
+    expect(screen.getByTestId("metis-reference-shell").className).toContain("redesign-app-window");
+    expect(screen.getByTestId("metis-reference-sidebar").className).toContain("redesign-sidebar");
+    expect(screen.getByTestId("formal-redesign-theme-switcher")).toBeTruthy();
+    expect(screen.getByTestId("workspace-skills").className).toContain("redesign-home");
     expect(screen.getByTestId("metis-brand-home")).toBeTruthy();
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
@@ -351,11 +355,16 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("agent-filter-all").textContent).toContain("全部 Agent");
     expect(screen.getByTestId("skill-dashboard-stats")).toBeTruthy();
     expect(screen.getByTestId("skill-card-grid")).toBeTruthy();
+    expect(screen.getByTestId("skill-card-grid").className).toContain("redesign-skill-grid");
     expect(screen.getByTestId("skill-card-e2e-skill")).toBeTruthy();
+    expect(screen.getByTestId("skill-row-e2e-skill").className).toContain("redesign-skill-card");
 
     await user.click(screen.getByTestId("workspace-tab-settings"));
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
     expect(screen.getByTestId("settings-agent-path-table")).toBeTruthy();
+    expect(screen.getByTestId("settings-agent-path-table").className).toContain(
+      "redesign-agent-path-table",
+    );
     expect(screen.getByTestId("settings-agent-path-codex")).toBeTruthy();
     expect(screen.getByText("扫描路径")).toBeTruthy();
     expect(screen.getByText("企业网络")).toBeTruthy();
@@ -541,7 +550,7 @@ describe("Metis desktop GUI main flow", () => {
 
     const resultRow = await screen.findByTestId("skill-row-claude-writer");
     expect(within(resultRow).getByText("claude-writer")).toBeTruthy();
-    expect(within(resultRow).queryByText("Claude Code")).toBeNull();
+    expect(within(resultRow).getByText("Claude Code")).toBeTruthy();
     expect(screen.queryByText("codex-planner")).toBeNull();
 
     await user.clear(screen.getByTestId("skill-search-input"));
@@ -694,13 +703,22 @@ describe("Metis desktop GUI main flow", () => {
     const row = await screen.findByTestId("skill-row-codex-planner");
     expect(within(row).queryByText("备份/回滚")).toBeNull();
     expect(within(row).queryByText(/metadata:/)).toBeNull();
-    expect(within(row).queryByText("Codex")).toBeNull();
+    expect(within(row).getByText("Codex")).toBeTruthy();
 
     await user.click(row);
 
     expect(await screen.findByTestId("skill-detail-codex-planner")).toBeTruthy();
+    expect(screen.getByTestId("skill-detail-codex-planner").className).toContain(
+      "redesign-detail",
+    );
     expect(screen.getByTestId("skill-intro-card-codex-planner")).toBeTruthy();
+    expect(screen.getByTestId("skill-intro-card-codex-planner").className).toContain(
+      "redesign-detail-summary",
+    );
     expect(screen.getByTestId("skill-detail-reference-summary-codex-planner")).toBeTruthy();
+    expect(screen.getByTestId("skill-operations-card-codex-planner").className).toContain(
+      "redesign-update-workbench",
+    );
     const introCard = within(screen.getByTestId("skill-intro-card-codex-planner"));
     expect(introCard.getByText("Name")).toBeTruthy();
     expect(introCard.getByText("Description")).toBeTruthy();

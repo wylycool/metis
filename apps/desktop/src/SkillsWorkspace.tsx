@@ -218,7 +218,12 @@ export function SkillsWorkspace({
   ]);
 
   return (
-    <main className="workspace workspace-pane phase6-workspace" data-testid="workspace-skills">
+    <main
+      className={`workspace workspace-pane phase6-workspace ${
+        route.kind === "list" ? "redesign-home" : ""
+      }`}
+      data-testid="workspace-skills"
+    >
       {route.kind === "detail" && routedDetailSkill && (
         <SkillDetailPage
           actionBusy={actionBusy}
@@ -269,12 +274,12 @@ export function SkillsWorkspace({
       )}
 
       {route.kind === "list" && (
-        <section className="skill-panel">
-          <div className="skill-dashboard-stats" data-testid="skill-dashboard-stats">
+        <section className="skill-panel redesign-home">
+          <div className="skill-dashboard-stats redesign-home-stats" data-testid="skill-dashboard-stats">
             <DashboardStat label="全部 Skill" value={baseVisibleSkills.length} tone="mint" />
-            <DashboardStat label="待更新" value={visibleUpdateAvailableCount} tone="rose" />
-            <DashboardStat label="已最新" value={visibleUpToDateCount} tone="sky" />
-            <DashboardStat label="本地修改" value={visibleModifiedCount} tone="warm" />
+            <DashboardStat label="待更新" value={visibleUpdateAvailableCount} tone="warm" />
+            <DashboardStat label="已最新" value={visibleUpToDateCount} tone="blue" />
+            <DashboardStat label="本地修改" value={visibleModifiedCount} tone="rose" />
           </div>
 
           <div
@@ -373,7 +378,15 @@ export function SkillsWorkspace({
             <EmptyState onOpenSettings={onOpenSettings} onScan={onScan} />
           )}
           {state === "loaded" && visibleSkills.length > 0 && (
-            <div className="skill-list" data-testid="skill-card-grid">
+            <>
+            <div className="redesign-section-heading">
+              <div>
+                <p>Skill inventory</p>
+                <h2>跨 Agent 安装概览</h2>
+              </div>
+              <span>{visibleSkills.length} of {baseVisibleSkills.length} visible</span>
+            </div>
+            <div className="skill-list redesign-skill-grid" data-testid="skill-card-grid">
               {visibleSkills.map((skill) => (
                 <SkillRow
                   key={skill.id}
@@ -401,6 +414,7 @@ export function SkillsWorkspace({
                 />
               ))}
             </div>
+            </>
           )}
         </section>
       )}
@@ -414,13 +428,14 @@ function DashboardStat({
   value,
 }: {
   label: string;
-  tone: "mint" | "rose" | "sky" | "warm";
+  tone: "mint" | "rose" | "blue" | "warm";
   value: number;
 }) {
   return (
-    <article className={`dashboard-stat-card ${tone}`}>
+    <article className={`dashboard-stat-card redesign-stat-card ${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
+      <small>{label === "待更新" ? "needs review" : label === "已最新" ? "ready to use" : "from real scan"}</small>
     </article>
   );
 }
