@@ -4133,24 +4133,22 @@ textarea {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr;
-  place-items: center;
-  padding: 44px;
+  place-items: stretch;
+  padding: 0;
   overflow-x: hidden;
-  background: var(--redesign-canvas);
+  background: #ffffff;
 }
 
 .metis-shell.redesign-app-window {
-  width: min(1480px, 100%);
-  min-height: min(860px, calc(100vh - 88px));
+  width: 100vw;
+  min-height: 100vh;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  border: 1px solid rgba(220, 229, 238, 0.88);
-  border-radius: 28px;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.86);
-  box-shadow:
-    0 34px 90px rgba(56, 74, 98, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  box-shadow: none;
 }
 
 .metis-sidebar.redesign-sidebar {
@@ -4159,7 +4157,7 @@ textarea {
   grid-template-rows: auto 1fr auto;
   gap: 34px;
   border-right: 1px solid rgba(221, 230, 238, 0.76);
-  border-radius: 28px 0 0 28px;
+  border-radius: 0;
   padding: 32px 22px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 253, 0.82)),
@@ -4307,6 +4305,14 @@ textarea {
   background: #f4f6fa;
 }
 
+.topbar-search.redesign-search-field svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
 .skill-panel.redesign-home {
   min-width: 0;
   display: grid;
@@ -4340,6 +4346,18 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.redesign-show-more {
+  width: fit-content;
+  justify-self: center;
+  border: 1px solid #d8e3ee;
+  border-radius: 999px;
+  padding: 0 18px;
+  color: #3154df;
+  background: #eef4ff;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .skill-row.redesign-skill-card {

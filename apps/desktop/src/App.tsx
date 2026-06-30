@@ -51,14 +51,7 @@ import type {
 } from "./types";
 
 type WorkspaceKey = "skills" | "governance" | "settings";
-type FormalTheme = "frost" | "sage" | "dawn" | "graphite";
-
-const formalThemes: Array<{ id: FormalTheme; label: string }> = [
-  { id: "frost", label: "Frost" },
-  { id: "sage", label: "Sage" },
-  { id: "dawn", label: "Dawn" },
-  { id: "graphite", label: "Graphite" },
-];
+type SkillsViewKind = "list" | "detail" | "add";
 
 function App() {
   if (isUiRedesignPreviewRoute()) {
@@ -101,8 +94,7 @@ function MetisApp() {
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
-  const [formalTheme, setFormalTheme] = useState<FormalTheme>("frost");
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [skillsViewKind, setSkillsViewKind] = useState<SkillsViewKind>("list");
   const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>({
     url: "",
@@ -181,6 +173,7 @@ function MetisApp() {
       setSkills(scanResult.skills);
       setWarnings(scanResult.warnings);
       setState("loaded");
+      setActionMessage("已重新扫描本机 skill 路径");
     } catch (caught) {
       setError(desktopError(caught));
       setState("error");
@@ -445,6 +438,8 @@ function MetisApp() {
       });
       setDiffError({});
       await refreshIndexedSkills();
+      const updateCount = results.filter((result) => result.status === "UpdateAvailable").length;
+      setActionMessage(`检查完成：${updateCount} 个 skill 待更新`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -474,18 +469,12 @@ function MetisApp() {
       });
       setDiffError({});
       await refreshIndexedSkills();
+      setActionMessage("检查完成：远端更新状态已刷新");
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
-  }
-
-  async function handleCheckAgentUpdates(agentId: string) {
-    const agentSkillIds = skills
-      .filter((skill) => skill.agent_id === agentId)
-      .map((skill) => skill.id);
-    await handleCheckUpdates(agentSkillIds, `agent-check:${agentId}`);
   }
 
   async function handlePreviewRemoteSync() {
@@ -1048,9 +1037,10 @@ function MetisApp() {
   }
 
   const settingsAgentRows = agentPathRows(agents);
+  const isSkillDetailView = activeWorkspace === "skills" && skillsViewKind === "detail";
 
   return (
-    <div className="metis-window redesign-preview-shell" data-theme={formalTheme}>
+    <div className="metis-window redesign-preview-shell" data-theme="frost">
       <div className="metis-shell redesign-app-window" data-testid="metis-reference-shell">
         <aside className="metis-sidebar redesign-sidebar" data-testid="metis-reference-sidebar">
           <button
@@ -1086,7 +1076,6 @@ function MetisApp() {
             >
               <GridIcon />
               Skills
-              <strong>{skills.length}</strong>
             </button>
             <button
               aria-pressed={activeWorkspace === "governance"}
@@ -1096,7 +1085,6 @@ function MetisApp() {
             >
               <RefreshIcon />
               Updates
-              <strong>{boundCount}</strong>
             </button>
             <button
               aria-pressed={activeWorkspace === "settings"}
@@ -1115,8 +1103,7 @@ function MetisApp() {
           </div>
         </aside>
         <div className="app-shell redesign-main">
-          <FormalThemeSwitcher activeTheme={formalTheme} onChange={setFormalTheme} />
-          <header className="topbar redesign-page-topbar">
+          {!isSkillDetailView && <header className="topbar redesign-page-topbar">
             <div className="topbar-title">
               <p>{activeWorkspace === "settings" ? "Settings" : activeWorkspace === "governance" ? "Updates" : "Skill Dashboard"}</p>
               <h1>{activeWorkspace === "settings" ? "Agent 路径设置" : activeWorkspace === "governance" ? "更新与治理" : "本机 Skill 工作台"}</h1>
@@ -1164,7 +1151,7 @@ function MetisApp() {
                 <span aria-hidden="true" />
               </button>
             </div>
-          </header>
+          </header>}
 
           <nav className="workspace-tabs" aria-hidden="true" hidden>
             <WorkspaceTab
@@ -1199,7 +1186,11 @@ function MetisApp() {
       )}
 
       {actionError && <InlineError error={actionError} />}
-      {actionMessage && <div className="inline-success">{actionMessage}</div>}
+      {actionMessage && (
+        <div className="redesign-toast" data-testid="redesign-toast">
+          {actionMessage}
+        </div>
+      )}
 
       {activeWorkspace === "governance" && (
         <section className="workspace-pane" data-testid="workspace-governance">
@@ -1582,7 +1573,6 @@ function MetisApp() {
       {activeWorkspace === "skills" && (
         <SkillsWorkspace
           actionBusy={actionBusy}
-          agents={agents}
           backupError={backupError}
           backupPanels={backupPanels}
           backups={backups}
@@ -1598,20 +1588,17 @@ function MetisApp() {
           remotePreview={remotePreview}
           remoteSyncDraft={remoteSyncDraft}
           remoteTargets={remoteTargets}
-          selectedAgentId={selectedAgentId}
           selectedDetailTargetIds={selectedDetailTargetIds}
           selectedRemoteTargetIds={selectedRemoteTargetIds}
           skillSearchQuery={skillSearchQuery}
           skills={skills}
           state={state}
           updateResults={updateResults}
-          warnings={warnings}
           onApplyUpdate={handleApplyUpdate}
           onBackupsDetailToggle={handleToggleDetailBackups}
           onBackupsToggle={handleToggleBackups}
           onBind={handleBindSource}
           onCancelBind={() => setBindingSkillId(null)}
-          onCheckAgentUpdates={handleCheckAgentUpdates}
           onCheckUpdates={handleCheckUpdates}
           onCheckDetailUpdates={handleCheckDetailUpdates}
           onDraftChange={setBindDraft}
@@ -1623,8 +1610,8 @@ function MetisApp() {
           onPreviewRemoteSync={handlePreviewRemoteSync}
           onRestoreBackup={handleRestoreBackup}
           onScan={handleScan}
-          onSelectAgent={setSelectedAgentId}
           onSetRemoteSyncDraft={setRemoteSyncDraft}
+          onRouteKindChange={setSkillsViewKind}
           onToggleDetailTarget={toggleDetailTarget}
           onToggleDetailDiff={handleToggleDetailDiff}
           onToggleDiff={handleToggleDiff}
@@ -1657,35 +1644,6 @@ function isUiRedesignPreviewRoute() {
   const hash = window.location.hash.replace(/^#/, "");
   const search = window.location.search;
   return hash === "/ui-redesign-preview" || search.includes("preview=ui-redesign");
-}
-
-function FormalThemeSwitcher({
-  activeTheme,
-  onChange,
-}: {
-  activeTheme: FormalTheme;
-  onChange: (theme: FormalTheme) => void;
-}) {
-  return (
-    <div
-      className="redesign-theme-switcher"
-      data-testid="formal-redesign-theme-switcher"
-      aria-label="正式界面背景主题"
-    >
-      {formalThemes.map((theme) => (
-        <button
-          aria-pressed={activeTheme === theme.id}
-          className={activeTheme === theme.id ? "active" : ""}
-          data-testid={`formal-redesign-theme-${theme.id}`}
-          key={theme.id}
-          onClick={() => onChange(theme.id)}
-        >
-          <span className="redesign-theme-swatch" aria-hidden="true" />
-          {theme.label}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {

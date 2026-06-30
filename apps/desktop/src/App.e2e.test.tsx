@@ -60,7 +60,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.type(screen.getByTestId("bind-ref-e2e-skill"), "main");
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
 
-    expect(await screen.findByText("编辑来源")).toBeTruthy();
+    expect(await screen.findByText("修改来源")).toBeTruthy();
 
     await user.click(screen.getByTestId("check-updates-e2e-skill"));
 
@@ -256,7 +256,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("bind-auto-update-e2e-skill"));
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
 
-    expect(await screen.findByText("编辑来源")).toBeTruthy();
+    expect(await screen.findByText("修改来源")).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith("save_desktop_settings", {
       settings: expect.objectContaining({
         team_policy_path: "/tmp/team-policy.json",
@@ -332,12 +332,14 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("metis-reference-sidebar")).toBeTruthy();
     expect(screen.getByTestId("metis-reference-shell").className).toContain("redesign-app-window");
     expect(screen.getByTestId("metis-reference-sidebar").className).toContain("redesign-sidebar");
-    expect(screen.getByTestId("formal-redesign-theme-switcher")).toBeTruthy();
+    expect(screen.queryByTestId("formal-redesign-theme-switcher")).toBeNull();
     expect(screen.getByTestId("workspace-skills").className).toContain("redesign-home");
     expect(screen.getByTestId("metis-brand-home")).toBeTruthy();
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
     expect(screen.getByTestId("scan-skills")).toBeTruthy();
+    expect(screen.getByTestId("workspace-tab-skills").textContent).toBe("Skills");
+    expect(screen.getByTestId("workspace-tab-governance-sidebar").textContent).toBe("Updates");
     expect(screen.getByTestId("workspace-tab-settings").textContent).toBe("");
     expect(screen.queryByTestId("workspace-tab-governance")).toBeNull();
     expect(screen.queryByText("Skill 索引")).toBeNull();
@@ -346,13 +348,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("来自本机 SQLite 索引和最新扫描结果")).toBeNull();
     expect(screen.queryByLabelText("扫描摘要")).toBeNull();
     expect(screen.queryByText("团队清单合规")).toBeNull();
-    expect(screen.getByTestId("skill-status-filters")).toBeTruthy();
-    expect(screen.getByTestId("status-filter-all")).toBeTruthy();
-    expect(screen.getByTestId("status-filter-up-to-date")).toBeTruthy();
-    expect(screen.getByTestId("status-filter-update-available")).toBeTruthy();
-    expect(screen.getByTestId("status-filter-modified")).toBeTruthy();
-    expect(screen.getByTestId("agent-category-bar")).toBeTruthy();
-    expect(screen.getByTestId("agent-filter-all").textContent).toContain("全部 Agent");
+    expect(screen.queryByTestId("skill-status-filters")).toBeNull();
+    expect(screen.queryByTestId("agent-category-bar")).toBeNull();
     expect(screen.getByTestId("skill-dashboard-stats")).toBeTruthy();
     expect(screen.getByTestId("skill-card-grid")).toBeTruthy();
     expect(screen.getByTestId("skill-card-grid").className).toContain("redesign-skill-grid");
@@ -372,7 +369,26 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(screen.getByTestId("metis-brand-home"));
     expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
-    expect(screen.getByTestId("skill-status-filters")).toBeTruthy();
+    expect(screen.queryByTestId("skill-status-filters")).toBeNull();
+  });
+
+  test("limits the formal home first screen and expands with show more", async () => {
+    const user = userEvent.setup();
+    const scenario = createAgentDetailScenario({ extraSkillCount: 8 });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId("skill-card-grid")).toBeTruthy();
+    expect(screen.getAllByTestId(/^skill-row-/)).toHaveLength(6);
+    expect(screen.queryByTestId("skill-row-extra-skill-6")).toBeNull();
+
+    await user.click(screen.getByTestId("show-more-skills"));
+
+    expect(await screen.findByTestId("skill-row-extra-skill-6")).toBeTruthy();
+    expect(screen.getAllByTestId(/^skill-row-/).length).toBeGreaterThan(6);
   });
 
   test("renders the static UI redesign preview without backend commands", async () => {
@@ -521,17 +537,16 @@ describe("Metis desktop GUI main flow", () => {
 
     const { container } = render(<App />);
 
-    await user.click(await screen.findByTestId("agent-filter-codex"));
-
-    expect(await screen.findByTestId("agent-detail-codex")).toBeTruthy();
-    expect(container.querySelectorAll(".agent-detail-summary")).toHaveLength(1);
+    expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
+    expect(container.querySelectorAll(".agent-detail-summary")).toHaveLength(0);
+    expect(screen.queryByTestId("agent-category-bar")).toBeNull();
     expect(screen.getByText("codex-planner")).toBeTruthy();
-    expect(screen.queryByText("claude-writer")).toBeNull();
+    expect(screen.getByText("claude-writer")).toBeTruthy();
 
-    await user.click(screen.getByTestId("check-agent-updates-codex"));
+    await user.click(screen.getByTestId("check-all-updates"));
 
     expect((await screen.findAllByText("待更新")).length).toBeGreaterThanOrEqual(1);
-    expect(scenario.checkedSkillIds()).toEqual([["codex-planner"]]);
+    expect(scenario.checkedSkillIds()).toEqual([["codex-planner", "claude-writer"]]);
   });
 
   test("local search stays global while showing each result agent", async () => {
@@ -543,8 +558,7 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByTestId("agent-filter-codex"));
-    expect(screen.queryByText("claude-writer")).toBeNull();
+    expect(await screen.findByTestId("skill-row-codex-planner")).toBeTruthy();
 
     await user.type(screen.getByTestId("skill-search-input"), "claude");
 
@@ -556,7 +570,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.clear(screen.getByTestId("skill-search-input"));
 
     expect(await screen.findByTestId("skill-row-codex-planner")).toBeTruthy();
-    expect(screen.queryByText("claude-writer")).toBeNull();
+    expect(screen.getByText("claude-writer")).toBeTruthy();
   });
 
   test("search deduplicates the same skill across agents and updates agent counts", async () => {
@@ -574,9 +588,7 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByTestId("skill-row-shared-codex")).toBeTruthy();
     expect(screen.queryByTestId("skill-row-shared-claude")).toBeNull();
-    expect(screen.getByTestId("agent-filter-all").textContent).toContain("1");
-    expect(screen.getByTestId("agent-filter-codex").textContent).toContain("1");
-    expect(screen.getByTestId("agent-filter-claude-code").textContent).toContain("1");
+    expect(screen.queryByTestId("agent-category-bar")).toBeNull();
 
     await user.clear(screen.getByTestId("skill-search-input"));
     await user.type(screen.getByTestId("skill-search-input"), "claude-only");
@@ -584,9 +596,6 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByTestId("skill-row-claude-only")).toBeTruthy();
     expect(screen.queryByTestId("skill-row-shared-codex")).toBeNull();
     expect(screen.queryByTestId("skill-row-shared-claude")).toBeNull();
-    expect(screen.getByTestId("agent-filter-all").textContent).toContain("1");
-    expect(screen.getByTestId("agent-filter-codex").textContent).toContain("0");
-    expect(screen.getByTestId("agent-filter-claude-code").textContent).toContain("1");
   });
 
   test("phase6 shows a cross-agent matrix on a bound skill detail page", async () => {
@@ -600,16 +609,20 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(await screen.findByTestId("skill-row-codex-planner"));
     expect(await screen.findByTestId("skill-detail-codex-planner")).toBeTruthy();
-    expect(await screen.findByTestId("target-row-codex")).toBeTruthy();
-    expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText("当前查看")).toBeTruthy();
-    expect(await screen.findByTestId("target-row-claude-code")).toBeTruthy();
-    expect((screen.getByTestId("target-checkbox-claude-code") as HTMLInputElement).disabled).toBe(
-      false,
+    expect(screen.queryByText("本机 Skill 工作台")).toBeNull();
+    expect(screen.queryByTestId("skill-search-input")).toBeNull();
+    expect(screen.queryByTestId("check-all-updates")).toBeNull();
+    expect(screen.queryByTestId("scan-skills")).toBeNull();
+    expect(screen.getByTestId("skill-intro-card-codex-planner").className).toContain(
+      "redesign-detail-summary",
     );
+    expect(screen.queryByText("Name")).toBeNull();
+    expect(screen.queryByText("Description")).toBeNull();
+    expect(screen.queryByText("Paths")).toBeNull();
+    expect(screen.queryByText("跨 Agent 安装状态")).toBeNull();
   });
 
-  test("cross-agent matrix gives refresh feedback and prioritizes local modified status", async () => {
+  test("detail check action gives the redesign toast feedback", async () => {
     const user = userEvent.setup();
     const scenario = createAgentDetailScenario({ slowTargets: true, codexLocalModified: true });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -619,19 +632,12 @@ describe("Metis desktop GUI main flow", () => {
     render(<App />);
 
     await user.click(await screen.findByTestId("skill-row-codex-planner"));
-    const refreshButton = await screen.findByTestId("refresh-target-matrix");
+    expect(await screen.findByTestId("skill-detail-codex-planner")).toBeTruthy();
 
-    expect((await screen.findByTestId("target-status-codex")).textContent).toContain("本地已修改");
-    expect(screen.getByTestId("target-status-codex").className).toContain("target-status-warning");
-    expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).disabled).toBe(false);
+    await user.click(screen.getByTestId("check-updates-codex-planner"));
 
-    await user.click(refreshButton);
-
-    expect(refreshButton.getAttribute("aria-busy")).toBe("true");
-    expect(screen.getByTestId("target-matrix-spinner")).toBeTruthy();
-    expect(screen.getByTestId("target-status-codex").textContent).toContain("本地已修改");
-
-    await screen.findByText("重新检查状态");
+    expect(await screen.findByTestId("redesign-toast")).toBeTruthy();
+    expect(await screen.findByTestId("check-panel-codex-planner")).toBeTruthy();
   });
 
   test("reuses an existing source when opening the same skill from another agent", async () => {
@@ -643,12 +649,11 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByTestId("agent-filter-claude-code"));
     await user.click(await screen.findByTestId("skill-row-claude-codex-planner"));
 
     expect(await screen.findByTestId("skill-detail-claude-codex-planner")).toBeTruthy();
-    expect(screen.getByText("编辑来源")).toBeTruthy();
-    expect(await screen.findByTestId("target-row-codex")).toBeTruthy();
+    expect(screen.getByText("修改来源")).toBeTruthy();
+    expect(screen.queryByText("跨 Agent 安装状态")).toBeNull();
 
     await user.click(screen.getByTestId("check-updates-claude-codex-planner"));
 
@@ -677,7 +682,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(saveButton?.textContent).toContain("保存中");
     expect(scenario.commandCalls("bind_skill_source")).toBe(1);
 
-    expect(await screen.findByText("编辑来源")).toBeTruthy();
+    expect(await screen.findByText("修改来源")).toBeTruthy();
     await user.click(screen.getByTestId("toggle-diff-e2e-skill"));
     const diffButton = screen.getByTestId("toggle-diff-e2e-skill");
 
@@ -699,7 +704,8 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    expect(await screen.findByTestId("skill-status-filters")).toBeTruthy();
+    expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
+    expect(screen.queryByTestId("skill-status-filters")).toBeNull();
     const row = await screen.findByTestId("skill-row-codex-planner");
     expect(within(row).queryByText("备份/回滚")).toBeNull();
     expect(within(row).queryByText(/metadata:/)).toBeNull();
@@ -708,6 +714,9 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(row);
 
     expect(await screen.findByTestId("skill-detail-codex-planner")).toBeTruthy();
+    expect(screen.queryByText("本机 Skill 工作台")).toBeNull();
+    expect(screen.queryByTestId("skill-search-input")).toBeNull();
+    expect(screen.queryByTestId("check-all-updates")).toBeNull();
     expect(screen.getByTestId("skill-detail-codex-planner").className).toContain(
       "redesign-detail",
     );
@@ -720,22 +729,22 @@ describe("Metis desktop GUI main flow", () => {
       "redesign-update-workbench",
     );
     const introCard = within(screen.getByTestId("skill-intro-card-codex-planner"));
-    expect(introCard.getByText("Name")).toBeTruthy();
-    expect(introCard.getByText("Description")).toBeTruthy();
-    expect(introCard.getByText("Paths")).toBeTruthy();
+    expect(introCard.queryByText("Name")).toBeNull();
+    expect(introCard.queryByText("Description")).toBeNull();
+    expect(introCard.queryByText("Paths")).toBeNull();
     expect(introCard.getByText("codex-planner")).toBeTruthy();
     expect(introCard.getByText("Codex managed skill")).toBeTruthy();
-    expect(introCard.getByText("Codex")).toBeTruthy();
-    expect(introCard.getByText("/Users/me/.codex/skills/codex-planner")).toBeTruthy();
-    expect(await introCard.findByText("opencode")).toBeTruthy();
-    expect(introCard.getByText("/Users/me/.opencode/skills/codex-planner")).toBeTruthy();
+    expect(introCard.queryByText("Codex")).toBeNull();
+    expect(introCard.queryByText("/Users/me/.codex/skills/codex-planner")).toBeNull();
+    expect(introCard.queryByText("opencode")).toBeNull();
+    expect(introCard.queryByText("/Users/me/.opencode/skills/codex-planner")).toBeNull();
     expect(introCard.queryByText("/Users/me/.claude/skills/codex-planner")).toBeNull();
     expect(screen.getByTestId("skill-operations-card-codex-planner")).toBeTruthy();
     expect(screen.getByTestId("open-bind-source-codex-planner")).toBeTruthy();
     expect(screen.getByText("返回")).toBeTruthy();
     expect(screen.queryByText("Skills / codex-planner")).toBeNull();
     expect(screen.queryByTestId("apply-update-codex-planner")).toBeNull();
-    expect(screen.getByText("跨 Agent 安装状态")).toBeTruthy();
+    expect(screen.queryByText("跨 Agent 安装状态")).toBeNull();
 
     await user.click(screen.getByTestId("open-bind-source-codex-planner"));
     expect(await screen.findByTestId("source-drawer-codex-planner")).toBeTruthy();
@@ -1412,6 +1421,7 @@ function createEmptyWorkspaceScenario() {
 function createAgentDetailScenario(
   options: {
     codexLocalModified?: boolean;
+    extraSkillCount?: number;
     includeUnboundDuplicate?: boolean;
     slowTargets?: boolean;
   } = {},
@@ -1446,6 +1456,16 @@ function createAgentDetailScenario(
     agentDetailSkill("codex-planner", "codex", "Codex", codexSource),
     agentDetailSkill("claude-writer", "claude-code", "Claude Code", claudeSource),
   ];
+  for (let index = 0; index < (options.extraSkillCount ?? 0); index += 1) {
+    skills.push(
+      agentDetailSkill(
+        `extra-skill-${index}`,
+        index % 2 === 0 ? "codex" : "claude-code",
+        index % 2 === 0 ? "Codex" : "Claude Code",
+        index % 2 === 0 ? codexSource : claudeSource,
+      ),
+    );
+  }
   if (options.includeUnboundDuplicate) {
     skills.push({
       ...agentDetailSkill("claude-codex-planner", "claude-code", "Claude Code", null),

@@ -58,6 +58,17 @@ function latestBlockFor(selector: string): string {
   return latest[1];
 }
 
+function exactBlockFor(selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = stylesheet.match(new RegExp(`(^|\\n)${escapedSelector}\\s*\\{([^}]*)\\}`, "m"));
+
+  if (!match) {
+    throw new Error(`Missing exact CSS block for ${selector}`);
+  }
+
+  return match[2];
+}
+
 function declaredPx(block: string, property: string): number {
   const match = block.match(new RegExp(`${property}:\\s*(\\d+)px`));
 
@@ -373,7 +384,7 @@ describe("Phase 6 light workspace contrast", () => {
       "grid-template-columns: repeat(4, minmax(0, 1fr));",
     );
     expect(latestBlockFor(".redesign-theme-swatch")).toContain("border-radius: 999px;");
-    expect(blockFor(".redesign-preview-shell")).toContain(
+    expect(exactBlockFor(".redesign-preview-shell")).toContain(
       "background: var(--redesign-canvas);",
     );
   });
@@ -430,15 +441,27 @@ describe("Phase 6 light workspace contrast", () => {
 
   test("maps the formal desktop UI onto the same redesign visual system as the preview", () => {
     expect(stylesheet).toMatch(
-      /\.metis-window\.redesign-preview-shell\s*\{[\s\S]*padding:\s*44px;/,
+      /\.metis-window\.redesign-preview-shell\s*\{[\s\S]*padding:\s*0;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.metis-window\.redesign-preview-shell\s*\{[\s\S]*background:\s*#ffffff;/,
     );
     expect(stylesheet).toMatch(
       /\.metis-shell\.redesign-app-window\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
     );
     expect(stylesheet).toMatch(
+      /\.metis-shell\.redesign-app-window\s*\{[\s\S]*border-radius:\s*0;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.metis-shell\.redesign-app-window\s*\{[\s\S]*box-shadow:\s*none;/,
+    );
+    expect(stylesheet).toMatch(
       /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*32px 22px;/,
     );
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*32px;/);
+    expect(stylesheet).toMatch(
+      /\.topbar-search\.redesign-search-field svg\s*\{[\s\S]*width:\s*22px;/,
+    );
     expect(stylesheet).toMatch(
       /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*22px;/,
     );

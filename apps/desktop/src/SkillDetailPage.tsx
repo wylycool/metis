@@ -1,4 +1,3 @@
-import { CrossAgentTargetMatrix } from "./CrossAgentTargetMatrix";
 import {
   BackupPanel,
   BindSourceForm,
@@ -94,7 +93,13 @@ export function SkillDetailPage({
     updateResult?.status === "UpToDate" ||
     updateResult?.status === "UpdateAvailable" ||
     updateResult?.status === "CheckFailed";
-  const installedPathRows = installedSkillPathRows(skill, detailTargets);
+  void detailInstallResult;
+  void detailTargetError;
+  void detailTargets;
+  void selectedDetailTargetIds;
+  void onInstallDetailTargets;
+  void onRefreshDetailTargets;
+  void onToggleDetailTarget;
 
   return (
     <section
@@ -113,40 +118,9 @@ export function SkillDetailPage({
           className="skill-intro-heading"
           data-testid={`skill-detail-reference-summary-${skill.id}`}
         >
-          <div className="skill-intro-facts">
-            <span className="redesign-detail-kicker">Skill detail</span>
-            <div className="skill-intro-fact">
-              <span className="skill-intro-label">Name</span>
-              <strong className="skill-intro-name">{skill.name}</strong>
-            </div>
-            <div className="skill-intro-fact">
-              <span className="skill-intro-label">Description</span>
-              <p className="skill-intro-copy">{skill.description || "暂无描述"}</p>
-            </div>
-            <div className="skill-intro-fact">
-              <span className="skill-intro-label">Source</span>
-              {source ? (
-                <div className="skill-source-summary">
-                  <code>{source.url}</code>
-                  <span>{source.repo_path}</span>
-                  <em>{source.ref_ || "main"}</em>
-                </div>
-              ) : (
-                <p className="skill-intro-copy">暂无来源</p>
-              )}
-            </div>
-            <div className="skill-intro-fact">
-              <span className="skill-intro-label">Paths</span>
-              <div className="skill-installed-paths">
-                {installedPathRows.map((row) => (
-                  <div className="skill-installed-path" key={`${row.agent_id}:${row.install_path}`}>
-                    <span>{row.agent_name}</span>
-                    <code>{row.install_path}</code>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <span className="redesign-detail-kicker">Skill detail</span>
+          <h1>{skill.name}</h1>
+          <p>{skill.description || "暂无描述"}</p>
         </div>
         <div className="intro-source-corner redesign-source-summary">
           <span>来源</span>
@@ -158,7 +132,7 @@ export function SkillDetailPage({
             onClick={onOpenBind}
           >
             <span aria-hidden="true" />
-            {source ? "编辑来源" : "添加来源"}
+            {source ? "修改来源" : "添加来源"}
           </button>
         </div>
         {(showLocalModifiedStatus || showUpdateStatus) && (
@@ -180,13 +154,6 @@ export function SkillDetailPage({
           className="skill-detail-card local-operations-card redesign-update-workbench"
           data-testid={`skill-operations-card-${skill.id}`}
         >
-          <div className="detail-card-heading">
-            <div>
-              <p className="detail-kicker">Operations</p>
-              <h3>检查和更新</h3>
-            </div>
-          </div>
-
           {updateResult?.diff_summary && (
             <div className="update-summary detail-update-summary">
               <span>+{updateResult.diff_summary.files_added}</span>
@@ -237,6 +204,9 @@ export function SkillDetailPage({
           </div>
 
           {diffError && <InlineError error={diffError} />}
+          {!diffDetail && !backupOpen && (
+            <FormalCheckPanel skill={skill} source={source} updateResult={updateResult} />
+          )}
           {diffDetail && <DiffPanel detail={diffDetail} />}
 
           {backupError && <InlineError error={backupError} />}
@@ -282,52 +252,50 @@ export function SkillDetailPage({
         </div>
       )}
 
-      {source && (
-        <CrossAgentTargetMatrix
-          currentAgentId={skill.agent_id}
-          error={detailTargetError}
-          installResult={detailInstallResult}
-          loading={actionBusy === `detail-targets:${skill.id}`}
-          selectedTargetIds={selectedDetailTargetIds}
-          targets={detailTargets}
-          title="跨 Agent 安装状态"
-          onInstall={onInstallDetailTargets}
-          onRefresh={onRefreshDetailTargets}
-          onToggleTarget={onToggleDetailTarget}
-        />
-      )}
     </section>
   );
 }
 
-function installedSkillPathRows(skill: DesktopSkill, targets: DesktopSkillTarget[]) {
-  const installedTargets = targets.filter((target) => isInstalledSkillTarget(target));
-  const rows =
-    installedTargets.length > 0
-      ? installedTargets.map((target) => ({
-          agent_id: target.agent_id,
-          agent_name: target.agent_name,
-          install_path: target.install_path,
-        }))
-      : [
-          {
-            agent_id: skill.agent_id,
-            agent_name: skill.agent_name,
-            install_path: skill.install_path,
-          },
-        ];
+function FormalCheckPanel({
+  skill,
+  source,
+  updateResult,
+}: {
+  skill: DesktopSkill;
+  source: DesktopSkill["source"];
+  updateResult?: DesktopUpdateCheckResult;
+}) {
+  const currentCommit = updateResult?.source?.current_commit ?? source?.current_commit ?? "local";
+  const targetCommit =
+    updateResult?.source?.remote_commit ?? source?.remote_commit ?? source?.ref_ ?? "unknown";
+  const summary = updateResult?.diff_summary
+    ? `+${updateResult.diff_summary.files_added} ~${updateResult.diff_summary.files_modified} -${updateResult.diff_summary.files_deleted}`
+    : updateResult?.status === "UpToDate"
+      ? "no changes"
+      : "等待检查";
+  const safeMessage = skill.local_modified
+    ? "检测到本地修改，建议先查看 diff 或备份后再更新。"
+    : "安全检查通过，建议先查看 diff；本地没有未提交修改。";
 
-  return rows.filter(
-    (row, index, list) =>
-      list.findIndex((item) => item.agent_id === row.agent_id && item.install_path === row.install_path) === index,
+  return (
+    <div className="redesign-check-panel" data-testid={`check-panel-${skill.id}`}>
+      <div>
+        <span>Local</span>
+        <strong>{shortCommit(currentCommit)}</strong>
+      </div>
+      <div>
+        <span>Remote</span>
+        <strong>{shortCommit(targetCommit)}</strong>
+      </div>
+      <div>
+        <span>Diff summary</span>
+        <strong>{summary}</strong>
+      </div>
+      <p>{safeMessage}</p>
+    </div>
   );
 }
 
-function isInstalledSkillTarget(target: DesktopSkillTarget) {
-  if (target.skill_id) {
-    return true;
-  }
-  return ["InstalledBound", "InstalledUnbound", "UpToDate", "UpdateAvailable"].includes(
-    target.status,
-  );
+function shortCommit(value: string) {
+  return value.length > 7 ? value.slice(0, 7) : value;
 }
