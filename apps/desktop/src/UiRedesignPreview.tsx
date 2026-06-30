@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 
 type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string };
+type PreviewTheme = "frost" | "sage" | "dawn" | "graphite";
 
 type PreviewSkill = {
   id: string;
@@ -112,6 +113,12 @@ const previewSkills: PreviewSkill[] = [
 ];
 
 const previewAgents = ["All", "Codex", "Claude", "opencode", "Hermes"];
+const previewThemes: Array<{ id: PreviewTheme; label: string }> = [
+  { id: "frost", label: "Frost" },
+  { id: "sage", label: "Sage" },
+  { id: "dawn", label: "Dawn" },
+  { id: "graphite", label: "Graphite" },
+];
 
 const previewMatrix = [
   { agent: "codex", status: "latest", active: true },
@@ -122,6 +129,7 @@ const previewMatrix = [
 
 export function UiRedesignPreview() {
   const [route, setRoute] = useState<PreviewRoute>({ kind: "home" });
+  const [theme, setTheme] = useState<PreviewTheme>("frost");
   const selectedSkill = useMemo(
     () =>
       route.kind === "detail"
@@ -131,9 +139,10 @@ export function UiRedesignPreview() {
   );
 
   return (
-    <div className="redesign-preview-shell" data-testid="ui-redesign-preview">
+    <div className="redesign-preview-shell" data-testid="ui-redesign-preview" data-theme={theme}>
       <RedesignRail />
       <main className="redesign-main">
+        <RedesignThemeSwitcher activeTheme={theme} onChange={setTheme} />
         {route.kind === "home" && (
           <RedesignHome onOpenSkill={(skillId) => setRoute({ kind: "detail", skillId })} />
         )}
@@ -141,6 +150,31 @@ export function UiRedesignPreview() {
           <RedesignDetail skill={selectedSkill} onBack={() => setRoute({ kind: "home" })} />
         )}
       </main>
+    </div>
+  );
+}
+
+function RedesignThemeSwitcher({
+  activeTheme,
+  onChange,
+}: {
+  activeTheme: PreviewTheme;
+  onChange: (theme: PreviewTheme) => void;
+}) {
+  return (
+    <div className="redesign-theme-switcher" aria-label="Preview background themes">
+      {previewThemes.map((theme) => (
+        <button
+          aria-pressed={activeTheme === theme.id}
+          className={activeTheme === theme.id ? "active" : ""}
+          data-testid={`redesign-theme-${theme.id}`}
+          key={theme.id}
+          onClick={() => onChange(theme.id)}
+        >
+          <span className="redesign-theme-swatch" aria-hidden="true" />
+          {theme.label}
+        </button>
+      ))}
     </div>
   );
 }

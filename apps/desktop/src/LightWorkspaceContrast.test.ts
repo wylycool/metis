@@ -353,4 +353,22 @@ describe("Phase 6 light workspace contrast", () => {
       "grid-template-columns: 10px minmax(0, 1fr) auto;",
     );
   });
+
+  test("defines non-purple selectable background themes for the static UI redesign preview", () => {
+    expect(stylesheet).toContain(".redesign-preview-shell[data-theme=\"frost\"]");
+    expect(stylesheet).toContain(".redesign-preview-shell[data-theme=\"sage\"]");
+    expect(stylesheet).toContain(".redesign-preview-shell[data-theme=\"dawn\"]");
+    expect(stylesheet).toContain(".redesign-preview-shell[data-theme=\"graphite\"]");
+    expect(stylesheet).toContain("--redesign-frost-canvas: #eef3f7;");
+    expect(stylesheet).toContain("--redesign-sage-canvas: #eef4ee;");
+    expect(stylesheet).toContain("--redesign-dawn-canvas: #f6f0e7;");
+    expect(stylesheet).toContain("--redesign-graphite-canvas: #e9edf0;");
+    expect(latestBlockFor(".redesign-theme-switcher")).toContain(
+      "grid-template-columns: repeat(4, minmax(0, 1fr));",
+    );
+    expect(latestBlockFor(".redesign-theme-swatch")).toContain("border-radius: 999px;");
+    expect(blockFor(".redesign-preview-shell")).toContain(
+      "background: var(--redesign-canvas);",
+    );
+  });
 });

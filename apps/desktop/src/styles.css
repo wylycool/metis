@@ -3575,6 +3575,14 @@ textarea {
   --redesign-update: #f0a840;
   --redesign-danger: #d05050;
   --redesign-shadow: rgba(130, 110, 190, 0.1);
+  --redesign-primary: #2e6f93;
+  --redesign-primary-dark: #1f536e;
+  --redesign-primary-soft: #d9ebf3;
+  --redesign-primary-ring: rgba(46, 111, 147, 0.34);
+  --redesign-frost-canvas: #eef3f7;
+  --redesign-sage-canvas: #eef4ee;
+  --redesign-dawn-canvas: #f6f0e7;
+  --redesign-graphite-canvas: #e9edf0;
 }
 
 .redesign-preview-shell {
@@ -3584,6 +3592,78 @@ textarea {
   color: var(--redesign-text-primary);
   background: var(--redesign-canvas);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+.redesign-preview-shell[data-theme="frost"] {
+  --redesign-canvas: var(--redesign-frost-canvas);
+  --redesign-raised: #fbfdff;
+  --redesign-subtle: rgba(250, 253, 255, 0.58);
+  --redesign-hover: #f4f9fc;
+  --redesign-text-primary: #263847;
+  --redesign-text-secondary: #536879;
+  --redesign-text-tertiary: #8494a1;
+  --redesign-placeholder: #9baaac;
+  --redesign-border: #dbe6ed;
+  --redesign-border-active: #b8cedd;
+  --redesign-primary: #2e6f93;
+  --redesign-primary-dark: #1f536e;
+  --redesign-primary-soft: #d9ebf3;
+  --redesign-primary-ring: rgba(46, 111, 147, 0.34);
+  --redesign-shadow: rgba(51, 89, 112, 0.1);
+}
+
+.redesign-preview-shell[data-theme="sage"] {
+  --redesign-canvas: var(--redesign-sage-canvas);
+  --redesign-raised: #fbfdf9;
+  --redesign-subtle: rgba(251, 253, 249, 0.58);
+  --redesign-hover: #f5faf2;
+  --redesign-text-primary: #263b31;
+  --redesign-text-secondary: #586f60;
+  --redesign-text-tertiary: #879885;
+  --redesign-placeholder: #9fae9d;
+  --redesign-border: #dbe7d8;
+  --redesign-border-active: #b8d0b1;
+  --redesign-primary: #4f8063;
+  --redesign-primary-dark: #31583f;
+  --redesign-primary-soft: #dcebdd;
+  --redesign-primary-ring: rgba(79, 128, 99, 0.34);
+  --redesign-shadow: rgba(71, 102, 80, 0.1);
+}
+
+.redesign-preview-shell[data-theme="dawn"] {
+  --redesign-canvas: var(--redesign-dawn-canvas);
+  --redesign-raised: #fffdf8;
+  --redesign-subtle: rgba(255, 253, 248, 0.6);
+  --redesign-hover: #fff8ed;
+  --redesign-text-primary: #46382a;
+  --redesign-text-secondary: #735e49;
+  --redesign-text-tertiary: #9a8978;
+  --redesign-placeholder: #ad9d8b;
+  --redesign-border: #eadfce;
+  --redesign-border-active: #d5be9c;
+  --redesign-primary: #b56f2d;
+  --redesign-primary-dark: #81501f;
+  --redesign-primary-soft: #f1dfc8;
+  --redesign-primary-ring: rgba(181, 111, 45, 0.32);
+  --redesign-shadow: rgba(124, 88, 48, 0.1);
+}
+
+.redesign-preview-shell[data-theme="graphite"] {
+  --redesign-canvas: var(--redesign-graphite-canvas);
+  --redesign-raised: #fbfcfc;
+  --redesign-subtle: rgba(251, 252, 252, 0.56);
+  --redesign-hover: #f3f6f6;
+  --redesign-text-primary: #242b2f;
+  --redesign-text-secondary: #566065;
+  --redesign-text-tertiary: #818b90;
+  --redesign-placeholder: #9aa2a6;
+  --redesign-border: #d9e0e2;
+  --redesign-border-active: #b7c4c8;
+  --redesign-primary: #485761;
+  --redesign-primary-dark: #2f3940;
+  --redesign-primary-soft: #dfe7e9;
+  --redesign-primary-ring: rgba(72, 87, 97, 0.32);
+  --redesign-shadow: rgba(50, 60, 67, 0.1);
 }
 
 .redesign-rail {
@@ -3641,19 +3721,19 @@ textarea {
   border: 0;
   border-radius: 7px;
   padding: 0;
-  color: #6a58a0;
+  color: var(--redesign-primary-dark);
   background: transparent;
   opacity: 0.45;
 }
 
 .redesign-rail button:hover:not(:disabled) {
   transform: none;
-  background: #f0e9fa;
+  background: var(--redesign-primary-soft);
   opacity: 0.75;
 }
 
 .redesign-rail button.active {
-  background: #ece4f8;
+  background: var(--redesign-primary-soft);
   opacity: 1;
 }
 
@@ -3665,8 +3745,8 @@ textarea {
   width: 3px;
   height: 3px;
   border-radius: 999px;
-  background: #6a58a0;
-  box-shadow: 0 0 8px rgba(106, 88, 160, 0.72);
+  background: var(--redesign-primary);
+  box-shadow: 0 0 8px var(--redesign-primary-ring);
   transform: translateX(-50%);
 }
 
@@ -3689,6 +3769,47 @@ textarea {
   display: grid;
   align-items: start;
   padding: 22px 24px;
+}
+
+.redesign-theme-switcher {
+  width: min(540px, 100%);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  justify-self: center;
+  margin: 0 0 18px;
+}
+
+.redesign-theme-switcher button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--redesign-border);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: var(--redesign-text-secondary);
+  background: color-mix(in srgb, var(--redesign-raised), transparent 12%);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.redesign-theme-switcher button.active,
+.redesign-theme-switcher button:hover:not(:disabled) {
+  color: var(--redesign-text-primary);
+  border-color: var(--redesign-border-active);
+  background: var(--redesign-primary-soft);
+  transform: none;
+}
+
+.redesign-theme-swatch {
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
+  background: var(--redesign-primary);
+  box-shadow: 0 0 0 3px var(--redesign-primary-ring);
 }
 
 .redesign-home,
@@ -3749,14 +3870,14 @@ textarea {
 
 .redesign-agent-pills button.active {
   color: var(--redesign-text-primary);
-  background: #ece4f8;
+  background: var(--redesign-primary-soft);
 }
 
 .redesign-agent-pills button span {
   width: 8px;
   height: 8px;
   border-radius: 3px;
-  background: linear-gradient(135deg, #8a68d8, #38b8a8);
+  background: linear-gradient(135deg, var(--redesign-primary), #38b8a8);
 }
 
 .redesign-status-numbers {
@@ -3809,7 +3930,7 @@ textarea {
   border-radius: 999px;
   color: transparent;
   background:
-    linear-gradient(135deg, #8a68d8, #38b8a8);
+    linear-gradient(135deg, var(--redesign-primary), #38b8a8);
   background-clip: text;
   font-size: 18px;
   font-weight: 900;
@@ -3823,7 +3944,7 @@ textarea {
   position: absolute;
   inset: -12px;
   z-index: -1;
-  border: 1.5px solid rgba(138, 104, 216, 0.35);
+  border: 1.5px solid var(--redesign-primary-ring);
   border-radius: 999px;
   animation: redesignRippleOut 3s ease-out infinite;
 }
@@ -3838,14 +3959,14 @@ textarea {
   height: 24px;
   margin-top: 12px;
   border-radius: 999px;
-  background: radial-gradient(ellipse, rgba(138, 104, 216, 0.18), transparent 68%);
+  background: radial-gradient(ellipse, var(--redesign-primary-ring), transparent 68%);
   filter: blur(2px);
 }
 
 .redesign-orb {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.7) inset,
-    0 18px 44px rgba(138, 104, 216, 0.2);
+    0 18px 44px color-mix(in srgb, var(--redesign-primary), transparent 78%);
 }
 
 .redesign-orb::selection {
@@ -3861,12 +3982,12 @@ textarea {
     radial-gradient(
       circle at 45% 40%,
       #ffffff 0%,
-      #f0ecf8 30%,
-      #e8d8f4 55%,
-      #dce4f8 75%,
-      #e8f0f4 100%
+      color-mix(in srgb, var(--redesign-primary-soft), #ffffff 24%) 30%,
+      var(--redesign-primary-soft) 55%,
+      color-mix(in srgb, var(--redesign-primary-soft), var(--redesign-canvas) 35%) 75%,
+      var(--redesign-canvas) 100%
     );
-  color: #6a48b8;
+  color: var(--redesign-primary-dark);
 }
 
 @keyframes redesignRippleOut {
@@ -3888,13 +4009,13 @@ textarea {
     transform: scale(1);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.7) inset,
-      0 18px 44px rgba(138, 104, 216, 0.2);
+      0 18px 44px color-mix(in srgb, var(--redesign-primary), transparent 78%);
   }
   50% {
     transform: scale(1.05);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.82) inset,
-      0 22px 52px rgba(138, 104, 216, 0.3);
+      0 22px 52px color-mix(in srgb, var(--redesign-primary), transparent 70%);
   }
 }
 
@@ -4100,7 +4221,7 @@ textarea {
 }
 
 .redesign-version-card div:nth-of-type(2) strong {
-  color: var(--redesign-violet-start);
+  color: var(--redesign-primary);
 }
 
 .redesign-version-card code {
@@ -4111,7 +4232,7 @@ textarea {
   border-radius: 8px;
   padding: 8px 10px;
   color: var(--redesign-text-secondary);
-  background: #f4effb;
+  background: var(--redesign-primary-soft);
   font-size: 11px;
 }
 
@@ -4174,8 +4295,8 @@ textarea {
   min-height: 40px;
   color: #ffffff;
   border-color: transparent;
-  background: linear-gradient(135deg, #5c4890, #7a60c0);
-  box-shadow: 0 12px 22px rgba(92, 72, 144, 0.2);
+  background: linear-gradient(135deg, var(--redesign-primary-dark), var(--redesign-primary));
+  box-shadow: 0 12px 22px var(--redesign-primary-ring);
 }
 
 .redesign-action-card .danger {

@@ -385,6 +385,32 @@ describe("Metis desktop GUI main flow", () => {
     window.location.hash = "";
   });
 
+  test("switches the static UI redesign preview across non-purple background themes", async () => {
+    const user = userEvent.setup();
+    window.location.hash = "#/ui-redesign-preview";
+
+    render(<App />);
+
+    const preview = await screen.findByTestId("ui-redesign-preview");
+    expect(preview.getAttribute("data-theme")).toBe("frost");
+    expect(screen.getByTestId("redesign-theme-frost")).toBeTruthy();
+    expect(screen.getByTestId("redesign-theme-sage")).toBeTruthy();
+    expect(screen.getByTestId("redesign-theme-dawn")).toBeTruthy();
+    expect(screen.getByTestId("redesign-theme-graphite")).toBeTruthy();
+
+    await user.click(screen.getByTestId("redesign-theme-sage"));
+    expect(preview.getAttribute("data-theme")).toBe("sage");
+
+    await user.click(screen.getByTestId("redesign-theme-dawn"));
+    expect(preview.getAttribute("data-theme")).toBe("dawn");
+
+    await user.click(screen.getByTestId("redesign-theme-graphite"));
+    expect(preview.getAttribute("data-theme")).toBe("graphite");
+    expect(invokeMock).not.toHaveBeenCalled();
+
+    window.location.hash = "";
+  });
+
   test("Command Sheet aligns Settings sections and keeps top update action compact", async () => {
     const user = userEvent.setup();
 
