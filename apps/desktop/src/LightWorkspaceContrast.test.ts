@@ -497,10 +497,18 @@ describe("Phase 6 light workspace contrast", () => {
     expect(introCopyBlock).toContain("overflow: hidden;");
     expect(introCopyBlock).toContain("max-height: 48px;");
 
+    const sourceSummaryBlock = latestBlockFor(
+      ".skill-detail-card.redesign-detail-summary .redesign-source-summary",
+    );
+    expect(sourceSummaryBlock).toContain("justify-items: start;");
+    expect(sourceSummaryBlock).toContain("text-align: left;");
+
     const sourceButtonBlock = latestBlockFor(
       ".skill-detail-card.redesign-detail-summary .redesign-source-summary button",
     );
-    expect(sourceButtonBlock).toContain("width: fit-content;");
+    expect(sourceButtonBlock).toContain("min-width: 116px;");
+    expect(sourceButtonBlock).toContain("min-height: 44px;");
+    expect(sourceButtonBlock).toContain("padding: 0 18px;");
     expect(sourceButtonBlock).toContain("background: linear-gradient(135deg, #3154df, #4b7df0);");
     expect(sourceButtonBlock).toContain("color: #ffffff;");
   });

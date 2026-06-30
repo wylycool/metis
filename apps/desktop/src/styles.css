@@ -4476,10 +4476,18 @@ textarea {
   -webkit-line-clamp: 2;
 }
 
+.skill-detail-card.redesign-detail-summary .redesign-source-summary {
+  display: grid;
+  justify-items: start;
+  text-align: left;
+}
+
 .skill-detail-card.redesign-detail-summary .redesign-source-summary button {
-  width: fit-content;
-  min-width: 0;
-  padding: 0 14px;
+  justify-self: start;
+  min-width: 116px;
+  min-height: 44px;
+  width: auto;
+  padding: 0 18px;
   color: #ffffff;
   border-color: transparent;
   background: linear-gradient(135deg, #3154df, #4b7df0);
