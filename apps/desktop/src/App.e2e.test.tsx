@@ -328,6 +328,8 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
     expect(screen.queryByTestId("workspace-rail")).toBeNull();
+    expect(screen.getByTestId("metis-reference-shell")).toBeTruthy();
+    expect(screen.getByTestId("metis-reference-sidebar")).toBeTruthy();
     expect(screen.getByTestId("metis-brand-home")).toBeTruthy();
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
@@ -347,9 +349,14 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("status-filter-modified")).toBeTruthy();
     expect(screen.getByTestId("agent-category-bar")).toBeTruthy();
     expect(screen.getByTestId("agent-filter-all").textContent).toContain("全部 Agent");
+    expect(screen.getByTestId("skill-dashboard-stats")).toBeTruthy();
+    expect(screen.getByTestId("skill-card-grid")).toBeTruthy();
+    expect(screen.getByTestId("skill-card-e2e-skill")).toBeTruthy();
 
     await user.click(screen.getByTestId("workspace-tab-settings"));
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
+    expect(screen.getByTestId("settings-agent-path-table")).toBeTruthy();
+    expect(screen.getByTestId("settings-agent-path-codex")).toBeTruthy();
     expect(screen.getByText("扫描路径")).toBeTruthy();
     expect(screen.getByText("企业网络")).toBeTruthy();
     expect(screen.queryByText("团队清单合规")).toBeNull();
@@ -693,6 +700,7 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByTestId("skill-detail-codex-planner")).toBeTruthy();
     expect(screen.getByTestId("skill-intro-card-codex-planner")).toBeTruthy();
+    expect(screen.getByTestId("skill-detail-reference-summary-codex-planner")).toBeTruthy();
     const introCard = within(screen.getByTestId("skill-intro-card-codex-planner"));
     expect(introCard.getByText("Name")).toBeTruthy();
     expect(introCard.getByText("Description")).toBeTruthy();

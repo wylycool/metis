@@ -270,6 +270,13 @@ export function SkillsWorkspace({
 
       {route.kind === "list" && (
         <section className="skill-panel">
+          <div className="skill-dashboard-stats" data-testid="skill-dashboard-stats">
+            <DashboardStat label="全部 Skill" value={baseVisibleSkills.length} tone="mint" />
+            <DashboardStat label="待更新" value={visibleUpdateAvailableCount} tone="rose" />
+            <DashboardStat label="已最新" value={visibleUpToDateCount} tone="sky" />
+            <DashboardStat label="本地修改" value={visibleModifiedCount} tone="warm" />
+          </div>
+
           <div
             className="skill-status-filters agent-detail-summary"
             data-testid={
@@ -366,7 +373,7 @@ export function SkillsWorkspace({
             <EmptyState onOpenSettings={onOpenSettings} onScan={onScan} />
           )}
           {state === "loaded" && visibleSkills.length > 0 && (
-            <div className="skill-list">
+            <div className="skill-list" data-testid="skill-card-grid">
               {visibleSkills.map((skill) => (
                 <SkillRow
                   key={skill.id}
@@ -398,6 +405,23 @@ export function SkillsWorkspace({
         </section>
       )}
     </main>
+  );
+}
+
+function DashboardStat({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: "mint" | "rose" | "sky" | "warm";
+  value: number;
+}) {
+  return (
+    <article className={`dashboard-stat-card ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
   );
 }
 

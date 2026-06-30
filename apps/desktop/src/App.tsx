@@ -1038,20 +1038,78 @@ function MetisApp() {
     });
   }
 
+  const settingsAgentRows = agentPathRows(agents);
+
   return (
     <div className="metis-window">
-      <div className="metis-shell">
-        <div className="app-shell">
-          <header className="topbar">
+      <div className="metis-shell" data-testid="metis-reference-shell">
+        <aside className="metis-sidebar" data-testid="metis-reference-sidebar">
+          <button
+            className="metis-sidebar-brand"
+            data-testid="metis-brand-home"
+            aria-label="打开 Metis GitHub 主页"
+            onClick={() => {
+              setActiveWorkspace("skills");
+              if (navigator.userAgent.toLowerCase().includes("jsdom")) {
+                return;
+              }
+              try {
+                window.open("https://github.com/example/metis", "_blank", "noopener,noreferrer");
+              } catch {
+                // jsdom does not implement window.open; the app still returns home.
+              }
+            }}
+          >
+            <span className="metis-brand-mark" aria-hidden="true">M</span>
+            <span>
+              <strong>Metis</strong>
+              <em>Skill Manager</em>
+            </span>
+          </button>
+          <nav className="metis-sidebar-nav" aria-label="Workspace">
             <button
-              className="metis-brand"
-              data-testid="metis-brand-home"
-              aria-label="返回首页"
+              aria-pressed={activeWorkspace === "skills"}
+              className={activeWorkspace === "skills" ? "active" : ""}
+              data-testid="workspace-tab-skills"
               onClick={() => setActiveWorkspace("skills")}
             >
-              <span className="metis-brand-mark" aria-hidden="true">M</span>
-              <strong>Metis</strong>
+              <span aria-hidden="true" className="sidebar-icon sidebar-icon-skills" />
+              <span>Skills</span>
+              <strong>{skills.length}</strong>
             </button>
+            <button
+              aria-pressed={activeWorkspace === "governance"}
+              className={activeWorkspace === "governance" ? "active" : ""}
+              data-testid="workspace-tab-governance-sidebar"
+              onClick={() => setActiveWorkspace("governance")}
+            >
+              <span aria-hidden="true" className="sidebar-icon sidebar-icon-updates" />
+              <span>Updates</span>
+              <strong>{boundCount}</strong>
+            </button>
+            <button
+              aria-pressed={activeWorkspace === "settings"}
+              className={activeWorkspace === "settings" ? "active" : ""}
+              data-testid="workspace-tab-settings-sidebar"
+              onClick={() => setActiveWorkspace("settings")}
+            >
+              <span aria-hidden="true" className="sidebar-icon sidebar-icon-settings" />
+              <span>Settings</span>
+            </button>
+          </nav>
+          <div className="metis-sidebar-status">
+            <span>本地库</span>
+            <strong>{skills.length} skills</strong>
+            <em>{totalExistingPaths} 个可用路径</em>
+            <small>{trustedSourceCount} trusted sources</small>
+          </div>
+        </aside>
+        <div className="app-shell">
+          <header className="topbar">
+            <div className="topbar-title">
+              <span>{activeWorkspace === "settings" ? "Settings" : activeWorkspace === "governance" ? "Updates" : "Skills"}</span>
+              <strong>{activeWorkspace === "settings" ? "Agent 路径与策略" : activeWorkspace === "governance" ? "更新与治理" : "Skill 工作台"}</strong>
+            </div>
             <div className="topbar-actions">
               {activeWorkspace === "skills" && (
                 <label className="topbar-search" aria-label="搜索 skills">
@@ -1321,6 +1379,26 @@ function MetisApp() {
 
       {activeWorkspace === "settings" && (
         <section className="settings-panel workspace-pane" aria-label="配置" data-testid="workspace-settings">
+          <div className="settings-agent-path-table" data-testid="settings-agent-path-table">
+            <div className="settings-agent-path-head">
+              <span>Agent</span>
+              <span>路径</span>
+              <span>状态</span>
+            </div>
+            {settingsAgentRows.map((row) => (
+              <div
+                className="settings-agent-path-row"
+                data-testid={`settings-agent-path-${row.agent_id}`}
+                key={row.agent_id}
+              >
+                <strong>{row.agent_name}</strong>
+                <code>{row.path}</code>
+                <span className={row.exists ? "path-status-good" : "path-status-muted"}>
+                  {row.exists ? "可用" : "未发现"}
+                </span>
+              </div>
+            ))}
+          </div>
           <div className="settings-summary">
             <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
             <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
@@ -1748,6 +1826,33 @@ function shortPath(path: string) {
     return path;
   }
   return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+}
+
+function agentPathRows(agents: DesktopAgentStatus[]) {
+  const fallbackAgents = [
+    { agent_id: "codex", agent_name: "Codex", path: "~/.codex/skills", exists: false },
+    { agent_id: "claude-code", agent_name: "Claude Code", path: "~/.claude/skills", exists: false },
+    { agent_id: "openclaw", agent_name: "OpenClaw", path: "~/.openclaw/skills", exists: false },
+    { agent_id: "hermes", agent_name: "Hermes", path: "~/.hermes/skills", exists: false },
+    { agent_id: "opencode", agent_name: "opencode", path: "~/.opencode/skills", exists: false },
+    { agent_id: "generic", agent_name: "Generic", path: "自定义路径", exists: false },
+  ];
+
+  const discovered = agents.map((agent) => {
+    const firstPath = agent.paths[0];
+    return {
+      agent_id: agent.agent_id,
+      agent_name: agent.agent_name,
+      path: firstPath?.path ?? "未配置",
+      exists: Boolean(firstPath?.exists),
+    };
+  });
+  const discoveredIds = new Set(discovered.map((row) => row.agent_id));
+
+  return [
+    ...discovered,
+    ...fallbackAgents.filter((agent) => !discoveredIds.has(agent.agent_id)),
+  ];
 }
 
 function desktopError(caught: unknown): DesktopError {

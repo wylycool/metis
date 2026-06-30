@@ -187,17 +187,19 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestVariableValue("--primary")).toBe(latestVariableValue("--ink"));
   });
 
-  test("uses a continuous top action shell without the previous left rail", () => {
+  test("uses the formal reference sidebar shell without the previous narrow rail", () => {
     expect(stylesheet).toContain(".metis-shell");
-    expect(latestBlockFor(".metis-window")).toContain("padding: 0");
-    expect(latestBlockFor(".metis-shell")).not.toContain("grid-template-columns");
+    expect(stylesheet).toMatch(/\.metis-window\s*\{[\s\S]*padding:\s*18px;/);
+    expect(stylesheet).toMatch(
+      /\.metis-shell\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
+    );
     expect(latestBlockFor(".metis-brand-mark")).toContain("linear-gradient(135deg");
     expect(latestBlockFor(".workspace-rail")).toContain("display: none");
     expect(latestBlockFor(".workspace-tabs")).toContain("display: none");
   });
 
-  test("keeps the refreshed desktop density compact", () => {
-    expect(declaredPx(latestBlockFor(".skill-row"), "min-height")).toBeLessThanOrEqual(60);
+  test("keeps the refreshed desktop chrome compact while allowing dashboard cards", () => {
+    expect(stylesheet).toMatch(/\.skill-row\s*\{[\s\S]*min-height:\s*184px;/);
     expect(declaredPx(latestBlockFor(".topbar"), "min-height")).toBeLessThanOrEqual(68);
     expect(declaredPx(latestBlockFor(".status-filter-button"), "min-height")).toBeLessThanOrEqual(42);
   });
@@ -304,17 +306,15 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".network-field-grid")).toContain("grid-auto-rows: 36px;");
   });
 
-  test("Command Sheet keeps list markers thin and subdued", () => {
+  test("Formal dashboard keeps list markers thin and polished", () => {
     expect(stylesheet).toContain("--skill-marker-start: #c4b5fd;");
     expect(stylesheet).toContain("--skill-marker-end: #f0abfc;");
     expect(stylesheet).toContain(".skill-row-marker");
     expect(latestBlockFor(".skill-row")).toContain("grid-template-columns: 4px minmax(0, 1fr);");
-    expect(latestBlockFor(".skill-row-marker")).toContain("width: 4px;");
-    expect(latestBlockFor(".skill-row-marker")).toContain("height: 28px;");
-    expect(latestBlockFor(".skill-row-marker")).toContain("border-radius: 999px;");
-    expect(latestBlockFor(".skill-row-marker")).toContain(
-      "background: linear-gradient(180deg, var(--skill-marker-start), var(--skill-marker-end));",
-    );
+    expect(stylesheet).toMatch(/\.skill-row-marker,\s*\.skill-row:nth-child\(n\) \.skill-row-marker\s*\{[\s\S]*width:\s*4px;/);
+    expect(stylesheet).toMatch(/\.skill-row-marker,\s*\.skill-row:nth-child\(n\) \.skill-row-marker\s*\{[\s\S]*height:\s*44px;/);
+    expect(stylesheet).toMatch(/\.skill-row-marker,\s*\.skill-row:nth-child\(n\) \.skill-row-marker\s*\{[\s\S]*border-radius:\s*999px;/);
+    expect(stylesheet).toMatch(/\.skill-row-marker,\s*\.skill-row:nth-child\(n\) \.skill-row-marker\s*\{[\s\S]*background:\s*linear-gradient\(180deg,\s*#6fd8ff,\s*#3e7bfa 48%,\s*#9857ff\);/);
   });
 
   test("renders cross-agent target statuses as colored badges with a spinner affordance", () => {
@@ -408,5 +408,25 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-diff-line.added")).toContain("background:");
     expect(stylesheet).toMatch(/\.redesign-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
+  });
+
+  test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {
+    expect(stylesheet).toMatch(
+      /\.metis-shell\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.metis-sidebar\s*\{[\s\S]*border-radius:\s*28px 0 0 28px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-dashboard-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-list\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(stylesheet).toMatch(/\.skill-row\s*\{[\s\S]*grid-template-rows:/);
+    expect(stylesheet).toMatch(/\.skill-agent-stack\s*\{[\s\S]*margin-left:\s*-7px;/);
+    expect(stylesheet).toMatch(/\.source-drawer\s*\{[\s\S]*position:\s*fixed;/);
+    expect(stylesheet).toMatch(/\.diff-panel\s*\{[\s\S]*grid-template-columns:/);
+    expect(stylesheet).toMatch(/\.settings-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
   });
 });

@@ -54,14 +54,23 @@ export function SkillRow({
         onOpenDetail?.();
       }}
     >
+      <span className="skill-card-anchor" data-testid={`skill-card-${skill.id}`} aria-hidden="true" />
       <span className="skill-row-marker" aria-hidden="true" />
       <div className="skill-row-main">
         <div className="skill-main">
           <div className="skill-title">
             <h3>{skill.name}</h3>
           </div>
-          {skill.description && <p>{skill.description}</p>}
-          <code>{skill.install_path}</code>
+          <p>{skill.description || "暂无简介。打开详情页后可以补充来源、检查更新并查看 diff。"}</p>
+          <div className="source-line">
+            <strong>{skill.source ? "来源" : "来源"}</strong>
+            <span>{skill.source ? sourceSummary(skill.source) : "暂无来源"}</span>
+            {skill.source?.repo_path && <em>{skill.source.repo_path}</em>}
+            <span className="source-policy">
+              {skill.source?.trusted && <small>Trusted</small>}
+              {skill.source?.auto_update && <small>Auto update</small>}
+            </span>
+          </div>
         </div>
 
         <div className="skill-status">
@@ -71,6 +80,14 @@ export function SkillRow({
           <StatusBadge tone={updateTone(updateResult, skill)}>
             {updateLabel(updateResult, skill)}
           </StatusBadge>
+          <div
+            className="skill-agent-stack"
+            data-testid={`skill-agent-stack-${skill.id}`}
+            aria-label={`存在于 ${skill.agent_name}`}
+          >
+            <span>{agentInitial(skill.agent_name)}</span>
+            <span>{skill.name.slice(0, 1).toUpperCase()}</span>
+          </div>
         </div>
       </div>
 
@@ -86,6 +103,18 @@ export function SkillRow({
       )}
     </article>
   );
+}
+
+function sourceSummary(source: DesktopSkill["source"]) {
+  if (!source) {
+    return "未绑定来源";
+  }
+  const cleanUrl = source.url.replace(/^https?:\/\//, "").replace(/^file:\/\//, "");
+  return `${cleanUrl}${source.ref_ ? ` @ ${source.ref_}` : ""}`;
+}
+
+function agentInitial(agentName: string) {
+  return (agentName.trim()[0] ?? "A").toUpperCase();
 }
 
 export function BackupPanel({

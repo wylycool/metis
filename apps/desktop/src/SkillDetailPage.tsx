@@ -107,7 +107,10 @@ export function SkillDetailPage({
         className="skill-detail-card skill-intro-card"
         data-testid={`skill-intro-card-${skill.id}`}
       >
-        <div className="skill-intro-heading" data-testid={`skill-detail-header-${skill.id}`}>
+        <div
+          className="skill-intro-heading"
+          data-testid={`skill-detail-reference-summary-${skill.id}`}
+        >
           <div className="skill-intro-facts">
             <div className="skill-intro-fact">
               <span className="skill-intro-label">Name</span>
@@ -116,6 +119,18 @@ export function SkillDetailPage({
             <div className="skill-intro-fact">
               <span className="skill-intro-label">Description</span>
               <p className="skill-intro-copy">{skill.description || "暂无描述"}</p>
+            </div>
+            <div className="skill-intro-fact">
+              <span className="skill-intro-label">Source</span>
+              {source ? (
+                <div className="skill-source-summary">
+                  <code>{source.url}</code>
+                  <span>{source.repo_path}</span>
+                  <em>{source.ref_ || "main"}</em>
+                </div>
+              ) : (
+                <p className="skill-intro-copy">暂无来源</p>
+              )}
             </div>
             <div className="skill-intro-fact">
               <span className="skill-intro-label">Paths</span>
