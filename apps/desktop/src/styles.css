@@ -4478,6 +4478,8 @@ textarea {
 
 .skill-detail-card.redesign-detail-summary .redesign-source-summary {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
   justify-items: start;
   text-align: left;
 }

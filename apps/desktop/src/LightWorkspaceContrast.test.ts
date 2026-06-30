@@ -500,6 +500,8 @@ describe("Phase 6 light workspace contrast", () => {
     const sourceSummaryBlock = latestBlockFor(
       ".skill-detail-card.redesign-detail-summary .redesign-source-summary",
     );
+    expect(sourceSummaryBlock).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(sourceSummaryBlock).toContain("justify-content: stretch;");
     expect(sourceSummaryBlock).toContain("justify-items: start;");
     expect(sourceSummaryBlock).toContain("text-align: left;");
 
