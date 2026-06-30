@@ -122,16 +122,18 @@ export function SkillDetailPage({
           <h1>{skill.name}</h1>
           <p>{skill.description || "暂无描述"}</p>
         </div>
-        <div className="intro-source-corner redesign-source-summary">
+        <div
+          className="intro-source-corner redesign-source-summary"
+          data-testid={`skill-source-summary-${skill.id}`}
+        >
           <span>来源</span>
           <strong>{source?.url || "未绑定来源"}</strong>
           <small>{source?.repo_path ? `${source.repo_path} · ${source.ref_ || "main"}` : ""}</small>
           <button
-            className={`source-chip-button ${source ? "bound" : "unbound"}`}
+            className={`redesign-source-action ${source ? "bound" : "unbound"}`}
             data-testid={`open-bind-source-${skill.id}`}
             onClick={onOpenBind}
           >
-            <span aria-hidden="true" />
             {source ? "修改来源" : "添加来源"}
           </button>
         </div>

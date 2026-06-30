@@ -43,7 +43,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByText("返回")).toBeTruthy();
     expect(screen.queryByText("Skills / e2e-skill")).toBeNull();
     expect(screen.queryByText("未检测更新")).toBeNull();
-    expect(screen.getByText("未绑定来源")).toBeTruthy();
+    const unboundSourceSummary = within(screen.getByTestId("skill-source-summary-e2e-skill"));
+    expect(unboundSourceSummary.getByText("来源")).toBeTruthy();
+    expect(unboundSourceSummary.getByText("未绑定来源")).toBeTruthy();
+    expect(unboundSourceSummary.getByTestId("open-bind-source-e2e-skill").textContent).toContain(
+      "添加来源",
+    );
     expect(screen.queryByTestId("apply-update-e2e-skill")).toBeNull();
     expect((screen.getByTestId("check-updates-e2e-skill") as HTMLButtonElement).disabled).toBe(
       true,
@@ -61,6 +66,12 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
 
     expect(await screen.findByText("修改来源")).toBeTruthy();
+    const boundSourceSummary = within(screen.getByTestId("skill-source-summary-e2e-skill"));
+    expect(boundSourceSummary.getByText("file:///tmp/metis-e2e-repo")).toBeTruthy();
+    expect(boundSourceSummary.getByText("skills/e2e-skill · main")).toBeTruthy();
+    expect(
+      boundSourceSummary.getByTestId("open-bind-source-e2e-skill").className,
+    ).toContain("redesign-source-action");
 
     await user.click(screen.getByTestId("check-updates-e2e-skill"));
 
@@ -740,7 +751,16 @@ describe("Metis desktop GUI main flow", () => {
     expect(introCard.queryByText("/Users/me/.opencode/skills/codex-planner")).toBeNull();
     expect(introCard.queryByText("/Users/me/.claude/skills/codex-planner")).toBeNull();
     expect(screen.getByTestId("skill-operations-card-codex-planner")).toBeTruthy();
-    expect(screen.getByTestId("open-bind-source-codex-planner")).toBeTruthy();
+    const sourceSummary = within(screen.getByTestId("skill-source-summary-codex-planner"));
+    expect(sourceSummary.getByText("来源")).toBeTruthy();
+    expect(sourceSummary.getByText("file:///tmp/metis-agent-detail")).toBeTruthy();
+    expect(sourceSummary.getByText("skills/codex-planner · main")).toBeTruthy();
+    expect(sourceSummary.getByTestId("open-bind-source-codex-planner").textContent).toContain(
+      "修改来源",
+    );
+    expect(sourceSummary.getByTestId("open-bind-source-codex-planner").className).toContain(
+      "redesign-source-action",
+    );
     expect(screen.getByText("返回")).toBeTruthy();
     expect(screen.queryByText("Skills / codex-planner")).toBeNull();
     expect(screen.queryByTestId("apply-update-codex-planner")).toBeNull();

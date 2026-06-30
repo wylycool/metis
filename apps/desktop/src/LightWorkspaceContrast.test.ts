@@ -487,4 +487,21 @@ describe("Phase 6 light workspace contrast", () => {
       /\.settings-agent-path-table\.redesign-agent-path-table\s*\{[\s\S]*border-radius:\s*20px;/,
     );
   });
+
+  test("keeps the formal detail summary compact and source action preview-aligned", () => {
+    const introCopyBlock = latestBlockFor(
+      ".skill-detail-card.redesign-detail-summary .skill-intro-heading p",
+    );
+    expect(introCopyBlock).toContain("display: -webkit-box;");
+    expect(introCopyBlock).toContain("-webkit-line-clamp: 2;");
+    expect(introCopyBlock).toContain("overflow: hidden;");
+    expect(introCopyBlock).toContain("max-height: 48px;");
+
+    const sourceButtonBlock = latestBlockFor(
+      ".skill-detail-card.redesign-detail-summary .redesign-source-summary button",
+    );
+    expect(sourceButtonBlock).toContain("width: fit-content;");
+    expect(sourceButtonBlock).toContain("background: linear-gradient(135deg, #3154df, #4b7df0);");
+    expect(sourceButtonBlock).toContain("color: #ffffff;");
+  });
 });

@@ -4468,6 +4468,24 @@ textarea {
   gap: 12px;
 }
 
+.skill-detail-card.redesign-detail-summary .skill-intro-heading p {
+  display: -webkit-box;
+  max-height: 48px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.skill-detail-card.redesign-detail-summary .redesign-source-summary button {
+  width: fit-content;
+  min-width: 0;
+  padding: 0 14px;
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #3154df, #4b7df0);
+  box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);
+}
+
 .local-operations-card.redesign-update-workbench {
   display: grid;
   gap: 14px;
