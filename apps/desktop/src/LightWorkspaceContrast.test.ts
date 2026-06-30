@@ -327,4 +327,30 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
     expect(latestBlockFor(".target-matrix-spinner")).toContain("animation:");
   });
+
+  test("defines the static UI redesign preview shell, orb, rows, and detail panels", () => {
+    expect(stylesheet).toContain("--redesign-canvas: #f5f4f8;");
+    expect(stylesheet).toContain("--redesign-text-primary: #3a3050;");
+    expect(stylesheet).toContain("--redesign-violet-start: #8a68d8;");
+    expect(stylesheet).toContain("@keyframes redesignRippleOut");
+    expect(stylesheet).toContain("@keyframes redesignRingPulse");
+    expect(blockFor(".redesign-preview-shell")).toContain(
+      "grid-template-columns: 52px minmax(0, 1fr);",
+    );
+    expect(blockFor(".redesign-rail")).toContain("width: 52px;");
+    expect(latestBlockFor(".redesign-orb")).toContain("width: 68px;");
+    expect(latestBlockFor(".redesign-orb::before")).toContain(
+      "animation: redesignRippleOut 3s ease-out infinite;",
+    );
+    expect(latestBlockFor(".redesign-skill-row")).toContain(
+      "grid-template-columns: 3px minmax(0, 1fr) 14px;",
+    );
+    expect(latestBlockFor(".redesign-skill-accent")).toContain("height: 24px;");
+    expect(latestBlockFor(".redesign-version-card")).toContain(
+      "grid-template-columns: repeat(2, minmax(0, 1fr));",
+    );
+    expect(latestBlockFor(".redesign-install-matrix-row")).toContain(
+      "grid-template-columns: 10px minmax(0, 1fr) auto;",
+    );
+  });
 });

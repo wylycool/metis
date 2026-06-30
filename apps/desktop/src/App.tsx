@@ -27,6 +27,7 @@ import {
 import type { RemoteSyncDraft } from "./AddSkillPage";
 import { remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
 import { InlineError, type BindDraft } from "./SkillRow";
+import { UiRedesignPreview } from "./UiRedesignPreview";
 import type {
   DesktopAgentStatus,
   DesktopBackupSummary,
@@ -52,6 +53,14 @@ import type {
 type WorkspaceKey = "skills" | "governance" | "settings";
 
 function App() {
+  if (isUiRedesignPreviewRoute()) {
+    return <UiRedesignPreview />;
+  }
+
+  return <MetisApp />;
+}
+
+function MetisApp() {
   const [agents, setAgents] = useState<DesktopAgentStatus[]>([]);
   const [skills, setSkills] = useState<DesktopSkill[]>([]);
   const [warnings, setWarnings] = useState<DesktopScanWarning[]>([]);
@@ -1554,6 +1563,15 @@ function App() {
       </div>
     </div>
   );
+}
+
+function isUiRedesignPreviewRoute() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const hash = window.location.hash.replace(/^#/, "");
+  const search = window.location.search;
+  return hash === "/ui-redesign-preview" || search.includes("preview=ui-redesign");
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {

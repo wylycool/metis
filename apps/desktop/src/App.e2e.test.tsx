@@ -359,6 +359,32 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("skill-status-filters")).toBeTruthy();
   });
 
+  test("renders the static UI redesign preview without backend commands", async () => {
+    const user = userEvent.setup();
+    window.location.hash = "#/ui-redesign-preview";
+
+    render(<App />);
+
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("ui-redesign-preview")).toBeTruthy();
+    expect(screen.getByTestId("redesign-rail")).toBeTruthy();
+    expect(screen.getByTestId("redesign-orb").textContent).toBe("48");
+    expect(screen.getByTestId("redesign-home")).toBeTruthy();
+    expect(screen.getByTestId("redesign-skill-list")).toBeTruthy();
+    expect(screen.getByTestId("redesign-skill-row-memory-weaver")).toBeTruthy();
+    expect(screen.queryByTestId("workspace-skills")).toBeNull();
+
+    await user.click(screen.getByTestId("redesign-skill-row-memory-weaver"));
+
+    expect(await screen.findByTestId("redesign-skill-detail-memory-weaver")).toBeTruthy();
+    expect(screen.getByTestId("redesign-version-card")).toBeTruthy();
+    expect(screen.getByTestId("redesign-source-card")).toBeTruthy();
+    expect(screen.getByTestId("redesign-install-matrix")).toBeTruthy();
+    expect(screen.getByText("后续真实改造切入点")).toBeTruthy();
+
+    window.location.hash = "";
+  });
+
   test("Command Sheet aligns Settings sections and keeps top update action compact", async () => {
     const user = userEvent.setup();
 
