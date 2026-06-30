@@ -1,7 +1,8 @@
 import { useMemo, useState, type CSSProperties } from "react";
 
-type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string };
+type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string } | { kind: "settings" };
 type PreviewTheme = "frost" | "sage" | "dawn" | "graphite";
+type PreviewOperation = "check" | "diff" | "backups";
 
 type PreviewSkill = {
   id: string;
@@ -15,104 +16,20 @@ type PreviewSkill = {
   sourceUrl: string;
   sourcePath: string;
   sourceRef: string;
+  trusted: boolean;
+  autoUpdate: boolean;
+  agents: string[];
   accentStart: string;
   accentEnd: string;
 };
 
-const previewSkills: PreviewSkill[] = [
-  {
-    id: "memory-weaver",
-    name: "memory-weaver",
-    agent: "Codex",
-    description: "Keeps durable project memory tidy across local agent skill folders.",
-    status: "update",
-    localCommit: "a3f8c2e",
-    remoteCommit: "b9d4f1a",
-    diffSummary: "+12  -3  lines in 2 files",
-    sourceUrl: "git@github.com:acme/agent-skills.git",
-    sourcePath: "skills/memory-weaver",
-    sourceRef: "main",
-    accentStart: "#8a68d8",
-    accentEnd: "#6a48b8",
-  },
-  {
-    id: "release-sentinel",
-    name: "release-sentinel",
-    agent: "Claude Code",
-    description: "Checks release readiness, changelog consistency, and artifact handoff notes.",
-    status: "latest",
-    localCommit: "6c912aa",
-    remoteCommit: "6c912aa",
-    diffSummary: "+0  -0  lines in 0 files",
-    sourceUrl: "git@github.com:acme/agent-skills.git",
-    sourcePath: "skills/release-sentinel",
-    sourceRef: "main",
-    accentStart: "#e06888",
-    accentEnd: "#c04868",
-  },
-  {
-    id: "schema-cartographer",
-    name: "schema-cartographer",
-    agent: "opencode",
-    description: "Maps table changes, migration edges, and database review risk.",
-    status: "latest",
-    localCommit: "dd04f8a",
-    remoteCommit: "dd04f8a",
-    diffSummary: "+0  -0  lines in 0 files",
-    sourceUrl: "git@github.com:acme/agent-skills.git",
-    sourcePath: "skills/schema-cartographer",
-    sourceRef: "main",
-    accentStart: "#38b8a8",
-    accentEnd: "#209890",
-  },
-  {
-    id: "ux-pressure-test",
-    name: "ux-pressure-test",
-    agent: "OpenClaw",
-    description: "Runs compact UI critiques before a desktop surface is committed.",
-    status: "update",
-    localCommit: "78b90e1",
-    remoteCommit: "84de4c9",
-    diffSummary: "+24  -8  lines in 3 files",
-    sourceUrl: "git@github.com:acme/agent-skills.git",
-    sourcePath: "skills/ux-pressure-test",
-    sourceRef: "main",
-    accentStart: "#f0a840",
-    accentEnd: "#d08820",
-  },
-  {
-    id: "incident-lens",
-    name: "incident-lens",
-    agent: "Hermes",
-    description: "Collects logs and turns them into readable incident narratives.",
-    status: "latest",
-    localCommit: "239aa70",
-    remoteCommit: "239aa70",
-    diffSummary: "+0  -0  lines in 0 files",
-    sourceUrl: "git@github.com:acme/agent-skills.git",
-    sourcePath: "skills/incident-lens",
-    sourceRef: "main",
-    accentStart: "#5098e0",
-    accentEnd: "#3078c0",
-  },
-  {
-    id: "policy-needle",
-    name: "policy-needle",
-    agent: "Generic",
-    description: "Finds governance drift between local installs and team manifests.",
-    status: "latest",
-    localCommit: "c8810f2",
-    remoteCommit: "c8810f2",
-    diffSummary: "+0  -0  lines in 0 files",
-    sourceUrl: "git@github.com:acme/agent-skills.git",
-    sourcePath: "skills/policy-needle",
-    sourceRef: "main",
-    accentStart: "#40c090",
-    accentEnd: "#209870",
-  },
-];
+type AgentPath = {
+  id: string;
+  name: string;
+  path: string;
+  status: "ready" | "missing";
+};
 
-const previewAgents = ["All", "Codex", "Claude", "opencode", "Hermes"];
 const previewThemes: Array<{ id: PreviewTheme; label: string }> = [
   { id: "frost", label: "Frost" },
   { id: "sage", label: "Sage" },
@@ -120,16 +37,140 @@ const previewThemes: Array<{ id: PreviewTheme; label: string }> = [
   { id: "graphite", label: "Graphite" },
 ];
 
-const previewMatrix = [
-  { agent: "codex", status: "latest", active: true },
-  { agent: "claude-code", status: "latest", active: true },
-  { agent: "opencode", status: "not installed", active: false },
-  { agent: "openclaw", status: "update", active: true },
+const previewSkills: PreviewSkill[] = [
+  {
+    id: "memory-weaver",
+    name: "memory-weaver",
+    agent: "Codex",
+    description:
+      "Keeps durable project memory tidy across local agent skill folders and flags stale source bindings before they drift.",
+    status: "update",
+    localCommit: "a3f8c2e",
+    remoteCommit: "b9d4f1a",
+    diffSummary: "+12 -3 lines in 2 files",
+    sourceUrl: "git@github.com:acme/agent-skills.git",
+    sourcePath: "skills/memory-weaver",
+    sourceRef: "main",
+    trusted: true,
+    autoUpdate: false,
+    agents: ["C", "CL", "O"],
+    accentStart: "#496ee8",
+    accentEnd: "#7f5be8",
+  },
+  {
+    id: "release-sentinel",
+    name: "release-sentinel",
+    agent: "Claude Code",
+    description:
+      "Checks release readiness, changelog consistency, artifact handoff notes, and missing smoke evidence.",
+    status: "latest",
+    localCommit: "6c912aa",
+    remoteCommit: "6c912aa",
+    diffSummary: "+0 -0 lines in 0 files",
+    sourceUrl: "git@github.com:acme/agent-skills.git",
+    sourcePath: "skills/release-sentinel",
+    sourceRef: "main",
+    trusted: true,
+    autoUpdate: true,
+    agents: ["CL", "G"],
+    accentStart: "#f06498",
+    accentEnd: "#c94f7d",
+  },
+  {
+    id: "schema-cartographer",
+    name: "schema-cartographer",
+    agent: "opencode",
+    description:
+      "Maps table changes, migration edges, and database review risk into compact handoff notes.",
+    status: "latest",
+    localCommit: "dd04f8a",
+    remoteCommit: "dd04f8a",
+    diffSummary: "+0 -0 lines in 0 files",
+    sourceUrl: "git@github.com:acme/agent-skills.git",
+    sourcePath: "skills/schema-cartographer",
+    sourceRef: "main",
+    trusted: false,
+    autoUpdate: false,
+    agents: ["O", "H"],
+    accentStart: "#2db8a0",
+    accentEnd: "#159a86",
+  },
+  {
+    id: "ux-pressure-test",
+    name: "ux-pressure-test",
+    agent: "OpenClaw",
+    description:
+      "Runs compact UI critiques before a desktop surface is committed, including overflow and copy density checks.",
+    status: "update",
+    localCommit: "78b90e1",
+    remoteCommit: "84de4c9",
+    diffSummary: "+24 -8 lines in 3 files",
+    sourceUrl: "git@github.com:acme/agent-skills.git",
+    sourcePath: "skills/ux-pressure-test",
+    sourceRef: "main",
+    trusted: true,
+    autoUpdate: false,
+    agents: ["OC", "C"],
+    accentStart: "#f0ad47",
+    accentEnd: "#d98225",
+  },
+  {
+    id: "incident-lens",
+    name: "incident-lens",
+    agent: "Hermes",
+    description:
+      "Collects logs and turns them into readable incident narratives with timelines and owner prompts.",
+    status: "latest",
+    localCommit: "239aa70",
+    remoteCommit: "239aa70",
+    diffSummary: "+0 -0 lines in 0 files",
+    sourceUrl: "",
+    sourcePath: "",
+    sourceRef: "",
+    trusted: false,
+    autoUpdate: false,
+    agents: ["H"],
+    accentStart: "#4c9fdb",
+    accentEnd: "#2f75bf",
+  },
+  {
+    id: "policy-needle",
+    name: "policy-needle",
+    agent: "Generic",
+    description:
+      "Finds governance drift between local installs, trusted source policy, and team manifests.",
+    status: "latest",
+    localCommit: "c8810f2",
+    remoteCommit: "c8810f2",
+    diffSummary: "+0 -0 lines in 0 files",
+    sourceUrl: "git@github.com:acme/agent-skills.git",
+    sourcePath: "skills/policy-needle",
+    sourceRef: "main",
+    trusted: true,
+    autoUpdate: true,
+    agents: ["G", "C", "CL"],
+    accentStart: "#41bf80",
+    accentEnd: "#1e9667",
+  },
+];
+
+const agentPaths: AgentPath[] = [
+  { id: "codex", name: "Codex", path: "~/.codex/skills", status: "ready" },
+  { id: "claude-code", name: "Claude Code", path: "~/.claude/skills", status: "ready" },
+  { id: "openclaw", name: "OpenClaw", path: "~/Library/Application Support/OpenClaw/skills", status: "missing" },
+  { id: "hermes", name: "Hermes", path: "~/.hermes/skills", status: "ready" },
+  { id: "opencode", name: "opencode", path: "~/.config/opencode/skills", status: "ready" },
+  { id: "generic", name: "Generic", path: "~/agent-skills", status: "ready" },
 ];
 
 export function UiRedesignPreview() {
   const [route, setRoute] = useState<PreviewRoute>({ kind: "home" });
   const [theme, setTheme] = useState<PreviewTheme>("frost");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+  const [sourceDrawerOpen, setSourceDrawerOpen] = useState(false);
+  const [activeOperation, setActiveOperation] = useState<PreviewOperation>("check");
+  const [customPaths, setCustomPaths] = useState(["~/work/metis-lab/skills"]);
   const selectedSkill = useMemo(
     () =>
       route.kind === "detail"
@@ -138,19 +179,116 @@ export function UiRedesignPreview() {
     [route],
   );
 
+  function showToast(message: string) {
+    setToast(message);
+  }
+
+  function openSkill(skillId: string) {
+    setActiveOperation("check");
+    setSourceDrawerOpen(false);
+    setRoute({ kind: "detail", skillId });
+  }
+
   return (
     <div className="redesign-preview-shell" data-testid="ui-redesign-preview" data-theme={theme}>
-      <RedesignRail />
-      <main className="redesign-main">
-        <RedesignThemeSwitcher activeTheme={theme} onChange={setTheme} />
-        {route.kind === "home" && (
-          <RedesignHome onOpenSkill={(skillId) => setRoute({ kind: "detail", skillId })} />
-        )}
-        {selectedSkill && (
-          <RedesignDetail skill={selectedSkill} onBack={() => setRoute({ kind: "home" })} />
-        )}
-      </main>
+      <div className="redesign-app-window" data-testid="redesign-app-window">
+        <RedesignSidebar
+          route={route}
+          onHome={() => setRoute({ kind: "home" })}
+          onSettings={() => setRoute({ kind: "settings" })}
+        />
+        <main className="redesign-main">
+          <RedesignThemeSwitcher activeTheme={theme} onChange={setTheme} />
+          {route.kind === "home" && (
+            <RedesignHome
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onOpenSkill={openSkill}
+              onToast={showToast}
+            />
+          )}
+          {selectedSkill && (
+            <RedesignDetail
+              activeOperation={activeOperation}
+              onBack={() => setRoute({ kind: "home" })}
+              onOpenDrawer={() => setSourceDrawerOpen(true)}
+              onOperation={setActiveOperation}
+              onToast={showToast}
+              skill={selectedSkill}
+            />
+          )}
+          {route.kind === "settings" && (
+            <RedesignSettings
+              customPaths={customPaths}
+              onAddPath={() => {
+                setCustomPaths([...customPaths, "~/Library/Application Support/Metis/custom-skills"]);
+                showToast("已添加额外扫描路径");
+              }}
+            />
+          )}
+        </main>
+      </div>
+      {sourceDrawerOpen && selectedSkill && (
+        <SourceDrawer
+          onCancel={() => setSourceDrawerOpen(false)}
+          onSave={() => {
+            setSourceDrawerOpen(false);
+            showToast("来源设置已保存");
+          }}
+          skill={selectedSkill}
+        />
+      )}
+      {sourceDrawerOpen && <button className="redesign-drawer-scrim" aria-label="关闭来源抽屉" onClick={() => setSourceDrawerOpen(false)} />}
+      {toast && <div className="redesign-toast" data-testid="redesign-toast">{toast}</div>}
     </div>
+  );
+}
+
+function RedesignSidebar({
+  route,
+  onHome,
+  onSettings,
+}: {
+  route: PreviewRoute;
+  onHome: () => void;
+  onSettings: () => void;
+}) {
+  return (
+    <aside className="redesign-sidebar">
+      <a
+        className="redesign-brand"
+        data-testid="redesign-brand-logo"
+        href="https://github.com/example/metis"
+        rel="noreferrer"
+        target="_blank"
+      >
+        <span className="redesign-logo-mark" aria-hidden="true"><span>M</span></span>
+        <span>
+          <strong>Metis</strong>
+          <small>Skill Manager</small>
+        </span>
+      </a>
+      <nav className="redesign-side-nav" aria-label="Preview navigation">
+        <button className={route.kind !== "settings" ? "active" : ""} onClick={onHome}>
+          <GridIcon /> Skills
+        </button>
+        <button onClick={onHome}>
+          <RefreshIcon /> Updates
+        </button>
+        <button
+          className={route.kind === "settings" ? "active" : ""}
+          data-testid="redesign-nav-settings"
+          onClick={onSettings}
+        >
+          <GearIcon /> Settings
+        </button>
+      </nav>
+      <div className="redesign-side-summary">
+        <span>Local library</span>
+        <strong>48 skills</strong>
+        <small>6 agents · 31 trusted sources · scanned 2 min ago</small>
+      </div>
+    </aside>
   );
 }
 
@@ -179,191 +317,337 @@ function RedesignThemeSwitcher({
   );
 }
 
-function RedesignRail() {
-  return (
-    <aside className="redesign-rail" data-testid="redesign-rail" aria-label="Preview navigation">
-      <div className="redesign-rail-logo" aria-label="Metis preview logo">
-        <span />
-      </div>
-      <nav className="redesign-rail-nav">
-        <button className="active" aria-label="Skills preview">
-          <GridIcon />
-        </button>
-        <button aria-label="Governance preview">
-          <TargetIcon />
-        </button>
-      </nav>
-      <button className="redesign-rail-settings" aria-label="Settings preview">
-        <GearIcon />
-      </button>
-    </aside>
-  );
-}
-
-function RedesignHome({ onOpenSkill }: { onOpenSkill: (skillId: string) => void }) {
-  const latestCount = previewSkills.filter((skill) => skill.status === "latest").length;
+function RedesignHome({
+  searchQuery,
+  onSearchChange,
+  onOpenSkill,
+  onToast,
+}: {
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  onOpenSkill: (skillId: string) => void;
+  onToast: (message: string) => void;
+}) {
+  const filteredSkills = previewSkills.filter((skill) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return true;
+    }
+    return `${skill.name} ${skill.agent} ${skill.description}`.toLowerCase().includes(query);
+  });
   const updateCount = previewSkills.filter((skill) => skill.status === "update").length;
+  const latestCount = previewSkills.filter((skill) => skill.status === "latest").length;
 
   return (
     <section className="redesign-home" data-testid="redesign-home">
-      <div className="redesign-stage" data-testid="redesign-stage">
-        <header className="redesign-masthead" data-testid="redesign-masthead">
-          <div>
-            <p>Local Skill Command Center</p>
-            <h1 className="redesign-masthead-title">Metis Skill Atlas</h1>
-            <span>Scan, compare, update, and govern every agent skill from one calm desktop bridge.</span>
-          </div>
-          <div className="redesign-status-numbers" aria-label="Status counts">
-            <span className="latest" /> {latestCount * 6 + 2}
-            <span className="update" /> {updateCount * 5}
-          </div>
-        </header>
-
-        <div className="redesign-hero-stats" data-testid="redesign-hero-stats">
-          <div>
-            <span>Total Skills</span>
-            <strong>48</strong>
-          </div>
-          <div>
-            <span>Agents</span>
-            <strong>6</strong>
-          </div>
-          <div>
-            <span>Trusted Sources</span>
-            <strong>31</strong>
-          </div>
-          <div>
-            <span>Needs Review</span>
-            <strong>10</strong>
-          </div>
+      <header className="redesign-page-topbar">
+        <div>
+          <p>Skill Dashboard</p>
+          <h1>本机 Skill 工作台</h1>
         </div>
-
-        <div className="redesign-topbar">
-          <button className="redesign-search-button" aria-label="Search skills">
-            <SearchIcon />
+        <label className="redesign-search-field">
+          <SearchIcon />
+          <input
+            data-testid="redesign-search-input"
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="搜索 skill、agent 或来源"
+            value={searchQuery}
+          />
+          <span>{filteredSkills.length} results</span>
+        </label>
+        <div className="redesign-top-actions">
+          <button data-testid="redesign-check-updates" onClick={() => onToast("检查完成：2 个 skill 待更新")}>
+            检查更新
           </button>
-          <div className="redesign-agent-pills" aria-label="Agent filters">
-            {previewAgents.map((agent, index) => (
-              <button className={index === 0 ? "active" : ""} key={agent}>
-                <span aria-hidden="true" />
-                {agent}
-              </button>
-            ))}
-          </div>
+          <button data-testid="redesign-rescan" onClick={() => onToast("已重新扫描本机 skill 路径")}>
+            重新扫描
+          </button>
         </div>
+      </header>
 
-        <div className="redesign-home-grid">
-          <div className="redesign-orb-zone">
-            <div className="redesign-orb" data-testid="redesign-orb">
-              48
-            </div>
-          </div>
-          <div className="redesign-skill-list" data-testid="redesign-skill-list">
-            {previewSkills.map((skill) => (
-              <button
-                className="redesign-skill-row"
-                data-testid={`redesign-skill-row-${skill.id}`}
-                key={skill.id}
-                onClick={() => onOpenSkill(skill.id)}
-                style={accentStyle(skill)}
-              >
-                <span className="redesign-skill-accent" aria-hidden="true" />
-                <span className="redesign-skill-copy">
-                  <strong>{skill.name}</strong>
-                  <small>{skill.agent}</small>
-                </span>
-                <span className={`redesign-status-dot ${skill.status}`} aria-hidden="true" />
-              </button>
-            ))}
-            <p className="redesign-more-skills">+ 42 more</p>
-          </div>
+      <div className="redesign-home-stats">
+        <StatCard testId="redesign-stat-total" tone="mint" label="全部 Skill" value="48" meta="+6 from last scan" />
+        <StatCard testId="redesign-stat-updates" tone="warm" label="待更新" value={String(updateCount)} meta="needs review" />
+        <StatCard testId="redesign-stat-latest" tone="blue" label="已最新" value={String(latestCount)} meta="ready to use" />
+        <StatCard testId="redesign-stat-trusted" tone="rose" label="可信来源" value="31" meta="trusted repos" />
+      </div>
+
+      <div className="redesign-section-heading">
+        <div>
+          <p>Skill inventory</p>
+          <h2>跨 Agent 安装概览</h2>
         </div>
+        <span>{filteredSkills.length} of 48 visible</span>
+      </div>
+
+      <div className="redesign-skill-grid" data-testid="redesign-skill-grid">
+        {filteredSkills.map((skill) => (
+          <button
+            className="redesign-skill-card"
+            data-testid={`redesign-skill-card-${skill.id}`}
+            key={skill.id}
+            onClick={() => onOpenSkill(skill.id)}
+            style={accentStyle(skill)}
+          >
+            <span className="redesign-card-accent" aria-hidden="true" />
+            <span className={`redesign-card-status ${skill.status}`}>
+              {skill.status === "update" ? "待更新" : "已最新"}
+            </span>
+            <strong>{skill.name}</strong>
+            <small>{skill.agent}</small>
+            <p>{skill.description}</p>
+            <span className="redesign-card-footer">
+              <span>{skill.sourcePath || "未绑定来源"}</span>
+              <AgentStack skill={skill} />
+            </span>
+          </button>
+        ))}
       </div>
     </section>
   );
 }
 
-function RedesignDetail({ skill, onBack }: { skill: PreviewSkill; onBack: () => void }) {
+function StatCard({
+  testId,
+  tone,
+  label,
+  value,
+  meta,
+}: {
+  testId: string;
+  tone: "mint" | "warm" | "blue" | "rose";
+  label: string;
+  value: string;
+  meta: string;
+}) {
+  return (
+    <div className={`redesign-stat-card ${tone}`} data-testid={testId}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{meta}</small>
+    </div>
+  );
+}
+
+function RedesignDetail({
+  activeOperation,
+  onBack,
+  onOpenDrawer,
+  onOperation,
+  onToast,
+  skill,
+}: {
+  activeOperation: PreviewOperation;
+  onBack: () => void;
+  onOpenDrawer: () => void;
+  onOperation: (operation: PreviewOperation) => void;
+  onToast: (message: string) => void;
+  skill: PreviewSkill;
+}) {
   return (
     <section
       className="redesign-detail"
       data-testid={`redesign-skill-detail-${skill.id}`}
       style={accentStyle(skill)}
     >
-      <header className="redesign-detail-hero" data-testid="redesign-detail-hero">
-        <div className="redesign-detail-header">
-          <button className="redesign-back-button" aria-label="Back to preview home" onClick={onBack}>
-            <span aria-hidden="true">{"<"}</span>
-          </button>
-          <span className="redesign-detail-diamond" aria-hidden="true" />
-          <strong>{skill.name}</strong>
-          <small>{skill.agent}</small>
+      <button className="redesign-back-button" data-testid="redesign-back-home" onClick={onBack}>
+        返回
+      </button>
+
+      <header className="redesign-detail-summary" data-testid="redesign-detail-summary">
+        <div>
+          <span className="redesign-detail-kicker">Skill detail</span>
+          <h1>{skill.name}</h1>
+          <p>{skill.description}</p>
         </div>
-        <span className={`redesign-detail-status ${skill.status}`}>
-          {skill.status === "latest" ? "latest" : "update"}
-        </span>
-        <div className="redesign-detail-hero-copy">
-          <p>Skill Source Bridge</p>
-          <h2>{skill.description}</h2>
+        <div className="redesign-source-summary">
+          <span>来源</span>
+          <strong>{skill.sourceUrl || "未绑定来源"}</strong>
+          <small>{skill.sourcePath ? `${skill.sourcePath} · ${skill.sourceRef}` : ""}</small>
+          <button data-testid="redesign-open-source-drawer" onClick={onOpenDrawer}>
+            {skill.sourceUrl ? "修改来源" : "添加来源"}
+          </button>
         </div>
       </header>
 
-      <div className="redesign-detail-layout">
-        <div className="redesign-detail-flow">
-          <section className="redesign-version-card" data-testid="redesign-version-card">
-            <p>Versions</p>
-            <div>
-              <span>Local</span>
-              <strong>{skill.localCommit}</strong>
-            </div>
-            <div>
-              <span>Remote</span>
-              <strong>{skill.remoteCommit}</strong>
-            </div>
-            <code>{skill.diffSummary}</code>
-          </section>
-
-          <section className="redesign-source-card" data-testid="redesign-source-card">
-            <p>Source</p>
-            <code>{skill.sourceUrl}</code>
-            <div>
-              <span>ref / {skill.sourceRef}</span>
-              <span>path / {skill.sourcePath}</span>
-              <span>trusted / on</span>
-              <span>auto-update / manual</span>
-            </div>
-          </section>
-
-          <section className="redesign-action-card">
-            <button className="redesign-apply-button">Apply Update</button>
-            <div>
-              <button>View Diff</button>
-              <button>Backup</button>
-              <button className="danger">Unbind</button>
-            </div>
-          </section>
+      <section className="redesign-update-workbench" data-testid="redesign-update-workbench">
+        <div className="redesign-operation-tabs">
+          <button
+            className={activeOperation === "check" ? "active" : ""}
+            data-testid="redesign-action-check"
+            onClick={() => {
+              onOperation("check");
+              onToast("检查完成：远端 b9d4f1a 可用");
+            }}
+          >
+            检查更新
+          </button>
+          <button
+            className={activeOperation === "diff" ? "active" : ""}
+            data-testid="redesign-action-diff"
+            onClick={() => onOperation("diff")}
+          >
+            查看 diff
+          </button>
+          <button
+            className={activeOperation === "backups" ? "active" : ""}
+            data-testid="redesign-action-backups"
+            onClick={() => onOperation("backups")}
+          >
+            备份/回滚
+          </button>
         </div>
-
-        <aside className="redesign-install-matrix" data-testid="redesign-install-matrix">
-          <p>Agent Install Matrix</p>
-          {previewMatrix.map((row) => (
-            <div className="redesign-install-matrix-row" key={row.agent}>
-              <span className={row.active ? row.status : "inactive"} aria-hidden="true" />
-              <strong>{row.agent}</strong>
-              <small>{row.status}</small>
-            </div>
-          ))}
-        </aside>
-      </div>
-
-      <section className="redesign-migration-notes">
-        <h3>后续真实改造切入点</h3>
-        <p>
-          先把当前 `SkillsWorkspace` 的 list/detail route 拆成可替换容器，再迁移 CSS token 与
-          SkillRow/SkillDetailPage 的结构，最后接入真实搜索激活态和跨 Agent 矩阵。
-        </p>
+        {activeOperation === "check" && <CheckPanel skill={skill} />}
+        {activeOperation === "diff" && <DiffViewer />}
+        {activeOperation === "backups" && <BackupPanel onRollback={() => onToast("已回滚到 pre-update-2026-06-30")} />}
       </section>
     </section>
+  );
+}
+
+function CheckPanel({ skill }: { skill: PreviewSkill }) {
+  return (
+    <div className="redesign-check-panel" data-testid="redesign-check-panel">
+      <div>
+        <span>Local</span>
+        <strong>{skill.localCommit}</strong>
+      </div>
+      <div>
+        <span>Remote</span>
+        <strong>{skill.remoteCommit}</strong>
+      </div>
+      <div>
+        <span>Diff summary</span>
+        <strong>{skill.diffSummary}</strong>
+      </div>
+      <p>安全检查通过，建议先查看 diff；本地没有未提交修改。</p>
+    </div>
+  );
+}
+
+function DiffViewer() {
+  return (
+    <div className="redesign-diff-viewer" data-testid="redesign-diff-viewer">
+      <div className="redesign-diff-files">
+        <button className="active">SKILL.md</button>
+        <button>references/usage.md</button>
+      </div>
+      <div className="redesign-diff-code">
+        <div className="redesign-diff-line muted">@@ -1,7 +1,9 @@</div>
+        <div className="redesign-diff-line removed">-description: Keeps durable project memory tidy.</div>
+        <div className="redesign-diff-line added">+description: Keeps durable project memory tidy across local agent skill folders.</div>
+        <div className="redesign-diff-line added">+triggers: memory, project notes, continuity</div>
+        <div className="redesign-diff-line">  Use when project context should survive between sessions.</div>
+      </div>
+    </div>
+  );
+}
+
+function BackupPanel({ onRollback }: { onRollback: () => void }) {
+  return (
+    <div className="redesign-backup-panel" data-testid="redesign-backup-panel">
+      <div>
+        <strong>pre-update-2026-06-30</strong>
+        <span>7 files · 18 KB · before applying b9d4f1a</span>
+        <button data-testid="redesign-rollback-latest" onClick={onRollback}>回滚</button>
+      </div>
+      <div>
+        <strong>manual-snapshot-2026-06-28</strong>
+        <span>7 files · 17 KB · user snapshot</span>
+        <button>查看</button>
+      </div>
+    </div>
+  );
+}
+
+function SourceDrawer({
+  onCancel,
+  onSave,
+  skill,
+}: {
+  onCancel: () => void;
+  onSave: () => void;
+  skill: PreviewSkill;
+}) {
+  return (
+    <aside className="redesign-source-drawer" data-testid="redesign-source-drawer">
+      <header>
+        <span>Source binding</span>
+        <h2>{skill.name}</h2>
+      </header>
+      <label>
+        Git URL
+        <input data-testid="redesign-source-url" defaultValue={skill.sourceUrl || "git@github.com:acme/agent-skills.git"} />
+      </label>
+      <label>
+        Repo path
+        <input data-testid="redesign-source-repo-path" defaultValue={skill.sourcePath || `skills/${skill.name}`} />
+      </label>
+      <label>
+        Ref
+        <input data-testid="redesign-source-ref" defaultValue={skill.sourceRef || "main"} />
+      </label>
+      <label className="redesign-checkbox-row">
+        <input data-testid="redesign-source-trusted" defaultChecked={skill.trusted} type="checkbox" />
+        Trusted
+      </label>
+      <label className="redesign-checkbox-row">
+        <input data-testid="redesign-source-auto-update" defaultChecked={skill.autoUpdate} type="checkbox" />
+        Auto update
+      </label>
+      <footer>
+        <button onClick={onCancel}>取消</button>
+        <button data-testid="redesign-save-source" onClick={onSave}>保存</button>
+      </footer>
+    </aside>
+  );
+}
+
+function RedesignSettings({
+  customPaths,
+  onAddPath,
+}: {
+  customPaths: string[];
+  onAddPath: () => void;
+}) {
+  return (
+    <section className="redesign-settings-page" data-testid="redesign-settings-page">
+      <header className="redesign-page-topbar">
+        <div>
+          <p>Settings</p>
+          <h1>Agent 路径设置</h1>
+        </div>
+      </header>
+      <div className="redesign-agent-path-table">
+        {agentPaths.map((agent) => (
+          <label className="redesign-agent-path-row" data-testid={`redesign-agent-path-${agent.id}`} key={agent.id}>
+            <span className={agent.status}>{agent.name}</span>
+            <input defaultValue={agent.path} />
+            <small>{agent.status === "ready" ? "可读写" : "路径不存在"}</small>
+          </label>
+        ))}
+        {customPaths.map((path) => (
+          <label className="redesign-agent-path-row custom" key={path}>
+            <span>Custom</span>
+            <input defaultValue={path} />
+            <small>额外路径</small>
+          </label>
+        ))}
+      </div>
+      <button className="redesign-add-path" data-testid="redesign-add-custom-path" onClick={onAddPath}>
+        添加指定路径
+      </button>
+    </section>
+  );
+}
+
+function AgentStack({ skill }: { skill: PreviewSkill }) {
+  return (
+    <span className="redesign-agent-stack" data-testid={`redesign-agent-stack-${skill.id}`}>
+      {skill.agents.map((agent) => (
+        <span key={agent}>{agent}</span>
+      ))}
+    </span>
   );
 }
 
@@ -385,11 +669,13 @@ function GridIcon() {
   );
 }
 
-function TargetIcon() {
+function RefreshIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="7" />
-      <circle cx="12" cy="12" r="3" />
+      <path d="M20 7v5h-5" />
+      <path d="M4 17v-5h5" />
+      <path d="M18 9a6.5 6.5 0 0 0-11-2" />
+      <path d="M6 15a6.5 6.5 0 0 0 11 2" />
     </svg>
   );
 }

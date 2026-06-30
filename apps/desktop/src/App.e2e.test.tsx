@@ -367,24 +367,64 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(invokeMock).not.toHaveBeenCalled();
     expect(await screen.findByTestId("ui-redesign-preview")).toBeTruthy();
-    expect(screen.getByTestId("redesign-rail")).toBeTruthy();
-    expect(screen.getByTestId("redesign-orb").textContent).toBe("48");
+    expect(screen.getByTestId("redesign-app-window")).toBeTruthy();
+    expect(screen.getByTestId("redesign-brand-logo")).toBeTruthy();
     expect(screen.getByTestId("redesign-home")).toBeTruthy();
-    expect(screen.getByTestId("redesign-stage")).toBeTruthy();
-    expect(screen.getByTestId("redesign-masthead")).toBeTruthy();
-    expect(screen.getByTestId("redesign-hero-stats")).toBeTruthy();
-    expect(screen.getByTestId("redesign-skill-list")).toBeTruthy();
-    expect(screen.getByTestId("redesign-skill-row-memory-weaver")).toBeTruthy();
+    expect(screen.getByTestId("redesign-search-input")).toBeTruthy();
+    expect(screen.getByTestId("redesign-stat-total")).toBeTruthy();
+    expect(screen.getByTestId("redesign-stat-updates")).toBeTruthy();
+    expect(screen.getByTestId("redesign-stat-latest")).toBeTruthy();
+    expect(screen.getByTestId("redesign-skill-grid")).toBeTruthy();
+    expect(screen.getByTestId("redesign-skill-card-memory-weaver")).toBeTruthy();
+    expect(screen.getByTestId("redesign-agent-stack-memory-weaver")).toBeTruthy();
     expect(screen.queryByTestId("workspace-skills")).toBeNull();
 
-    await user.click(screen.getByTestId("redesign-skill-row-memory-weaver"));
+    await user.type(screen.getByTestId("redesign-search-input"), "release");
+    expect(screen.queryByTestId("redesign-skill-card-memory-weaver")).toBeNull();
+    expect(screen.getByTestId("redesign-skill-card-release-sentinel")).toBeTruthy();
+    await user.clear(screen.getByTestId("redesign-search-input"));
+
+    await user.click(screen.getByTestId("redesign-check-updates"));
+    expect(await screen.findByTestId("redesign-toast")).toBeTruthy();
+    await user.click(screen.getByTestId("redesign-rescan"));
+    expect(await screen.findByText("已重新扫描本机 skill 路径")).toBeTruthy();
+
+    await user.click(screen.getByTestId("redesign-skill-card-memory-weaver"));
 
     expect(await screen.findByTestId("redesign-skill-detail-memory-weaver")).toBeTruthy();
-    expect(screen.getByTestId("redesign-detail-hero")).toBeTruthy();
-    expect(screen.getByTestId("redesign-version-card")).toBeTruthy();
-    expect(screen.getByTestId("redesign-source-card")).toBeTruthy();
-    expect(screen.getByTestId("redesign-install-matrix")).toBeTruthy();
-    expect(screen.getByText("后续真实改造切入点")).toBeTruthy();
+    expect(screen.getByTestId("redesign-detail-summary")).toBeTruthy();
+    expect(screen.getByTestId("redesign-update-workbench")).toBeTruthy();
+
+    await user.click(screen.getByTestId("redesign-open-source-drawer"));
+    expect(await screen.findByTestId("redesign-source-drawer")).toBeTruthy();
+    expect(screen.getByTestId("redesign-source-url")).toBeTruthy();
+    expect(screen.getByTestId("redesign-source-repo-path")).toBeTruthy();
+    expect(screen.getByTestId("redesign-source-ref")).toBeTruthy();
+    expect(screen.getByTestId("redesign-source-trusted")).toBeTruthy();
+    expect(screen.getByTestId("redesign-source-auto-update")).toBeTruthy();
+    await user.click(screen.getByTestId("redesign-save-source"));
+    expect(await screen.findByText("来源设置已保存")).toBeTruthy();
+
+    await user.click(screen.getByTestId("redesign-action-check"));
+    expect(await screen.findByTestId("redesign-check-panel")).toBeTruthy();
+    await user.click(screen.getByTestId("redesign-action-diff"));
+    expect(await screen.findByTestId("redesign-diff-viewer")).toBeTruthy();
+    expect(screen.getByText("SKILL.md")).toBeTruthy();
+    await user.click(screen.getByTestId("redesign-action-backups"));
+    expect(await screen.findByTestId("redesign-backup-panel")).toBeTruthy();
+    await user.click(screen.getByTestId("redesign-rollback-latest"));
+    expect(await screen.findByText("已回滚到 pre-update-2026-06-30")).toBeTruthy();
+
+    await user.click(screen.getByTestId("redesign-back-home"));
+    expect(await screen.findByTestId("redesign-home")).toBeTruthy();
+
+    await user.click(screen.getByTestId("redesign-nav-settings"));
+    expect(await screen.findByTestId("redesign-settings-page")).toBeTruthy();
+    expect(screen.getByTestId("redesign-agent-path-codex")).toBeTruthy();
+    expect(screen.getByTestId("redesign-agent-path-claude-code")).toBeTruthy();
+    expect(screen.getByTestId("redesign-add-custom-path")).toBeTruthy();
+    await user.click(screen.getByTestId("redesign-add-custom-path"));
+    expect(await screen.findByText("已添加额外扫描路径")).toBeTruthy();
 
     window.location.hash = "";
   });

@@ -379,4 +379,34 @@ describe("Phase 6 light workspace contrast", () => {
       "background: var(--redesign-canvas);",
     );
   });
+
+  test("defines the reference dashboard preview layout, drawer, diff, and settings table", () => {
+    expect(stylesheet).toMatch(
+      /\.redesign-preview-shell\s*\{[\s\S]*place-items:\s*center;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.redesign-preview-shell\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.redesign-app-window\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.redesign-sidebar\s*\{[\s\S]*border-radius:\s*28px 0 0 28px;/,
+    );
+    expect(latestBlockFor(".redesign-logo-mark")).toContain("background: linear-gradient(135deg");
+    expect(stylesheet).toMatch(
+      /\.redesign-home-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.redesign-skill-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
+    );
+    expect(latestBlockFor(".redesign-skill-card")).toContain("-webkit-line-clamp: 2;");
+    expect(latestBlockFor(".redesign-agent-stack")).toContain("margin-left: -7px;");
+    expect(latestBlockFor(".redesign-source-drawer")).toContain("position: fixed");
+    expect(latestBlockFor(".redesign-source-drawer")).toContain("right: 0");
+    expect(stylesheet).toMatch(/\.redesign-diff-viewer\s*\{[\s\S]*font-family:/);
+    expect(latestBlockFor(".redesign-diff-line.added")).toContain("background:");
+    expect(stylesheet).toMatch(/\.redesign-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
+    expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
+  });
 });
