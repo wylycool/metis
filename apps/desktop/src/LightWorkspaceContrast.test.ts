@@ -434,19 +434,26 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".agent-badge-logo")).toContain("width: 16px;");
     expect(latestBlockFor(".agent-badge-logo")).toContain("stroke: currentColor;");
+    expect(latestBlockFor(".agent-badge")).toContain("color: var(--agent-badge-foreground, #ffffff);");
+    expect(latestBlockFor(".agent-logo-fill")).toContain("fill: currentColor;");
     expect(latestBlockFor(".agent-badge-letter")).toContain("font-weight: 850;");
     expect(latestBlockFor(".agent-badge-codex")).toContain(
-      "--agent-badge-background: linear-gradient(135deg, #8fa8ff 0%, #b7a4f3 100%);",
+      "--agent-badge-background: linear-gradient(135deg, #3867f4 0%, #6d5cf6 100%);",
     );
     expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-background: #e8a88f;");
-    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-background: #667085;");
-    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #69cdbd;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-background: #1f2328;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-foreground: #f8fafc;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #111827;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-foreground: #f8fafc;");
     expect(latestBlockFor(".agent-badge-openclaw")).toContain(
-      "--agent-badge-background: linear-gradient(135deg, #f4a8b6, #ef9a9a);",
+      "--agent-badge-background: #ef4444;",
     );
     expect(latestBlockFor(".agent-badge-hermes")).toContain(
-      "--agent-badge-background: linear-gradient(135deg, #b69df1, #8bddea);",
+      "--agent-badge-background: #f8fafc;",
     );
+    expect(latestBlockFor(".agent-badge-hermes")).toContain("--agent-badge-foreground: #111827;");
+    expect(latestBlockFor(".agent-badge-generic,\n.agent-badge-default")).toContain("--agent-badge-background: #e2e8f0;");
+    expect(latestBlockFor(".agent-badge-generic,\n.agent-badge-default")).toContain("--agent-badge-foreground: #475569;");
   });
 
   test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {

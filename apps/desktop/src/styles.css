@@ -3951,7 +3951,7 @@ textarea {
   margin-left: -7px;
   border: 2px solid #ffffff;
   border-radius: 999px;
-  color: #ffffff;
+  color: var(--agent-badge-foreground, #ffffff);
   background: var(--agent-badge-background, linear-gradient(135deg, #3e7bfa, #2dd4bf));
   font-size: 11px;
   font-weight: 900;
@@ -3967,6 +3967,16 @@ textarea {
   stroke-width: 1.8;
 }
 
+.agent-logo-fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+.agent-logo-eye {
+  fill: #062f38;
+  stroke: none;
+}
+
 .agent-badge-letter {
   display: inline-block;
   font-size: 10px;
@@ -3975,7 +3985,7 @@ textarea {
 }
 
 .agent-badge-codex {
-  --agent-badge-background: linear-gradient(135deg, #8fa8ff 0%, #b7a4f3 100%);
+  --agent-badge-background: linear-gradient(135deg, #3867f4 0%, #6d5cf6 100%);
 }
 
 .agent-badge-claude-code {
@@ -3983,24 +3993,28 @@ textarea {
 }
 
 .agent-badge-cursor {
-  --agent-badge-background: #667085;
+  --agent-badge-background: #1f2328;
+  --agent-badge-foreground: #f8fafc;
 }
 
 .agent-badge-opencode {
-  --agent-badge-background: #69cdbd;
+  --agent-badge-background: #111827;
+  --agent-badge-foreground: #f8fafc;
 }
 
 .agent-badge-openclaw {
-  --agent-badge-background: linear-gradient(135deg, #f4a8b6, #ef9a9a);
+  --agent-badge-background: #ef4444;
 }
 
 .agent-badge-hermes {
-  --agent-badge-background: linear-gradient(135deg, #b69df1, #8bddea);
+  --agent-badge-background: #f8fafc;
+  --agent-badge-foreground: #111827;
 }
 
 .agent-badge-generic,
 .agent-badge-default {
-  --agent-badge-background: #94a3b8;
+  --agent-badge-background: #e2e8f0;
+  --agent-badge-foreground: #475569;
 }
 
 .skill-agent-stack > .agent-badge:first-child {
@@ -6270,7 +6284,7 @@ textarea {
   margin-left: -7px;
   border: 2px solid #ffffff;
   border-radius: 999px;
-  color: #ffffff;
+  color: var(--agent-badge-foreground, #ffffff);
   background: var(--agent-badge-background, linear-gradient(135deg, #3154df, #46bfa4));
   font-size: 10px;
   font-weight: 950;
