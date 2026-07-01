@@ -446,6 +446,13 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByTestId("skill-row-extra-skill-6")).toBeTruthy();
     expect(screen.getAllByTestId(/^skill-row-/).length).toBeGreaterThan(6);
+    expect(screen.getByTestId("collapse-skills")).toBeTruthy();
+
+    await user.click(screen.getByTestId("collapse-skills"));
+
+    expect(screen.getAllByTestId(/^skill-row-/)).toHaveLength(6);
+    expect(screen.queryByTestId("skill-row-extra-skill-6")).toBeNull();
+    expect(screen.getByTestId("show-more-skills")).toBeTruthy();
   });
 
   test("renders the static UI redesign preview without backend commands", async () => {

@@ -301,6 +301,15 @@ export function SkillsWorkspace({
                 查看更多 {hiddenSkillCount} 个
               </button>
             )}
+            {showAllSkills && visibleSkills.length > HOME_SKILL_PREVIEW_LIMIT && (
+              <button
+                className="redesign-show-more"
+                data-testid="collapse-skills"
+                onClick={() => setShowAllSkills(false)}
+              >
+                收起
+              </button>
+            )}
             </>
           )}
         </section>
