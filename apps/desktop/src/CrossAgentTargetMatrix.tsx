@@ -122,10 +122,10 @@ export function remoteTargetId(target: DesktopSkillTarget) {
 }
 
 function isRemoteTargetSelectable(target: DesktopSkillTarget) {
-  if (target.status === "UpdateAvailable") {
-    return target.local_modified !== true;
+  if (target.local_modified) {
+    return ["UpToDate", "UpdateAvailable", "InstalledUnbound"].includes(target.status);
   }
-  return ["NotInstalled", "InstalledUnbound"].includes(target.status);
+  return ["NotInstalled", "InstalledUnbound", "UpdateAvailable"].includes(target.status);
 }
 
 function remoteTargetStatusLabel(target: DesktopSkillTarget) {

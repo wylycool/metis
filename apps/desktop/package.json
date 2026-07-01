@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test:e2e": "vitest run --config vite.config.ts --environment jsdom src/App.e2e.test.tsx",
+    "test:acceptance:tauri-window": "node ../../tools/product_acceptance/tauri_window_acceptance.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:build:mac-universal": "tauri build --target universal-apple-darwin --bundles dmg"

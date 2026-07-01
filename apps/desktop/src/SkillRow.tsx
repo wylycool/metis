@@ -5,6 +5,7 @@ import type {
   DesktopSkill,
   DesktopUpdateCheckResult,
 } from "./types";
+import type { CSSProperties } from "react";
 
 export interface BindDraft {
   url: string;
@@ -44,8 +45,9 @@ export function SkillRow({
 }) {
   return (
     <article
-      className="skill-row"
+      className="skill-row redesign-skill-card"
       data-testid={`skill-row-${skill.id}`}
+      style={skillAccentStyle(skill)}
       onClick={(event) => {
         const target = event.target as HTMLElement;
         if (target.closest("button, input, textarea, label, a")) {
@@ -54,25 +56,29 @@ export function SkillRow({
         onOpenDetail?.();
       }}
     >
-      <span className="skill-row-marker" aria-hidden="true" />
+      <span className="skill-card-anchor" data-testid={`skill-card-${skill.id}`} aria-hidden="true" />
+      <span className="skill-row-marker redesign-card-accent" aria-hidden="true" />
+      <span className={`redesign-card-status ${cardStatusTone(updateResult, skill)}`}>
+        {cardStatusLabel(updateResult, skill)}
+      </span>
+      <strong>{skill.name}</strong>
       <div className="skill-row-main">
         <div className="skill-main">
-          <div className="skill-title">
-            <h3>{skill.name}</h3>
-          </div>
-          {skill.description && <p>{skill.description}</p>}
-          <code>{skill.install_path}</code>
-        </div>
-
-        <div className="skill-status">
-          <StatusBadge tone={skill.local_modified ? "danger" : "muted"}>
-            {localModifiedLabel(skill.local_modified)}
-          </StatusBadge>
-          <StatusBadge tone={updateTone(updateResult, skill)}>
-            {updateLabel(updateResult, skill)}
-          </StatusBadge>
+          <p>{skill.description || "暂无简介。打开详情页后可以补充来源、检查更新并查看 diff。"}</p>
         </div>
       </div>
+
+      <span className="redesign-card-footer">
+        <span>{skill.source?.repo_path || "未绑定来源"}</span>
+        <span
+          className="skill-agent-stack redesign-agent-stack"
+          data-testid={`skill-agent-stack-${skill.id}`}
+          aria-label={`存在于 ${skill.agent_name}`}
+        >
+          <span>{agentInitial(skill.agent_name)}</span>
+          <span>{skill.name.slice(0, 1).toUpperCase()}</span>
+        </span>
+      </span>
 
       {updateResult?.diff_summary && (
         <div className="update-summary">
@@ -88,6 +94,54 @@ export function SkillRow({
   );
 }
 
+function cardStatusLabel(updateResult: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
+  if (skill.local_modified) {
+    return "已修改";
+  }
+  if (updateResult?.status === "UpdateAvailable") {
+    return "待更新";
+  }
+  if (updateResult?.status === "UpToDate") {
+    return "已最新";
+  }
+  return "未检查";
+}
+
+function cardStatusTone(updateResult: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
+  if (skill.local_modified || updateResult?.status === "UpdateAvailable") {
+    return "update";
+  }
+  return "latest";
+}
+
+function skillAccentStyle(skill: DesktopSkill): CSSProperties {
+  const palette = [
+    ["#496ee8", "#7f5be8"],
+    ["#f06498", "#c94f7d"],
+    ["#2db8a0", "#159a86"],
+    ["#f0ad47", "#d98225"],
+    ["#4c9fdb", "#2f75bf"],
+    ["#41bf80", "#1e9667"],
+  ];
+  const index = Math.abs(hashText(`${skill.agent_id}:${skill.name}`)) % palette.length;
+  return {
+    "--redesign-accent-start": palette[index][0],
+    "--redesign-accent-end": palette[index][1],
+  } as CSSProperties;
+}
+
+function hashText(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return hash;
+}
+
+function agentInitial(agentName: string) {
+  return (agentName.trim()[0] ?? "A").toUpperCase();
+}
+
 export function BackupPanel({
   skillId,
   backups,
@@ -100,7 +154,7 @@ export function BackupPanel({
   onRestoreBackup: (backupId: string) => void;
 }) {
   return (
-    <div className="backup-panel">
+    <div className="backup-panel redesign-backup-panel">
       <div className="backup-heading">
         <strong>备份</strong>
         <span>{backups.length} items</span>
@@ -141,21 +195,49 @@ export function BackupPanel({
 }
 
 export function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
-  const patches = detail.files
-    .map((file) => file.patch || `${file.status}: ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}`)
-    .join("\n\n");
+  const patches = detail.files.flatMap((file) =>
+    (file.patch || `${file.status}: ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}`)
+      .split("\n"),
+  );
 
   return (
-    <div className="diff-panel">
-      <div className="diff-heading">
-        <span>{shortCommit(detail.current_commit)}</span>
-        <strong>→</strong>
-        <span>{shortCommit(detail.target_commit)}</span>
-        <b>{detail.files.length} files</b>
+    <div className="diff-panel redesign-diff-viewer">
+      <div className="diff-heading redesign-diff-files">
+        {detail.files.map((file, index) => (
+          <button className={index === 0 ? "active" : ""} key={`${file.status}:${file.path}`}>
+            {file.path}
+          </button>
+        ))}
       </div>
-      <pre className="simple-diff">{patches || "暂无可展示的 diff 文本。"}</pre>
+      <div className="simple-diff redesign-diff-code">
+        <div className="redesign-diff-line muted">
+          {shortCommit(detail.current_commit)} -&gt; {shortCommit(detail.target_commit)} · {detail.files.length} files
+        </div>
+        {patches.length > 0 ? (
+          patches.map((line, index) => (
+            <div className={`redesign-diff-line ${diffLineTone(line)}`} key={`${index}:${line}`}>
+              {line || " "}
+            </div>
+          ))
+        ) : (
+          <div className="redesign-diff-line muted">暂无可展示的 diff 文本。</div>
+        )}
+      </div>
     </div>
   );
+}
+
+function diffLineTone(line: string) {
+  if (line.startsWith("+") && !line.startsWith("+++")) {
+    return "added";
+  }
+  if (line.startsWith("-") && !line.startsWith("---")) {
+    return "removed";
+  }
+  if (line.startsWith("@@")) {
+    return "muted";
+  }
+  return "";
 }
 
 export function BindSourceForm({
@@ -321,7 +403,7 @@ export function updateTone(
 
 export function updateLabel(result: DesktopUpdateCheckResult | undefined, skill: DesktopSkill) {
   if (result?.local_modified) {
-    return "本地修改，先处理";
+    return "本地修改，可手动覆盖";
   }
   if (result?.status === "UpToDate") {
     return "无需更新";

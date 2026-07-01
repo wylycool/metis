@@ -25,8 +25,10 @@ import {
   unbindSkillSource,
 } from "./api";
 import type { RemoteSyncDraft } from "./AddSkillPage";
+import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
 import { InlineError, type BindDraft } from "./SkillRow";
+import { UiRedesignPreview } from "./UiRedesignPreview";
 import type {
   DesktopAgentStatus,
   DesktopBackupSummary,
@@ -50,8 +52,17 @@ import type {
 } from "./types";
 
 type WorkspaceKey = "skills" | "governance" | "settings";
+type SkillsViewKind = "list" | "detail" | "add";
 
 function App() {
+  if (isUiRedesignPreviewRoute()) {
+    return <UiRedesignPreview />;
+  }
+
+  return <MetisApp />;
+}
+
+function MetisApp() {
   const [agents, setAgents] = useState<DesktopAgentStatus[]>([]);
   const [skills, setSkills] = useState<DesktopSkill[]>([]);
   const [warnings, setWarnings] = useState<DesktopScanWarning[]>([]);
@@ -84,7 +95,7 @@ function App() {
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<DesktopError | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [skillsViewKind, setSkillsViewKind] = useState<SkillsViewKind>("list");
   const [skillSearchQuery, setSkillSearchQuery] = useState("");
   const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>({
     url: "",
@@ -163,6 +174,7 @@ function App() {
       setSkills(scanResult.skills);
       setWarnings(scanResult.warnings);
       setState("loaded");
+      setActionMessage("已重新扫描本机 skill 路径");
     } catch (caught) {
       setError(desktopError(caught));
       setState("error");
@@ -427,6 +439,8 @@ function App() {
       });
       setDiffError({});
       await refreshIndexedSkills();
+      const updateCount = results.filter((result) => result.status === "UpdateAvailable").length;
+      setActionMessage(`检查完成：${updateCount} 个 skill 待更新`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -456,18 +470,12 @@ function App() {
       });
       setDiffError({});
       await refreshIndexedSkills();
+      setActionMessage("检查完成：远端更新状态已刷新");
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
-  }
-
-  async function handleCheckAgentUpdates(agentId: string) {
-    const agentSkillIds = skills
-      .filter((skill) => skill.agent_id === agentId)
-      .map((skill) => skill.id);
-    await handleCheckUpdates(agentSkillIds, `agent-check:${agentId}`);
   }
 
   async function handlePreviewRemoteSync() {
@@ -1029,61 +1037,86 @@ function App() {
     });
   }
 
+  const settingsAgentRows = agentPathRows(agents);
+  const isSkillDetailView = activeWorkspace === "skills" && skillsViewKind === "detail";
+
   return (
-    <div className="metis-window">
-      <div className="metis-shell">
-        <div className="app-shell">
-          <header className="topbar">
+    <div className="metis-window redesign-preview-shell" data-theme="frost">
+      <div className="metis-shell redesign-app-window" data-testid="metis-reference-shell">
+        <aside className="metis-sidebar redesign-sidebar" data-testid="metis-reference-sidebar">
+          <button
+            className="metis-sidebar-brand redesign-brand"
+            data-testid="metis-brand-home"
+            aria-label="打开 Metis GitHub 主页"
+            onClick={() => {
+              setActiveWorkspace("skills");
+              if (navigator.userAgent.toLowerCase().includes("jsdom")) {
+                return;
+              }
+              try {
+                window.open("https://github.com/example/metis", "_blank", "noopener,noreferrer");
+              } catch {
+                // jsdom does not implement window.open; the app still returns home.
+              }
+            }}
+          >
+            <span className="metis-brand-mark redesign-logo-mark" aria-hidden="true">
+              <CrystalSkillLogo testId="metis-brand-crystal-logo" />
+            </span>
+            <span>
+              <strong>Metis</strong>
+              <small>Skill Manager</small>
+            </span>
+          </button>
+          <nav className="metis-sidebar-nav redesign-side-nav" aria-label="Workspace">
             <button
-              className="metis-brand"
-              data-testid="metis-brand-home"
-              aria-label="返回首页"
+              aria-pressed={activeWorkspace === "skills"}
+              className={activeWorkspace === "skills" ? "active" : ""}
+              data-testid="workspace-tab-skills"
               onClick={() => setActiveWorkspace("skills")}
             >
-              <span className="metis-brand-mark" aria-hidden="true">M</span>
-              <strong>Metis</strong>
+              <GridIcon />
+              Skills
             </button>
-            <div className="topbar-actions">
-              {activeWorkspace === "skills" && (
-                <label className="topbar-search" aria-label="搜索 skills">
-                  <span aria-hidden="true" />
-                  <input
-                    data-testid="skill-search-input"
-                    placeholder="搜索 skill、路径或来源"
-                    value={skillSearchQuery}
-                    onChange={(event) => setSkillSearchQuery(event.target.value)}
-                  />
-                </label>
-              )}
-              <button
-                className="ghost-button topbar-secondary-action"
-                data-testid="check-all-updates"
-                disabled={
-                  state === "loading" || actionBusy === "check-updates" || skills.length === 0
-                }
-                onClick={() => handleCheckUpdates(skills.map((skill) => skill.id))}
-              >
-                {actionBusy === "check-updates" ? "检查中" : "检查更新"}
-              </button>
-              <button
-                className="scan-button"
-                data-testid="scan-skills"
-                disabled={state === "loading"}
-                onClick={handleScan}
-              >
-                {state === "loading" ? "扫描中" : "重新扫描"}
-              </button>
-              <button
-                aria-label="Settings"
-                aria-pressed={activeWorkspace === "settings"}
-                className="settings-icon-button"
-                data-testid="workspace-tab-settings"
-                onClick={() => setActiveWorkspace("settings")}
-              >
-                <span aria-hidden="true" />
-              </button>
-            </div>
-          </header>
+            <button
+              aria-pressed={activeWorkspace === "governance"}
+              className={activeWorkspace === "governance" ? "active" : ""}
+              data-testid="workspace-tab-governance-sidebar"
+              onClick={() => setActiveWorkspace("governance")}
+            >
+              <RefreshIcon />
+              Updates
+            </button>
+            <button
+              aria-pressed={activeWorkspace === "settings"}
+              className={activeWorkspace === "settings" ? "active" : ""}
+              data-testid="workspace-tab-settings-sidebar"
+              onClick={() => setActiveWorkspace("settings")}
+            >
+              <GearIcon />
+              Settings
+            </button>
+          </nav>
+          <div className="metis-sidebar-status redesign-side-summary">
+            <span>Local library</span>
+            <strong>{skills.length} skills</strong>
+            <small>{agents.length} agents · {trustedSourceCount} trusted sources · {totalExistingPaths} ready paths</small>
+          </div>
+        </aside>
+        <div className="app-shell redesign-main">
+          {!isSkillDetailView && (
+            <WorkspaceTopbar
+              actionBusy={actionBusy}
+              activeWorkspace={activeWorkspace}
+              isLoading={state === "loading"}
+              skillCount={skills.length}
+              skillSearchQuery={skillSearchQuery}
+              onCheckAllUpdates={() => handleCheckUpdates(skills.map((skill) => skill.id))}
+              onOpenSettings={() => setActiveWorkspace("settings")}
+              onScan={handleScan}
+              onSearchChange={setSkillSearchQuery}
+            />
+          )}
 
           <nav className="workspace-tabs" aria-hidden="true" hidden>
             <WorkspaceTab
@@ -1118,7 +1151,11 @@ function App() {
       )}
 
       {actionError && <InlineError error={actionError} />}
-      {actionMessage && <div className="inline-success">{actionMessage}</div>}
+      {actionMessage && (
+        <div className="redesign-toast" data-testid="redesign-toast">
+          {actionMessage}
+        </div>
+      )}
 
       {activeWorkspace === "governance" && (
         <section className="workspace-pane" data-testid="workspace-governance">
@@ -1311,7 +1348,20 @@ function App() {
       )}
 
       {activeWorkspace === "settings" && (
-        <section className="settings-panel workspace-pane" aria-label="配置" data-testid="workspace-settings">
+        <section className="settings-panel workspace-pane redesign-settings-page" aria-label="配置" data-testid="workspace-settings">
+          <div className="settings-agent-path-table redesign-agent-path-table" data-testid="settings-agent-path-table">
+            {settingsAgentRows.map((row) => (
+              <label
+                className="settings-agent-path-row redesign-agent-path-row"
+                data-testid={`settings-agent-path-${row.agent_id}`}
+                key={row.agent_id}
+              >
+                <span className={row.exists ? "ready" : "missing"}>{row.agent_name}</span>
+                <input readOnly value={row.path} />
+                <small>{row.exists ? "可读写" : "路径不存在"}</small>
+              </label>
+            ))}
+          </div>
           <div className="settings-summary">
             <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
             <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
@@ -1488,7 +1538,6 @@ function App() {
       {activeWorkspace === "skills" && (
         <SkillsWorkspace
           actionBusy={actionBusy}
-          agents={agents}
           backupError={backupError}
           backupPanels={backupPanels}
           backups={backups}
@@ -1504,20 +1553,17 @@ function App() {
           remotePreview={remotePreview}
           remoteSyncDraft={remoteSyncDraft}
           remoteTargets={remoteTargets}
-          selectedAgentId={selectedAgentId}
           selectedDetailTargetIds={selectedDetailTargetIds}
           selectedRemoteTargetIds={selectedRemoteTargetIds}
           skillSearchQuery={skillSearchQuery}
           skills={skills}
           state={state}
           updateResults={updateResults}
-          warnings={warnings}
           onApplyUpdate={handleApplyUpdate}
           onBackupsDetailToggle={handleToggleDetailBackups}
           onBackupsToggle={handleToggleBackups}
           onBind={handleBindSource}
           onCancelBind={() => setBindingSkillId(null)}
-          onCheckAgentUpdates={handleCheckAgentUpdates}
           onCheckUpdates={handleCheckUpdates}
           onCheckDetailUpdates={handleCheckDetailUpdates}
           onDraftChange={setBindDraft}
@@ -1529,8 +1575,8 @@ function App() {
           onPreviewRemoteSync={handlePreviewRemoteSync}
           onRestoreBackup={handleRestoreBackup}
           onScan={handleScan}
-          onSelectAgent={setSelectedAgentId}
           onSetRemoteSyncDraft={setRemoteSyncDraft}
+          onRouteKindChange={setSkillsViewKind}
           onToggleDetailTarget={toggleDetailTarget}
           onToggleDetailDiff={handleToggleDetailDiff}
           onToggleDiff={handleToggleDiff}
@@ -1554,6 +1600,15 @@ function App() {
       </div>
     </div>
   );
+}
+
+function isUiRedesignPreviewRoute() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const hash = window.location.hash.replace(/^#/, "");
+  const search = window.location.search;
+  return hash === "/ui-redesign-preview" || search.includes("preview=ui-redesign");
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {
@@ -1732,6 +1787,33 @@ function shortPath(path: string) {
   return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
 }
 
+function agentPathRows(agents: DesktopAgentStatus[]) {
+  const fallbackAgents = [
+    { agent_id: "codex", agent_name: "Codex", path: "~/.codex/skills", exists: false },
+    { agent_id: "claude-code", agent_name: "Claude Code", path: "~/.claude/skills", exists: false },
+    { agent_id: "openclaw", agent_name: "OpenClaw", path: "~/.openclaw/skills", exists: false },
+    { agent_id: "hermes", agent_name: "Hermes", path: "~/.hermes/skills", exists: false },
+    { agent_id: "opencode", agent_name: "opencode", path: "~/.opencode/skills", exists: false },
+    { agent_id: "generic", agent_name: "Generic", path: "自定义路径", exists: false },
+  ];
+
+  const discovered = agents.map((agent) => {
+    const firstPath = agent.paths[0];
+    return {
+      agent_id: agent.agent_id,
+      agent_name: agent.agent_name,
+      path: firstPath?.path ?? "未配置",
+      exists: Boolean(firstPath?.exists),
+    };
+  });
+  const discoveredIds = new Set(discovered.map((row) => row.agent_id));
+
+  return [
+    ...discovered,
+    ...fallbackAgents.filter((agent) => !discoveredIds.has(agent.agent_id)),
+  ];
+}
+
 function desktopError(caught: unknown): DesktopError {
   if (isDesktopError(caught)) {
     return caught;
@@ -1782,6 +1864,133 @@ function unknownDesktopError(detail: string): DesktopError {
     suggestion: "请确认目标目录、Git source 和本地数据库状态后重试。",
     debug_detail: detail,
   };
+}
+
+type WorkspaceTopbarProps = {
+  actionBusy: string | null;
+  activeWorkspace: WorkspaceKey;
+  isLoading: boolean;
+  skillCount: number;
+  skillSearchQuery: string;
+  onCheckAllUpdates: () => void;
+  onOpenSettings: () => void;
+  onScan: () => void;
+  onSearchChange: (value: string) => void;
+};
+
+const workspaceTopbarCopy: Record<WorkspaceKey, { eyebrow: string; title: string }> = {
+  skills: { eyebrow: "Skill Dashboard", title: "Skills" },
+  governance: { eyebrow: "Updates", title: "更新与治理" },
+  settings: { eyebrow: "Settings", title: "Agent 路径设置" },
+};
+
+function WorkspaceTopbar({
+  actionBusy,
+  activeWorkspace,
+  isLoading,
+  skillCount,
+  skillSearchQuery,
+  onCheckAllUpdates,
+  onOpenSettings,
+  onScan,
+  onSearchChange,
+}: WorkspaceTopbarProps) {
+  const copy = workspaceTopbarCopy[activeWorkspace];
+  const showSearch = activeWorkspace === "skills";
+
+  return (
+    <header className="topbar redesign-page-topbar" data-testid="workspace-topbar">
+      <div className="topbar-title">
+        <p>{copy.eyebrow}</p>
+        <h1>{copy.title}</h1>
+      </div>
+      <div className="topbar-actions">
+        <div
+          className={`topbar-middle-slot${showSearch ? "" : " is-empty"}`}
+          data-testid="workspace-topbar-middle"
+        >
+          {showSearch && (
+            <label className="topbar-search redesign-search-field" aria-label="搜索 skills">
+              <SearchIcon />
+              <input
+                data-testid="skill-search-input"
+                placeholder="搜索 skill、路径或来源"
+                value={skillSearchQuery}
+                onChange={(event) => onSearchChange(event.target.value)}
+              />
+            </label>
+          )}
+        </div>
+        <div className="redesign-top-actions" data-testid="workspace-topbar-actions">
+          <button
+            className="ghost-button topbar-secondary-action"
+            data-testid="check-all-updates"
+            disabled={isLoading || actionBusy === "check-updates" || skillCount === 0}
+            onClick={onCheckAllUpdates}
+          >
+            {actionBusy === "check-updates" ? "检查中" : "检查更新"}
+          </button>
+          <button
+            className="scan-button"
+            data-testid="scan-skills"
+            disabled={isLoading}
+            onClick={onScan}
+          >
+            {isLoading ? "扫描中" : "重新扫描"}
+          </button>
+        </div>
+        <button
+          aria-label="Settings"
+          aria-pressed={activeWorkspace === "settings"}
+          className="settings-icon-button"
+          data-testid="workspace-tab-settings"
+          onClick={onOpenSettings}
+        >
+          <span aria-hidden="true" />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function GridIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="6" height="6" rx="1.4" />
+      <rect x="14" y="4" width="6" height="6" rx="1.4" />
+      <rect x="4" y="14" width="6" height="6" rx="1.4" />
+      <rect x="14" y="14" width="6" height="6" rx="1.4" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M20 7v5h-5" />
+      <path d="M4 17v-5h5" />
+      <path d="M18 9a6.5 6.5 0 0 0-11-2" />
+      <path d="M6 15a6.5 6.5 0 0 0 11 2" />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M12 8.4a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Z" />
+      <path d="M12 3.4 14 5l2.5-.5 1.2 2.1-1.6 2 .4 1.4 2.2 1v2.4l-2.2 1-.4 1.4 1.6 2-1.2 2.1-2.5-.5-2 1.6-2-1.6-2.5.5-1.2-2.1 1.6-2-.4-1.4-2.2-1V11l2.2-1 .4-1.4-1.6-2 1.2-2.1L10 5l2-1.6Z" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <circle cx="10.5" cy="10.5" r="5.8" />
+      <path d="m15 15 4.4 4.4" />
+    </svg>
+  );
 }
 
 export default App;
