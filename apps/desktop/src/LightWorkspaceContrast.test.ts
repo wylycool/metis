@@ -472,6 +472,12 @@ describe("Phase 6 light workspace contrast", () => {
       /\.topbar-search\.redesign-search-field svg\s*\{[\s\S]*width:\s*22px;/,
     );
     expect(stylesheet).toMatch(
+      /\.topbar-search\.redesign-search-field span::before,\s*\.topbar-search\.redesign-search-field span::after\s*\{[\s\S]*content:\s*none;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.topbar-search\.redesign-search-field input\s*\{[\s\S]*padding-left:\s*0;/,
+    );
+    expect(stylesheet).toMatch(
       /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*22px;/,
     );
     expect(stylesheet).toMatch(

@@ -4313,6 +4313,15 @@ textarea {
   stroke-width: 2;
 }
 
+.topbar-search.redesign-search-field span::before,
+.topbar-search.redesign-search-field span::after {
+  content: none;
+}
+
+.topbar-search.redesign-search-field input {
+  padding-left: 0;
+}
+
 .skill-panel.redesign-home {
   min-width: 0;
   display: grid;
