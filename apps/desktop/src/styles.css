@@ -3958,32 +3958,32 @@ textarea {
 }
 
 .agent-badge-codex {
-  --agent-badge-background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);
+  --agent-badge-background: linear-gradient(135deg, #8fa8ff 0%, #b7a4f3 100%);
 }
 
 .agent-badge-claude-code {
-  --agent-badge-background: #d97757;
+  --agent-badge-background: #e8a88f;
 }
 
 .agent-badge-cursor {
-  --agent-badge-background: #111827;
+  --agent-badge-background: #667085;
 }
 
 .agent-badge-opencode {
-  --agent-badge-background: #00a88f;
+  --agent-badge-background: #69cdbd;
 }
 
 .agent-badge-openclaw {
-  --agent-badge-background: linear-gradient(135deg, #fb7185, #ef4444);
+  --agent-badge-background: linear-gradient(135deg, #f4a8b6, #ef9a9a);
 }
 
 .agent-badge-hermes {
-  --agent-badge-background: linear-gradient(135deg, #7c3aed, #22d3ee);
+  --agent-badge-background: linear-gradient(135deg, #b69df1, #8bddea);
 }
 
 .agent-badge-generic,
 .agent-badge-default {
-  --agent-badge-background: #64748b;
+  --agent-badge-background: #94a3b8;
 }
 
 .skill-agent-stack span:first-child {

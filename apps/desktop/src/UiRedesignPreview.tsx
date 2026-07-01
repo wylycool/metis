@@ -156,6 +156,25 @@ const previewSkills: PreviewSkill[] = [
     accentStart: "#41bf80",
     accentEnd: "#1e9667",
   },
+  {
+    id: "agent-palette-lab",
+    name: "agent-palette-lab",
+    agent: "All Agents",
+    description:
+      "Preview-only card for checking the full overlapping badge palette across every supported agent.",
+    status: "latest",
+    localCommit: "9f2a011",
+    remoteCommit: "9f2a011",
+    diffSummary: "+0 -0 lines in 0 files",
+    sourceUrl: "git@github.com:acme/agent-skills.git",
+    sourcePath: "skills/agent-palette-lab",
+    sourceRef: "main",
+    trusted: true,
+    autoUpdate: false,
+    agents: ["codex", "claude-code", "cursor", "openclaw", "hermes", "opencode", "generic"],
+    accentStart: "#8fa8ff",
+    accentEnd: "#69cdbd",
+  },
 ];
 
 const agentPaths: AgentPath[] = [
@@ -665,6 +684,7 @@ function previewAgentIdentity(agentId: string) {
   const names: Record<string, string> = {
     "claude-code": "Claude Code",
     codex: "Codex",
+    cursor: "Cursor",
     generic: "Generic Agent Skills",
     hermes: "Hermes",
     openclaw: "OpenClaw",

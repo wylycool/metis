@@ -512,6 +512,15 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("redesign-skill-grid")).toBeTruthy();
     expect(screen.getByTestId("redesign-skill-card-memory-weaver")).toBeTruthy();
     expect(screen.getByTestId("redesign-agent-stack-memory-weaver")).toBeTruthy();
+    expect(screen.getByTestId("redesign-skill-card-agent-palette-lab")).toBeTruthy();
+    const previewAgentStack = within(screen.getByTestId("redesign-agent-stack-agent-palette-lab"));
+    expect(previewAgentStack.getByTestId("agent-badge-codex")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-claude-code")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-cursor")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-openclaw")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-hermes")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-opencode")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-generic")).toBeTruthy();
     expect(screen.queryByTestId("workspace-skills")).toBeNull();
 
     await user.type(screen.getByTestId("redesign-search-input"), "release");

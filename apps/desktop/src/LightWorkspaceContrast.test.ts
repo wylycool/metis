@@ -433,11 +433,17 @@ describe("Phase 6 light workspace contrast", () => {
       "background: var(--agent-badge-background, linear-gradient(135deg, #3154df, #46bfa4));",
     );
     expect(latestBlockFor(".agent-badge-codex")).toContain(
-      "--agent-badge-background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);",
+      "--agent-badge-background: linear-gradient(135deg, #8fa8ff 0%, #b7a4f3 100%);",
     );
-    expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-background: #d97757;");
-    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-background: #111827;");
-    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #00a88f;");
+    expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-background: #e8a88f;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-background: #667085;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #69cdbd;");
+    expect(latestBlockFor(".agent-badge-openclaw")).toContain(
+      "--agent-badge-background: linear-gradient(135deg, #f4a8b6, #ef9a9a);",
+    );
+    expect(latestBlockFor(".agent-badge-hermes")).toContain(
+      "--agent-badge-background: linear-gradient(135deg, #b69df1, #8bddea);",
+    );
   });
 
   test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {
