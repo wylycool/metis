@@ -349,6 +349,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
     expect(screen.getByTestId("scan-skills")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Skills" })).toBeTruthy();
+    expect(screen.queryByText("本机 Skill 工作台")).toBeNull();
     expect(screen.getByTestId("workspace-tab-skills").textContent).toBe("Skills");
     expect(screen.getByTestId("workspace-tab-governance-sidebar").textContent).toBe("Updates");
     expect(screen.getByTestId("workspace-tab-settings").textContent).toBe("");
@@ -366,6 +368,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("skill-card-grid").className).toContain("redesign-skill-grid");
     expect(screen.getByTestId("skill-card-e2e-skill")).toBeTruthy();
     expect(screen.getByTestId("skill-row-e2e-skill").className).toContain("redesign-skill-card");
+    expect(within(screen.getByTestId("skill-row-e2e-skill")).queryByText("Generic Agent Skills")).toBeNull();
 
     await user.click(screen.getByTestId("workspace-tab-settings"));
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
@@ -395,6 +398,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByTestId("skill-card-grid")).toBeTruthy();
     expect(screen.getAllByTestId(/^skill-row-/)).toHaveLength(6);
     expect(screen.queryByTestId("skill-row-extra-skill-6")).toBeNull();
+    expect(screen.queryByText("Codex")).toBeNull();
+    expect(screen.queryByText("Claude Code")).toBeNull();
 
     await user.click(screen.getByTestId("show-more-skills"));
 
@@ -575,7 +580,12 @@ describe("Metis desktop GUI main flow", () => {
 
     const resultRow = await screen.findByTestId("skill-row-claude-writer");
     expect(within(resultRow).getByText("claude-writer")).toBeTruthy();
-    expect(within(resultRow).getByText("Claude Code")).toBeTruthy();
+    expect(within(resultRow).queryByText("Claude Code")).toBeNull();
+    expect(
+      within(resultRow)
+        .getByTestId("skill-agent-stack-claude-writer")
+        .getAttribute("aria-label"),
+    ).toBe("存在于 Claude Code");
     expect(screen.queryByText("codex-planner")).toBeNull();
 
     await user.clear(screen.getByTestId("skill-search-input"));
@@ -720,7 +730,12 @@ describe("Metis desktop GUI main flow", () => {
     const row = await screen.findByTestId("skill-row-codex-planner");
     expect(within(row).queryByText("备份/回滚")).toBeNull();
     expect(within(row).queryByText(/metadata:/)).toBeNull();
-    expect(within(row).getByText("Codex")).toBeTruthy();
+    expect(within(row).queryByText("Codex")).toBeNull();
+    expect(
+      within(row)
+        .getByTestId("skill-agent-stack-codex-planner")
+        .getAttribute("aria-label"),
+    ).toBe("存在于 Codex");
 
     await user.click(row);
 

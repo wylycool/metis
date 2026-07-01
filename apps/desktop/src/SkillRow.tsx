@@ -62,7 +62,6 @@ export function SkillRow({
         {cardStatusLabel(updateResult, skill)}
       </span>
       <strong>{skill.name}</strong>
-      <small>{skill.agent_name}</small>
       <div className="skill-row-main">
         <div className="skill-main">
           <p>{skill.description || "暂无简介。打开详情页后可以补充来源、检查更新并查看 diff。"}</p>

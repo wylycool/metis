@@ -4252,8 +4252,8 @@ textarea {
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: 22px;
-  padding: 32px;
+  gap: 18px;
+  padding: 24px;
   overflow: auto;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.2)),
@@ -4261,10 +4261,10 @@ textarea {
 }
 
 .topbar.redesign-page-topbar {
-  min-height: 74px;
+  min-height: 60px;
   display: grid;
-  grid-template-columns: minmax(230px, 0.72fr) minmax(320px, 1fr) auto;
-  gap: 18px;
+  grid-template-columns: minmax(120px, 0.42fr) minmax(260px, 1fr) minmax(104px, auto) minmax(104px, auto);
+  gap: 12px;
   align-items: center;
   padding: 0;
 }
@@ -4280,7 +4280,7 @@ textarea {
 .topbar.redesign-page-topbar .topbar-title h1 {
   margin: 4px 0 0;
   color: #172033;
-  font-size: 30px;
+  font-size: 26px;
   line-height: 1.08;
 }
 
@@ -4316,7 +4316,7 @@ textarea {
 .skill-panel.redesign-home {
   min-width: 0;
   display: grid;
-  gap: 22px;
+  gap: 16px;
   min-height: 0;
   border: 0;
   padding: 0;
@@ -4327,25 +4327,34 @@ textarea {
 .skill-dashboard-stats.redesign-home-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 0;
 }
 
 .dashboard-stat-card.redesign-stat-card {
-  min-height: 132px;
+  min-height: 104px;
   display: grid;
   align-content: center;
-  gap: 12px;
+  gap: 8px;
   border: 1px solid rgba(223, 232, 242, 0.7);
   border-radius: 18px;
-  padding: 20px;
+  padding: 16px;
   box-shadow: none;
+}
+
+.dashboard-stat-card.redesign-stat-card strong {
+  font-size: 30px;
+}
+
+.dashboard-stat-card.redesign-stat-card span,
+.dashboard-stat-card.redesign-stat-card small {
+  font-size: 11px;
 }
 
 .skill-list.redesign-skill-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .redesign-show-more {
@@ -4361,15 +4370,15 @@ textarea {
 }
 
 .skill-row.redesign-skill-card {
-  min-height: 214px;
+  min-height: 168px;
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: auto auto auto minmax(44px, 1fr) auto;
-  gap: 8px;
+  grid-template-rows: auto auto minmax(36px, 1fr) auto;
+  gap: 7px;
   position: relative;
   border: 1px solid #e4ebf3;
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 16px;
+  padding: 16px;
   color: #172033;
   background: #ffffff;
   text-align: left;
@@ -4400,8 +4409,8 @@ textarea {
   overflow: hidden;
   margin: 0;
   color: #64748b;
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.42;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -4422,23 +4431,21 @@ textarea {
 .skill-row.redesign-skill-card > strong {
   overflow: hidden;
   color: #172033;
-  font-size: 18px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .skill-row.redesign-skill-card > small {
-  color: #7b8da4;
-  font-size: 12px;
-  font-weight: 850;
+  display: none;
 }
 
 .skill-row.redesign-skill-card .redesign-card-footer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid #edf2f7;
 }
 
@@ -5860,8 +5867,7 @@ textarea {
 }
 
 .redesign-top-actions {
-  display: flex;
-  gap: 10px;
+  display: contents;
 }
 
 .redesign-top-actions button,
@@ -5878,6 +5884,12 @@ textarea {
   background: #ffffff;
   font-size: 12px;
   font-weight: 900;
+}
+
+.redesign-top-actions button {
+  min-width: 104px;
+  padding: 0 14px;
+  white-space: nowrap;
 }
 
 .redesign-top-actions button:first-child,

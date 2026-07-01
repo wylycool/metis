@@ -1106,7 +1106,7 @@ function MetisApp() {
           {!isSkillDetailView && <header className="topbar redesign-page-topbar">
             <div className="topbar-title">
               <p>{activeWorkspace === "settings" ? "Settings" : activeWorkspace === "governance" ? "Updates" : "Skill Dashboard"}</p>
-              <h1>{activeWorkspace === "settings" ? "Agent 路径设置" : activeWorkspace === "governance" ? "更新与治理" : "本机 Skill 工作台"}</h1>
+              <h1>{activeWorkspace === "settings" ? "Agent 路径设置" : activeWorkspace === "governance" ? "更新与治理" : "Skills"}</h1>
             </div>
             <div className="topbar-actions">
               {activeWorkspace === "skills" && (

@@ -458,7 +458,16 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*32px 22px;/,
     );
-    expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*32px;/);
+    expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
+    expect(stylesheet).toMatch(
+      /\.topbar\.redesign-page-topbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(120px,\s*0\.42fr\) minmax\(260px,\s*1fr\) minmax\(104px,\s*auto\) minmax\(104px,\s*auto\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.redesign-top-actions\s*\{[\s\S]*display:\s*contents;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.redesign-top-actions button\s*\{[\s\S]*min-width:\s*104px;[\s\S]*white-space:\s*nowrap;/,
+    );
     expect(stylesheet).toMatch(
       /\.topbar-search\.redesign-search-field svg\s*\{[\s\S]*width:\s*22px;/,
     );
@@ -472,7 +481,16 @@ describe("Phase 6 light workspace contrast", () => {
       /\.skill-list\.redesign-skill-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
     );
     expect(stylesheet).toMatch(
-      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*214px;/,
+      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*104px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*168px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*grid-template-rows:\s*auto auto minmax\(36px,\s*1fr\) auto;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-row\.redesign-skill-card > small\s*\{[\s\S]*display:\s*none;/,
     );
     expect(stylesheet).toMatch(
       /\.skill-detail-card\.redesign-detail-summary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(320px,\s*0\.48fr\);/,
