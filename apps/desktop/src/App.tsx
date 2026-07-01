@@ -1059,24 +1059,36 @@ function MetisApp() {
     <div className="metis-window redesign-preview-shell" data-theme="frost">
       <div className="metis-shell redesign-app-window" data-testid="metis-reference-shell">
         <aside className="metis-sidebar redesign-sidebar" data-testid="metis-reference-sidebar">
-          <button
-            className="metis-sidebar-brand redesign-brand"
-            data-testid="metis-brand-home"
-            data-github-url={METIS_GITHUB_URL}
-            aria-label="打开 Metis GitHub 主页"
-            onClick={() => {
-              setActiveWorkspace("skills");
-              openMetisGithub();
-            }}
-          >
-            <span className="metis-brand-mark redesign-logo-mark" aria-hidden="true">
-              <CrystalSkillLogo testId="metis-brand-crystal-logo" />
-            </span>
-            <span>
-              <strong>Metis</strong>
-              <small>Skill Manager</small>
-            </span>
-          </button>
+          <div className="metis-sidebar-brand-row" data-testid="metis-brand-row">
+            <button
+              className="metis-sidebar-brand redesign-brand"
+              data-testid="metis-brand-home"
+              data-github-url={METIS_GITHUB_URL}
+              aria-label="打开 Metis GitHub 主页"
+              onClick={() => {
+                setActiveWorkspace("skills");
+                openMetisGithub();
+              }}
+            >
+              <span className="metis-brand-mark redesign-logo-mark" aria-hidden="true">
+                <CrystalSkillLogo testId="metis-brand-crystal-logo" />
+              </span>
+              <span>
+                <strong>Metis</strong>
+                <small>Skill Manager</small>
+              </span>
+            </button>
+            <button
+              className="metis-sidebar-github"
+              data-testid="metis-github-link"
+              data-github-url={METIS_GITHUB_URL}
+              aria-label="打开 Metis GitHub 仓库"
+              title="GitHub"
+              onClick={openMetisGithub}
+            >
+              <GitHubIcon />
+            </button>
+          </div>
           <nav className="metis-sidebar-nav redesign-side-nav" aria-label="Workspace">
             <button
               aria-pressed={activeWorkspace === "skills"}
@@ -1106,16 +1118,6 @@ function MetisApp() {
               Settings
             </button>
           </nav>
-          <button
-            className="metis-sidebar-github"
-            data-testid="metis-github-link"
-            data-github-url={METIS_GITHUB_URL}
-            aria-label="打开 Metis GitHub 仓库"
-            title="GitHub"
-            onClick={openMetisGithub}
-          >
-            <GitHubIcon />
-          </button>
         </aside>
         <div className="app-shell redesign-main">
           {!isSkillDetailView && (

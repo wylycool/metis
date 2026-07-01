@@ -349,6 +349,11 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("workspace-topbar-middle")).toBeTruthy();
     expect(screen.getByTestId("workspace-topbar-actions")).toBeTruthy();
     expect(screen.getByTestId("metis-brand-home")).toBeTruthy();
+    expect(
+      screen.getByTestId("metis-brand-row").contains(screen.getByTestId("metis-github-link")),
+    ).toBe(
+      true,
+    );
     expect(screen.getByTestId("metis-brand-home").getAttribute("data-github-url")).toBe(
       "https://github.com/wylycool/metis",
     );
@@ -482,6 +487,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByTestId("ui-redesign-preview")).toBeTruthy();
     expect(screen.getByTestId("redesign-app-window")).toBeTruthy();
     expect(screen.getByTestId("redesign-brand-logo")).toBeTruthy();
+    expect(
+      screen.getByTestId("redesign-brand-row").contains(screen.getByTestId("redesign-github-link")),
+    ).toBe(true);
     expect(screen.getByTestId("redesign-brand-logo").getAttribute("href")).toBe(
       "https://github.com/wylycool/metis",
     );

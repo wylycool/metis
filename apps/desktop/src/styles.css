@@ -4183,7 +4183,7 @@ textarea {
 .metis-sidebar.redesign-sidebar {
   min-width: 0;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   gap: 26px;
   border-right: 1px solid rgba(221, 230, 238, 0.76);
   border-radius: 0;
@@ -4191,6 +4191,13 @@ textarea {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 253, 0.82)),
     #f9fbfd;
+}
+
+.metis-sidebar-brand-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
 }
 
 .metis-sidebar-brand.redesign-brand {
@@ -4270,8 +4277,8 @@ textarea {
   height: 42px;
   display: grid;
   place-items: center;
-  align-self: end;
-  justify-self: start;
+  align-self: center;
+  justify-self: end;
   border: 0;
   border-radius: 14px;
   padding: 0;
@@ -5731,6 +5738,13 @@ textarea {
   border-right: 1px solid rgba(221, 230, 238, 0.76);
 }
 
+.redesign-brand-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
+}
+
 .redesign-brand {
   display: grid;
   grid-template-columns: 50px minmax(0, 1fr);
@@ -5846,8 +5860,8 @@ textarea {
   height: 42px;
   display: grid;
   place-items: center;
-  align-self: end;
-  justify-self: start;
+  align-self: center;
+  justify-self: end;
   border: 0;
   border-radius: 14px;
   color: #64748b;

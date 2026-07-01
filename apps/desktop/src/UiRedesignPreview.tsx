@@ -259,21 +259,34 @@ function RedesignSidebar({
 }) {
   return (
     <aside className="redesign-sidebar">
-      <a
-        className="redesign-brand"
-        data-testid="redesign-brand-logo"
-        href={METIS_GITHUB_URL}
-        rel="noreferrer"
-        target="_blank"
-      >
-        <span className="redesign-logo-mark" aria-hidden="true">
-          <CrystalSkillLogo testId="redesign-brand-crystal-logo" />
-        </span>
-        <span>
-          <strong>Metis</strong>
-          <small>Skill Manager</small>
-        </span>
-      </a>
+      <div className="redesign-brand-row" data-testid="redesign-brand-row">
+        <a
+          className="redesign-brand"
+          data-testid="redesign-brand-logo"
+          href={METIS_GITHUB_URL}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <span className="redesign-logo-mark" aria-hidden="true">
+            <CrystalSkillLogo testId="redesign-brand-crystal-logo" />
+          </span>
+          <span>
+            <strong>Metis</strong>
+            <small>Skill Manager</small>
+          </span>
+        </a>
+        <a
+          className="redesign-github-link"
+          data-testid="redesign-github-link"
+          href={METIS_GITHUB_URL}
+          rel="noreferrer"
+          target="_blank"
+          aria-label="打开 Metis GitHub 仓库"
+          title="GitHub"
+        >
+          <GitHubIcon />
+        </a>
+      </div>
       <nav className="redesign-side-nav" aria-label="Preview navigation">
         <button className={route.kind !== "settings" ? "active" : ""} onClick={onHome}>
           <GridIcon /> Skills
@@ -289,17 +302,6 @@ function RedesignSidebar({
           <GearIcon /> Settings
         </button>
       </nav>
-      <a
-        className="redesign-github-link"
-        data-testid="redesign-github-link"
-        href={METIS_GITHUB_URL}
-        rel="noreferrer"
-        target="_blank"
-        aria-label="打开 Metis GitHub 仓库"
-        title="GitHub"
-      >
-        <GitHubIcon />
-      </a>
     </aside>
   );
 }
