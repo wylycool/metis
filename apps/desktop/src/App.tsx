@@ -1917,7 +1917,6 @@ function WorkspaceTopbar({
                 value={skillSearchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
               />
-              <span>{skillCount} results</span>
             </label>
           )}
         </div>

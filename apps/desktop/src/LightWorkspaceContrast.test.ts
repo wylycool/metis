@@ -478,6 +478,9 @@ describe("Phase 6 light workspace contrast", () => {
       /\.redesign-top-actions button\s*\{[\s\S]*min-width:\s*104px;[\s\S]*white-space:\s*nowrap;/,
     );
     expect(stylesheet).toMatch(
+      /\.topbar-search\.redesign-search-field\s*\{[\s\S]*grid-template-columns:\s*22px minmax\(0,\s*1fr\);/,
+    );
+    expect(stylesheet).toMatch(
       /\.topbar-search\.redesign-search-field svg\s*\{[\s\S]*width:\s*22px;/,
     );
     expect(stylesheet).toMatch(
@@ -485,6 +488,9 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(stylesheet).toMatch(
       /\.topbar-search\.redesign-search-field input\s*\{[\s\S]*padding-left:\s*0;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.topbar-search\.redesign-search-field input:focus\s*\{[\s\S]*border-color:\s*transparent;[\s\S]*box-shadow:\s*none;/,
     );
     expect(stylesheet).toMatch(
       /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*22px;/,

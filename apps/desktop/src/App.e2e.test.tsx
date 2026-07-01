@@ -350,6 +350,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("workspace-topbar-actions")).toBeTruthy();
     expect(screen.getByTestId("metis-brand-home")).toBeTruthy();
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
+    expect(screen.queryByText(/\d+ results/)).toBeNull();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
     expect(screen.getByTestId("scan-skills")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Skills" })).toBeTruthy();
@@ -409,6 +410,7 @@ describe("Metis desktop GUI main flow", () => {
     );
     expect(screen.getByTestId("workspace-topbar-actions").children).toHaveLength(2);
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
+    expect(within(screen.getByTestId("workspace-topbar-middle")).queryByText(/\d+ results/)).toBeNull();
 
     await user.click(screen.getByTestId("workspace-tab-governance-sidebar"));
     expect(await screen.findByTestId("workspace-governance")).toBeTruthy();
