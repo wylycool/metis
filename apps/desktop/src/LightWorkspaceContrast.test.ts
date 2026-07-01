@@ -426,12 +426,18 @@ describe("Phase 6 light workspace contrast", () => {
   });
 
   test("brands overlapping agent letter badges by agent identity", () => {
-    expect(latestBlockFor(".agent-badge-codex")).toContain(
-      "background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);",
+    expect(latestBlockFor(".skill-agent-stack span")).toContain(
+      "background: var(--agent-badge-background, linear-gradient(135deg, #3e7bfa, #2dd4bf));",
     );
-    expect(latestBlockFor(".agent-badge-claude-code")).toContain("background: #d97757;");
-    expect(latestBlockFor(".agent-badge-cursor")).toContain("background: #111827;");
-    expect(latestBlockFor(".agent-badge-opencode")).toContain("background: #00a88f;");
+    expect(latestBlockFor(".redesign-agent-stack span")).toContain(
+      "background: var(--agent-badge-background, linear-gradient(135deg, #3154df, #46bfa4));",
+    );
+    expect(latestBlockFor(".agent-badge-codex")).toContain(
+      "--agent-badge-background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);",
+    );
+    expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-background: #d97757;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-background: #111827;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #00a88f;");
   });
 
   test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {

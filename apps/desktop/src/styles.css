@@ -3952,38 +3952,38 @@ textarea {
   border: 2px solid #ffffff;
   border-radius: 999px;
   color: #ffffff;
-  background: linear-gradient(135deg, #3e7bfa, #2dd4bf);
+  background: var(--agent-badge-background, linear-gradient(135deg, #3e7bfa, #2dd4bf));
   font-size: 11px;
   font-weight: 900;
 }
 
 .agent-badge-codex {
-  background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);
+  --agent-badge-background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);
 }
 
 .agent-badge-claude-code {
-  background: #d97757;
+  --agent-badge-background: #d97757;
 }
 
 .agent-badge-cursor {
-  background: #111827;
+  --agent-badge-background: #111827;
 }
 
 .agent-badge-opencode {
-  background: #00a88f;
+  --agent-badge-background: #00a88f;
 }
 
 .agent-badge-openclaw {
-  background: linear-gradient(135deg, #fb7185, #ef4444);
+  --agent-badge-background: linear-gradient(135deg, #fb7185, #ef4444);
 }
 
 .agent-badge-hermes {
-  background: linear-gradient(135deg, #7c3aed, #22d3ee);
+  --agent-badge-background: linear-gradient(135deg, #7c3aed, #22d3ee);
 }
 
 .agent-badge-generic,
 .agent-badge-default {
-  background: #64748b;
+  --agent-badge-background: #64748b;
 }
 
 .skill-agent-stack span:first-child {
@@ -6254,7 +6254,7 @@ textarea {
   border: 2px solid #ffffff;
   border-radius: 999px;
   color: #ffffff;
-  background: linear-gradient(135deg, #3154df, #46bfa4);
+  background: var(--agent-badge-background, linear-gradient(135deg, #3154df, #46bfa4));
   font-size: 10px;
   font-weight: 950;
 }
