@@ -476,6 +476,8 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 42px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 42px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border-radius: 14px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("border: 0;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("box-shadow: none;");
     expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
@@ -495,6 +497,15 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(stylesheet).toMatch(
       /\.redesign-top-actions button\s*\{[\s\S]*min-width:\s*104px;[\s\S]*white-space:\s*nowrap;/,
+    );
+    expect(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button")).toContain(
+      "font-weight: 680;",
+    );
+    expect(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button:hover:not(:disabled),\n.metis-sidebar-nav.redesign-side-nav button.active")).toContain(
+      "color: #3154df;",
+    );
+    expect(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button:hover:not(:disabled),\n.metis-sidebar-nav.redesign-side-nav button.active")).toContain(
+      "box-shadow: none;",
     );
     expect(stylesheet).toMatch(
       /\.topbar-search\.redesign-search-field\s*\{[\s\S]*grid-template-columns:\s*22px minmax\(0,\s*1fr\);/,
@@ -523,6 +534,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*104px;/,
     );
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
+      "font-weight: 720;",
+    );
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card span,\n.dashboard-stat-card.redesign-stat-card small")).toContain(
+      "font-weight: 620;",
+    );
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*168px;/,
     );
@@ -535,6 +552,16 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card:hover\s*\{[\s\S]*transform:\s*translateY\(-2px\);/,
     );
+    expect(latestBlockFor(".skill-row.redesign-skill-card:hover")).toContain(
+      "box-shadow: 0 12px 24px rgba(30, 48, 78, 0.08);",
+    );
+    expect(latestBlockFor(".skill-row.redesign-skill-card .skill-main p")).toContain(
+      "font-weight: 450;",
+    );
+    expect(latestBlockFor(".skill-row.redesign-skill-card > strong")).toContain(
+      "font-weight: 680;",
+    );
+    expect(latestBlockFor(".redesign-show-more")).toContain("font-weight: 680;");
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card > small\s*\{[\s\S]*display:\s*none;/,
     );
