@@ -118,6 +118,16 @@ export function skillAccentStyle(skill: DesktopSkill): CSSProperties {
     ["#f0ad47", "#d98225"],
     ["#4c9fdb", "#2f75bf"],
     ["#41bf80", "#1e9667"],
+    ["#6f72e8", "#4f46c8"],
+    ["#e35d6a", "#b9465a"],
+    ["#21a6c8", "#167da0"],
+    ["#c47a2c", "#9a5f1f"],
+    ["#8f5bd8", "#6843b8"],
+    ["#22a66f", "#157a58"],
+    ["#d95f9f", "#a84b86"],
+    ["#5b8be8", "#3466c8"],
+    ["#7aa33a", "#587d2b"],
+    ["#5f6f86", "#405166"],
   ];
   const index = Math.abs(hashText(`${skill.agent_id}:${skill.name}`)) % palette.length;
   return {
