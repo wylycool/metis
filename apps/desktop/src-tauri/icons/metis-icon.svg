@@ -1,55 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" class="metis-crystal-app-icon" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="app-bg" x1="168" x2="856" y1="86" y2="938" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#111a3f"/>
-      <stop offset="0.48" stop-color="#172f73"/>
-      <stop offset="1" stop-color="#0a1028"/>
+    <clipPath id="app-clip">
+      <rect width="1024" height="1024" rx="228"/>
+    </clipPath>
+    <linearGradient id="app-bg" x1="152" x2="872" y1="70" y2="954" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffdf8"/>
+      <stop offset="0.56" stop-color="#fbfaf8"/>
+      <stop offset="1" stop-color="#eee8dc"/>
     </linearGradient>
-    <radialGradient id="app-glow" cx="50%" cy="46%" r="58%">
-      <stop offset="0" stop-color="#75f2ff" stop-opacity="0.5"/>
-      <stop offset="0.58" stop-color="#4d7cff" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#070b1c" stop-opacity="0"/>
+    <radialGradient id="app-warm-glow" cx="50%" cy="42%" r="68%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="0.68" stop-color="#f7f1e5" stop-opacity="0.46"/>
+      <stop offset="1" stop-color="#e9decf" stop-opacity="0"/>
     </radialGradient>
-    <filter id="soft-shadow" x="-24%" y="-24%" width="148%" height="158%">
-      <feDropShadow dx="0" dy="34" stdDeviation="34" flood-color="#06102a" flood-opacity="0.34"/>
-      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#76efff" flood-opacity="0.2"/>
+    <filter id="mark-shadow" x="-28%" y="-20%" width="156%" height="164%">
+      <feDropShadow dx="0" dy="36" stdDeviation="30" flood-color="#758098" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#71e8ff" flood-opacity="0.22"/>
     </filter>
-    <linearGradient id="logo-layer-base" x1="194" x2="804" y1="745" y2="417" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#6b54f4"/>
-      <stop offset="0.5" stop-color="#4b8eff"/>
-      <stop offset="1" stop-color="#8ff8ff"/>
+    <radialGradient id="logo-glow" cx="50%" cy="52%" r="58%">
+      <stop offset="0%" stop-color="#78f2ff" stop-opacity="0.48"/>
+      <stop offset="70%" stop-color="#6c8cff" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#1a2f73" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logo-layer-base-fill" x1="16" x2="50" y1="48" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5a4fe8"/>
+      <stop offset="52%" stop-color="#5b8dff"/>
+      <stop offset="100%" stop-color="#88f5ff"/>
     </linearGradient>
-    <linearGradient id="logo-layer-mid" x1="212" x2="792" y1="620" y2="322" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#745ef5"/>
-      <stop offset="0.52" stop-color="#35a6ff"/>
-      <stop offset="1" stop-color="#a7fbff"/>
+    <linearGradient id="logo-layer-mid-fill" x1="13" x2="51" y1="39" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6a55f0"/>
+      <stop offset="54%" stop-color="#3f8dff"/>
+      <stop offset="100%" stop-color="#9cf8ff"/>
     </linearGradient>
-    <linearGradient id="logo-layer-top" x1="262" x2="742" y1="494" y2="248" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7be8ff" stop-opacity="0.9"/>
-      <stop offset="1" stop-color="#f5ffff" stop-opacity="0.94"/>
+    <linearGradient id="logo-layer-top-fill" x1="18" x2="46" y1="30" y2="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#77dfff" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#f5ffff" stop-opacity="0.92"/>
     </linearGradient>
-    <linearGradient id="logo-crystal" x1="332" x2="692" y1="142" y2="556" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#9cb3ff"/>
-      <stop offset="0.46" stop-color="#39d9ff"/>
-      <stop offset="1" stop-color="#2659f0"/>
+    <linearGradient id="logo-crystal-fill" x1="20" x2="44" y1="8" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8ea9ff"/>
+      <stop offset="45%" stop-color="#3bdcff"/>
+      <stop offset="100%" stop-color="#2858ee"/>
     </linearGradient>
   </defs>
+  <g clip-path="url(#app-clip)">
   <rect width="1024" height="1024" rx="228" fill="url(#app-bg)"/>
-  <rect x="43" y="38" width="938" height="938" rx="196" fill="none" stroke="#ffffff" stroke-opacity="0.13" stroke-width="6"/>
-  <circle cx="512" cy="481" r="430" fill="url(#app-glow)"/>
-  <g filter="url(#soft-shadow)">
-    <ellipse cx="512" cy="774" rx="286" ry="64" fill="#1e4be7" opacity="0.28"/>
-    <path class="logo-layer-base" d="M222 650 512 507l290 143-290 174-290-174Z" fill="url(#logo-layer-base)" stroke="#ffffff" stroke-opacity="0.48" stroke-width="14" stroke-linejoin="round"/>
-    <path d="M222 650v58l290 176 290-176v-58L512 824 222 650Z" fill="#172766" opacity="0.24"/>
-    <path class="logo-layer-mid" d="M252 540 512 407l260 133-260 158-260-158Z" fill="url(#logo-layer-mid)" stroke="#ffffff" stroke-opacity="0.54" stroke-width="13" stroke-linejoin="round"/>
-    <path d="M252 540v52l260 160 260-160v-52L512 698 252 540Z" fill="#0a2259" opacity="0.2"/>
-    <path class="logo-layer-top" d="M298 432 512 323l214 109-214 132-214-132Z" fill="url(#logo-layer-top)" stroke="#ffffff" stroke-opacity="0.62" stroke-width="12" stroke-linejoin="round"/>
-    <path d="M298 432v44l214 134 214-134v-44L512 564 298 432Z" fill="#2a63ce" opacity="0.13"/>
-    <path class="logo-crystal" d="M512 112 696 328 512 560 328 328 512 112Z" fill="url(#logo-crystal)" stroke="#ffffff" stroke-opacity="0.68" stroke-width="13" stroke-linejoin="round"/>
-    <path d="M512 112v448L328 328 512 112Z" fill="#d7fcff" opacity="0.33"/>
-    <path d="M512 112 696 328H512V112Z" fill="#ffffff" opacity="0.42"/>
-    <path d="M512 328h184L512 560V328Z" fill="#163fd2" opacity="0.28"/>
-    <path d="M378 328 512 170l134 158" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.55" stroke-width="15"/>
-    <circle cx="512" cy="330" r="74" fill="#92f8ff" opacity="0.24"/>
+  <rect x="44" y="42" width="936" height="936" rx="196" fill="none" stroke="#ffffff" stroke-opacity="0.72" stroke-width="8"/>
+  <rect x="64" y="64" width="896" height="896" rx="176" fill="url(#app-warm-glow)"/>
+  <g class="metis-crystal-logo-source" filter="url(#mark-shadow)" transform="translate(144 128) scale(11.5)">
+    <ellipse cx="32" cy="52" rx="24" ry="7" fill="url(#logo-glow)"/>
+    <path class="logo-layer-base metis-crystal-logo-layer" d="M14 40.5 32 31.5l18 9-18 10.8-18-10.8Z" fill="url(#logo-layer-base-fill)" stroke="#ffffff" stroke-opacity="0.62" stroke-width="1.15" stroke-linejoin="round"/>
+    <path class="logo-layer-mid metis-crystal-logo-layer" d="M16 33.5 32 25.4l16 8.1-16 9.7-16-9.7Z" fill="url(#logo-layer-mid-fill)" stroke="#ffffff" stroke-opacity="0.62" stroke-width="1.15" stroke-linejoin="round"/>
+    <path class="logo-layer-top metis-crystal-logo-layer" d="M18.8 27.1 32 20.4l13.2 6.7L32 35.2 18.8 27.1Z" fill="url(#logo-layer-top-fill)" stroke="#ffffff" stroke-opacity="0.62" stroke-width="1.15" stroke-linejoin="round"/>
+    <path class="metis-crystal-logo-crystal" d="M32 6.5 43.5 20 32 34.4 20.5 20 32 6.5Z" fill="url(#logo-crystal-fill)" stroke="#ffffff" stroke-opacity="0.66" stroke-width="1.2" stroke-linejoin="round"/>
+    <path class="metis-crystal-logo-facet" d="M32 6.5 32 34.4 20.5 20Z" fill="#c9fbff" opacity="0.38"/>
+    <path class="metis-crystal-logo-facet" d="M32 6.5 43.5 20 32 20Z" fill="#f6ffff" opacity="0.44"/>
+    <path class="metis-crystal-logo-facet" d="M32 20 43.5 20 32 34.4Z" fill="#1e52dc" opacity="0.26"/>
+    <path class="metis-crystal-logo-highlight" d="M23.8 20.1 32 10.4 40.2 20.1" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.55" stroke-width="1.2"/>
+  </g>
   </g>
 </svg>

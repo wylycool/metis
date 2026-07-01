@@ -140,3 +140,7 @@ export function exportAuditLogReportToFile(
 ): Promise<DesktopFileExportResult> {
   return invoke("export_audit_log_report_to_file", { request });
 }
+
+export function openExternalUrl(url: string): Promise<void> {
+  return invoke("open_external_url", { url });
+}

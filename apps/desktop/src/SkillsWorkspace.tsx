@@ -127,6 +127,9 @@ export function SkillsWorkspace({
     }
     return skills;
   }, [normalizedSearchQuery, searchMatchedSkills, skills]);
+  const agentMembershipsByKey = useMemo(() => {
+    return agentMembershipsBySkillKey(searchMatchedSkills);
+  }, [searchMatchedSkills]);
   const visibleSkills = baseVisibleSkills;
   const displayedSkills = showAllSkills
     ? visibleSkills
@@ -269,6 +272,7 @@ export function SkillsWorkspace({
                 <SkillRow
                   key={skill.id}
                   skill={skill}
+                  agentMemberships={agentMembershipsByKey.get(skillIdentityKey(skill)) ?? [skill]}
                   updateResult={updateResults[skill.id]}
                   diffDetail={diffDetails[skill.id]}
                   diffError={diffError[skill.id]}
@@ -400,6 +404,17 @@ function uniqueSkills(skills: DesktopSkill[]) {
     unique.push(skill);
   }
   return unique;
+}
+
+function agentMembershipsBySkillKey(skills: DesktopSkill[]) {
+  const memberships = new Map<string, DesktopSkill[]>();
+  for (const skill of skills) {
+    const key = skillIdentityKey(skill);
+    const group = memberships.get(key) ?? [];
+    group.push(skill);
+    memberships.set(key, group);
+  }
+  return memberships;
 }
 
 function skillIdentityKey(skill: DesktopSkill) {

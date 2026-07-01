@@ -18,6 +18,7 @@ import {
   listAgents,
   listIndexedSkills,
   loadTeamManifestFromFile,
+  openExternalUrl,
   previewRemoteSkillSource,
   restoreSkillBackup,
   saveDesktopSettings,
@@ -26,6 +27,8 @@ import {
 } from "./api";
 import type { RemoteSyncDraft } from "./AddSkillPage";
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
+import { GitHubIcon } from "./GitHubIcon";
+import { METIS_GITHUB_URL } from "./projectLinks";
 import { remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
 import { InlineError, type BindDraft } from "./SkillRow";
 import { UiRedesignPreview } from "./UiRedesignPreview";
@@ -1039,6 +1042,18 @@ function MetisApp() {
 
   const settingsAgentRows = agentPathRows(agents);
   const isSkillDetailView = activeWorkspace === "skills" && skillsViewKind === "detail";
+  const openMetisGithub = () => {
+    void openExternalUrl(METIS_GITHUB_URL).catch(() => {
+      if (navigator.userAgent.toLowerCase().includes("jsdom")) {
+        return;
+      }
+      try {
+        window.open(METIS_GITHUB_URL, "_blank", "noopener,noreferrer");
+      } catch {
+        // Some embedded WebViews do not support window.open; the command above is preferred.
+      }
+    });
+  };
 
   return (
     <div className="metis-window redesign-preview-shell" data-theme="frost">
@@ -1047,17 +1062,11 @@ function MetisApp() {
           <button
             className="metis-sidebar-brand redesign-brand"
             data-testid="metis-brand-home"
+            data-github-url={METIS_GITHUB_URL}
             aria-label="打开 Metis GitHub 主页"
             onClick={() => {
               setActiveWorkspace("skills");
-              if (navigator.userAgent.toLowerCase().includes("jsdom")) {
-                return;
-              }
-              try {
-                window.open("https://github.com/example/metis", "_blank", "noopener,noreferrer");
-              } catch {
-                // jsdom does not implement window.open; the app still returns home.
-              }
+              openMetisGithub();
             }}
           >
             <span className="metis-brand-mark redesign-logo-mark" aria-hidden="true">
@@ -1097,11 +1106,16 @@ function MetisApp() {
               Settings
             </button>
           </nav>
-          <div className="metis-sidebar-status redesign-side-summary">
-            <span>Local library</span>
-            <strong>{skills.length} skills</strong>
-            <small>{agents.length} agents · {trustedSourceCount} trusted sources · {totalExistingPaths} ready paths</small>
-          </div>
+          <button
+            className="metis-sidebar-github"
+            data-testid="metis-github-link"
+            data-github-url={METIS_GITHUB_URL}
+            aria-label="打开 Metis GitHub 仓库"
+            title="GitHub"
+            onClick={openMetisGithub}
+          >
+            <GitHubIcon />
+          </button>
         </aside>
         <div className="app-shell redesign-main">
           {!isSkillDetailView && (

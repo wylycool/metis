@@ -51,6 +51,7 @@ use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
@@ -1197,6 +1198,38 @@ fn export_audit_log_report_to_file(
     export_audit_log_report_to_file_for_state(&state, request)
 }
 
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    validate_external_url(&url)?;
+    open_url_with_system_handler(&url)
+}
+
+fn validate_external_url(url: &str) -> Result<(), String> {
+    let normalized = url.trim().trim_end_matches('/');
+    if normalized == "https://github.com/wylycool/metis" {
+        return Ok(());
+    }
+
+    Err("不允许打开未受信任的外部链接。".to_string())
+}
+
+fn open_url_with_system_handler(url: &str) -> Result<(), String> {
+    let status = if cfg!(target_os = "macos") {
+        Command::new("open").arg(url).status()
+    } else if cfg!(target_os = "windows") {
+        Command::new("cmd").args(["/C", "start", "", url]).status()
+    } else {
+        Command::new("xdg-open").arg(url).status()
+    }
+    .map_err(|error| format!("打开外部链接失败：{error}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("打开外部链接失败，系统命令退出状态：{status}"))
+    }
+}
+
 fn desktop_scan_response(
     result: ScanResult,
     store: &SkillIndexStore,
@@ -1838,7 +1871,8 @@ pub fn run() {
             load_team_manifest_from_file,
             export_team_compliance_report_to_file,
             export_environment_report_to_file,
-            export_audit_log_report_to_file
+            export_audit_log_report_to_file,
+            open_external_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2956,6 +2990,14 @@ description: {description}
             assert_eq!(error.message, message);
             assert_eq!(error.debug_detail.as_deref(), Some(raw));
         }
+    }
+
+    #[test]
+    fn open_external_url_validation_only_allows_metis_github() {
+        assert!(validate_external_url("https://github.com/wylycool/metis").is_ok());
+        assert!(validate_external_url("https://github.com/wylycool/metis/").is_ok());
+        assert!(validate_external_url("https://github.com/example/metis").is_err());
+        assert!(validate_external_url("file:///tmp/metis").is_err());
     }
 
     #[test]

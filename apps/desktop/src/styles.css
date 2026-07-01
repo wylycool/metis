@@ -3957,6 +3957,35 @@ textarea {
   font-weight: 900;
 }
 
+.agent-badge-codex {
+  background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);
+}
+
+.agent-badge-claude-code {
+  background: #d97757;
+}
+
+.agent-badge-cursor {
+  background: #111827;
+}
+
+.agent-badge-opencode {
+  background: #00a88f;
+}
+
+.agent-badge-openclaw {
+  background: linear-gradient(135deg, #fb7185, #ef4444);
+}
+
+.agent-badge-hermes {
+  background: linear-gradient(135deg, #7c3aed, #22d3ee);
+}
+
+.agent-badge-generic,
+.agent-badge-default {
+  background: #64748b;
+}
+
 .skill-agent-stack span:first-child {
   margin-left: 0;
 }
@@ -4218,7 +4247,7 @@ textarea {
   color: #7b8798;
   background: transparent;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 680;
   text-align: left;
 }
 
@@ -4230,10 +4259,43 @@ textarea {
 
 .metis-sidebar-nav.redesign-side-nav button:hover:not(:disabled),
 .metis-sidebar-nav.redesign-side-nav button.active {
-  color: #ffffff;
-  background: linear-gradient(135deg, #3154df, #456fe8);
-  box-shadow: 0 14px 26px rgba(49, 84, 223, 0.24);
-  transform: translateY(-1px);
+  color: #3154df;
+  background: #eef4ff;
+  box-shadow: none;
+  transform: none;
+}
+
+.metis-sidebar-github {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  justify-self: start;
+  border: 0;
+  border-radius: 14px;
+  padding: 0;
+  color: #64748b;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    transform 180ms ease,
+    color 180ms ease,
+    box-shadow 200ms ease,
+    background 180ms ease;
+}
+
+.metis-sidebar-github:hover:not(:disabled) {
+  color: #3154df;
+  background: #eef4ff;
+  box-shadow: none;
+  transform: none;
+}
+
+.metis-sidebar-github svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .metis-sidebar-status.redesign-side-summary {
@@ -4272,8 +4334,8 @@ textarea {
 .topbar.redesign-page-topbar .topbar-title p {
   color: #7b8da4;
   font-size: 11px;
-  font-weight: 950;
-  letter-spacing: 1px;
+  font-weight: 620;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
 }
 
@@ -4281,6 +4343,7 @@ textarea {
   margin: 4px 0 0;
   color: #172033;
   font-size: 26px;
+  font-weight: 680;
   line-height: 1.08;
 }
 
@@ -4374,11 +4437,13 @@ textarea {
 
 .dashboard-stat-card.redesign-stat-card strong {
   font-size: 30px;
+  font-weight: 720;
 }
 
 .dashboard-stat-card.redesign-stat-card span,
 .dashboard-stat-card.redesign-stat-card small {
   font-size: 11px;
+  font-weight: 620;
 }
 
 .skill-list.redesign-skill-grid {
@@ -4396,7 +4461,7 @@ textarea {
   color: #3154df;
   background: #eef4ff;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 680;
 }
 
 .skill-row.redesign-skill-card {
@@ -4422,9 +4487,9 @@ textarea {
 
 .skill-row.redesign-skill-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--redesign-accent-start), #ffffff 58%);
+  border-color: color-mix(in srgb, var(--redesign-accent-start), #ffffff 68%);
   background: #ffffff;
-  box-shadow: 0 16px 32px rgba(30, 48, 78, 0.1);
+  box-shadow: 0 12px 24px rgba(30, 48, 78, 0.08);
 }
 
 .skill-row.redesign-skill-card .skill-row-main {
@@ -4445,6 +4510,7 @@ textarea {
   margin: 0;
   color: #64748b;
   font-size: 12px;
+  font-weight: 450;
   line-height: 1.42;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -4467,6 +4533,7 @@ textarea {
   overflow: hidden;
   color: #172033;
   font-size: 16px;
+  font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4502,6 +4569,7 @@ textarea {
   padding: 24px;
   background:
     radial-gradient(circle at 0 0, color-mix(in srgb, var(--redesign-accent-start, #3154df), transparent 82%), transparent 32%),
+    radial-gradient(circle at 100% 10%, color-mix(in srgb, var(--redesign-accent-end, #4b7df0), transparent 88%), transparent 34%),
     #ffffff;
   box-shadow: 0 16px 34px rgba(30, 48, 78, 0.08);
 }
@@ -5707,7 +5775,7 @@ textarea {
   content: none;
 }
 
-.redesign-logo-mark svg {
+.redesign-logo-mark img {
   width: 50px;
   height: 50px;
   display: block;
@@ -5771,6 +5839,39 @@ textarea {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
+}
+
+.redesign-github-link {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  justify-self: start;
+  border: 0;
+  border-radius: 14px;
+  color: #64748b;
+  background: transparent;
+  box-shadow: none;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    color 180ms ease,
+    box-shadow 200ms ease,
+    background 180ms ease;
+}
+
+.redesign-github-link:hover {
+  color: #3154df;
+  background: #eef4ff;
+  box-shadow: none;
+  transform: none;
+}
+
+.redesign-github-link svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .redesign-side-summary {

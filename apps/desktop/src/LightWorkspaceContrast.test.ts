@@ -403,7 +403,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.redesign-sidebar\s*\{[\s\S]*border-radius:\s*28px 0 0 28px;/,
     );
     expect(latestBlockFor(".redesign-logo-mark")).toContain("overflow: visible");
-    expect(latestBlockFor(".redesign-logo-mark svg")).toContain("width: 50px;");
+    expect(latestBlockFor(".redesign-logo-mark img")).toContain("width: 50px;");
     expect(latestBlockFor(".redesign-logo-mark span")).toContain("display: none;");
     expect(stylesheet).toMatch(
       /\.redesign-home-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
@@ -413,12 +413,25 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".redesign-skill-card")).toContain("-webkit-line-clamp: 2;");
     expect(latestBlockFor(".redesign-agent-stack")).toContain("margin-left: -7px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("width: 42px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("height: 42px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("border-radius: 14px;");
+    expect(latestBlockFor(".redesign-github-link svg")).toContain("width: 20px;");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("position: fixed");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("right: 0");
     expect(stylesheet).toMatch(/\.redesign-diff-viewer\s*\{[\s\S]*font-family:/);
     expect(latestBlockFor(".redesign-diff-line.added")).toContain("background:");
     expect(stylesheet).toMatch(/\.redesign-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
+  });
+
+  test("brands overlapping agent letter badges by agent identity", () => {
+    expect(latestBlockFor(".agent-badge-codex")).toContain(
+      "background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);",
+    );
+    expect(latestBlockFor(".agent-badge-claude-code")).toContain("background: #d97757;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("background: #111827;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("background: #00a88f;");
   });
 
   test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {
@@ -460,6 +473,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*28px 16px;/,
     );
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 42px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 42px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("border-radius: 14px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("border: 0;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("box-shadow: none;");
+    expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
       /\.topbar\.redesign-page-topbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(120px,\s*0\.42fr\) minmax\(0,\s*1fr\) auto;/,
@@ -478,6 +497,15 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(stylesheet).toMatch(
       /\.redesign-top-actions button\s*\{[\s\S]*min-width:\s*104px;[\s\S]*white-space:\s*nowrap;/,
+    );
+    expect(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button")).toContain(
+      "font-weight: 680;",
+    );
+    expect(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button:hover:not(:disabled),\n.metis-sidebar-nav.redesign-side-nav button.active")).toContain(
+      "color: #3154df;",
+    );
+    expect(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button:hover:not(:disabled),\n.metis-sidebar-nav.redesign-side-nav button.active")).toContain(
+      "box-shadow: none;",
     );
     expect(stylesheet).toMatch(
       /\.topbar-search\.redesign-search-field\s*\{[\s\S]*grid-template-columns:\s*22px minmax\(0,\s*1fr\);/,
@@ -506,6 +534,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*104px;/,
     );
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
+      "font-weight: 720;",
+    );
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card span,\n.dashboard-stat-card.redesign-stat-card small")).toContain(
+      "font-weight: 620;",
+    );
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*168px;/,
     );
@@ -518,11 +552,27 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card:hover\s*\{[\s\S]*transform:\s*translateY\(-2px\);/,
     );
+    expect(latestBlockFor(".skill-row.redesign-skill-card:hover")).toContain(
+      "box-shadow: 0 12px 24px rgba(30, 48, 78, 0.08);",
+    );
+    expect(latestBlockFor(".skill-row.redesign-skill-card .skill-main p")).toContain(
+      "font-weight: 450;",
+    );
+    expect(latestBlockFor(".skill-row.redesign-skill-card > strong")).toContain(
+      "font-weight: 680;",
+    );
+    expect(latestBlockFor(".redesign-show-more")).toContain("font-weight: 680;");
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card > small\s*\{[\s\S]*display:\s*none;/,
     );
     expect(stylesheet).toMatch(
       /\.skill-detail-card\.redesign-detail-summary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(320px,\s*0\.48fr\);/,
+    );
+    expect(latestBlockFor(".skill-detail-card.redesign-detail-summary")).toContain(
+      "var(--redesign-accent-start, #3154df)",
+    );
+    expect(latestBlockFor(".skill-detail-card.redesign-detail-summary")).toContain(
+      "var(--redesign-accent-end, #4b7df0)",
     );
     expect(stylesheet).toMatch(
       /\.local-operations-card\.redesign-update-workbench\s*\{[\s\S]*padding:\s*20px;/,

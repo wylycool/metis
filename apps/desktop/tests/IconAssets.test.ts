@@ -99,13 +99,55 @@ function readPngRgba(path: string): { width: number; height: number; pixels: Rgb
   return { width, height, pixels };
 }
 
+function contentBounds(
+  image: { width: number; height: number; pixels: Rgba[] },
+  predicate: (pixel: Rgba) => boolean,
+) {
+  let minX = image.width;
+  let minY = image.height;
+  let maxX = -1;
+  let maxY = -1;
+
+  image.pixels.forEach((pixel, index) => {
+    if (!predicate(pixel)) {
+      return;
+    }
+
+    const x = index % image.width;
+    const y = Math.floor(index / image.width);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  });
+
+  if (maxX < minX || maxY < minY) {
+    throw new Error("No pixels matched content bounds predicate");
+  }
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  };
+}
+
 describe("desktop app icon assets", () => {
   test("uses the crystal skill stack artwork for favicon and Tauri bundle source", () => {
+    const sharedLogo = readFileSync("src/assets/metis-crystal-logo.svg", "utf8");
     const favicon = readFileSync("public/metis-icon.svg", "utf8");
     const tauriSource = readFileSync("src-tauri/icons/metis-icon.svg", "utf8");
 
+    expect(sharedLogo).toContain("metis-crystal-logo-source");
+    expect(sharedLogo).toContain("logo-layer-base");
+    expect(sharedLogo).toContain("logo-layer-top");
+
     for (const svg of [favicon, tauriSource]) {
       expect(svg).toContain("metis-crystal-app-icon");
+      expect(svg).toContain("metis-crystal-logo-source");
       expect(svg).toContain("logo-layer-base");
       expect(svg).toContain("logo-layer-top");
       expect(svg).not.toContain("<text");
@@ -113,7 +155,7 @@ describe("desktop app icon assets", () => {
     }
   });
 
-  test("renders the Tauri primary PNG with crystal blues instead of the old gold mark", () => {
+  test("renders the Tauri primary PNG with a light app-icon background and crystal blues", () => {
     const icon = readPngRgba("src-tauri/icons/icon.png");
     const opaquePixels = icon.pixels.filter((pixel) => pixel.a > 220);
     const crystalPixels = opaquePixels.filter(
@@ -122,10 +164,39 @@ describe("desktop app icon assets", () => {
     const oldGoldPixels = opaquePixels.filter(
       (pixel) => pixel.r > 180 && pixel.g > 135 && pixel.g < 190 && pixel.b < 110,
     );
+    const darkBackgroundPixels = opaquePixels.filter(
+      (pixel) => pixel.r < 70 && pixel.g < 90 && pixel.b < 140,
+    );
+    const lightBackgroundPixels = opaquePixels.filter(
+      (pixel) => pixel.r > 225 && pixel.g > 220 && pixel.b > 210,
+    );
 
     expect(icon.width).toBe(512);
     expect(icon.height).toBe(512);
-    expect(crystalPixels.length / opaquePixels.length).toBeGreaterThan(0.08);
+    expect(crystalPixels.length / opaquePixels.length).toBeGreaterThan(0.045);
     expect(oldGoldPixels.length / opaquePixels.length).toBeLessThan(0.02);
+    expect(darkBackgroundPixels.length / opaquePixels.length).toBeLessThan(0.18);
+    expect(lightBackgroundPixels.length / opaquePixels.length).toBeGreaterThan(0.45);
+  });
+
+  test("keeps the crystal artwork inside platform icon safe margins", () => {
+    const tauriSource = readFileSync("src-tauri/icons/metis-icon.svg", "utf8");
+    const transform = tauriSource.match(/class="metis-crystal-logo-source"[^>]*transform="translate\((\d+) (\d+)\) scale\(([\d.]+)\)"/);
+
+    expect(transform).toBeTruthy();
+    expect(Number(transform?.[3])).toBeLessThanOrEqual(11.7);
+
+    const icon = readPngRgba("src-tauri/icons/icon.png");
+    const blueMarkBounds = contentBounds(
+      icon,
+      (pixel) => pixel.a > 170 && pixel.b > 145 && pixel.g > 105 && pixel.r < 170,
+    );
+
+    expect(blueMarkBounds.width / icon.width).toBeLessThanOrEqual(0.74);
+    expect(blueMarkBounds.height / icon.height).toBeLessThanOrEqual(0.74);
+    expect(blueMarkBounds.minX / icon.width).toBeGreaterThan(0.12);
+    expect(blueMarkBounds.minY / icon.height).toBeGreaterThan(0.12);
+    expect(blueMarkBounds.maxX / icon.width).toBeLessThan(0.88);
+    expect(blueMarkBounds.maxY / icon.height).toBeLessThan(0.88);
   });
 });

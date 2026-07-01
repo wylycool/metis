@@ -5,6 +5,7 @@ import {
   InlineError,
   StatusBadge,
   localModifiedLabel,
+  skillAccentStyle,
   updateLabel,
   updateTone,
   type BindDraft,
@@ -113,6 +114,7 @@ export function SkillDetailPage({
       <header
         className="skill-detail-card skill-intro-card redesign-detail-summary"
         data-testid={`skill-intro-card-${skill.id}`}
+        style={skillAccentStyle(skill)}
       >
         <div
           className="skill-intro-heading"
