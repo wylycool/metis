@@ -130,6 +130,9 @@ export function SkillsWorkspace({
   const agentMembershipsByKey = useMemo(() => {
     return agentMembershipsBySkillKey(searchMatchedSkills);
   }, [searchMatchedSkills]);
+  const allAgentMembershipsByKey = useMemo(() => {
+    return agentMembershipsBySkillKey(skills);
+  }, [skills]);
   const visibleSkills = baseVisibleSkills;
   const displayedSkills = showAllSkills
     ? visibleSkills
@@ -202,6 +205,11 @@ export function SkillsWorkspace({
           diffDetail={diffDetails[routedDetailSkill.id]}
           diffError={diffError[routedDetailSkill.id]}
           isBinding={bindingSkillId === routedDetailSkill.id}
+          agentMemberships={
+            routedSkill
+              ? allAgentMembershipsByKey.get(skillIdentityKey(routedSkill)) ?? [routedDetailSkill]
+              : [routedDetailSkill]
+          }
           selectedDetailTargetIds={selectedDetailTargetIds[routedDetailSkill.id] ?? []}
           skill={routedDetailSkill}
           updateResult={updateResults[routedDetailSkill.id]}

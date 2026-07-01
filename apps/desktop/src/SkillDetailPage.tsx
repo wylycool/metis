@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+import { AgentBadge, normalizeAgentId, type AgentIdentity } from "./AgentBadge";
 import {
   BackupPanel,
   BindSourceForm,
@@ -32,6 +34,7 @@ export function SkillDetailPage({
   diffDetail,
   diffError,
   isBinding,
+  agentMemberships,
   selectedDetailTargetIds,
   skill,
   updateResult,
@@ -61,6 +64,7 @@ export function SkillDetailPage({
   diffDetail?: DesktopDiffDetail;
   diffError?: DesktopError;
   isBinding: boolean;
+  agentMemberships: Pick<DesktopSkill, "agent_id" | "agent_name" | "install_path">[];
   selectedDetailTargetIds: string[];
   skill: DesktopSkill;
   updateResult?: DesktopUpdateCheckResult;
@@ -94,9 +98,12 @@ export function SkillDetailPage({
     updateResult?.status === "UpToDate" ||
     updateResult?.status === "UpdateAvailable" ||
     updateResult?.status === "CheckFailed";
+  const installedAgentRows = useMemo(
+    () => detailInstalledAgentRows(skill, agentMemberships, detailTargets),
+    [agentMemberships, detailTargets, skill],
+  );
   void detailInstallResult;
   void detailTargetError;
-  void detailTargets;
   void selectedDetailTargetIds;
   void onInstallDetailTargets;
   void onRefreshDetailTargets;
@@ -152,6 +159,8 @@ export function SkillDetailPage({
           </div>
         )}
       </header>
+
+      <FormalDetailAgentPaths skill={skill} rows={installedAgentRows} />
 
       <div className="skill-detail-grid">
         <section
@@ -260,6 +269,59 @@ export function SkillDetailPage({
   );
 }
 
+function FormalDetailAgentPaths({
+  rows,
+  skill,
+}: {
+  rows: DetailAgentInstallRow[];
+  skill: DesktopSkill;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <section
+      className="redesign-detail-agent-panel"
+      data-testid={`skill-detail-agent-panel-${skill.id}`}
+    >
+      <button
+        aria-controls={`skill-detail-agent-paths-${skill.id}`}
+        aria-expanded={isExpanded}
+        className="redesign-detail-agent-toggle"
+        data-testid={`skill-detail-agent-toggle-${skill.id}`}
+        onClick={() => setIsExpanded((current) => !current)}
+      >
+        <span>
+          <small>安装位置</small>
+          <strong>{rows.length} 个 Agent 已安装此 skill</strong>
+        </span>
+        <span className="redesign-detail-agent-toggle-action">
+          {isExpanded ? "收起" : "展开"}
+          <span aria-hidden="true">{isExpanded ? "↑" : "↓"}</span>
+        </span>
+      </button>
+      {isExpanded && (
+        <div
+          className="redesign-detail-agent-paths"
+          data-testid={`skill-detail-agent-paths-${skill.id}`}
+          id={`skill-detail-agent-paths-${skill.id}`}
+        >
+          {rows.map((row) => (
+            <div
+              className="redesign-detail-agent-path-row"
+              data-testid={`skill-detail-agent-path-${skill.id}-${row.agentId}`}
+              key={row.agentId}
+            >
+              <AgentBadge agent={row.agent} />
+              <span>{row.agent.agent_name}</span>
+              <code>{row.installPath}</code>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function FormalCheckPanel({
   skill,
   source,
@@ -302,4 +364,56 @@ function FormalCheckPanel({
 
 function shortCommit(value: string) {
   return value.length > 7 ? value.slice(0, 7) : value;
+}
+
+type DetailAgentInstallRow = {
+  agent: AgentIdentity;
+  agentId: string;
+  installPath: string;
+};
+
+function detailInstalledAgentRows(
+  skill: DesktopSkill,
+  agentMemberships: Pick<DesktopSkill, "agent_id" | "agent_name" | "install_path">[],
+  detailTargets: DesktopSkillTarget[],
+) {
+  const rows: DetailAgentInstallRow[] = [];
+  const seen = new Set<string>();
+
+  function addRow(agent: AgentIdentity, installPath: string) {
+    const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
+    if (!agentId || seen.has(agentId)) {
+      return;
+    }
+    seen.add(agentId);
+    rows.push({ agent, agentId, installPath });
+  }
+
+  for (const membership of agentMemberships) {
+    addRow(
+      { agent_id: membership.agent_id, agent_name: membership.agent_name },
+      membership.install_path,
+    );
+  }
+
+  addRow(
+    { agent_id: skill.agent_id, agent_name: skill.agent_name },
+    skill.install_path,
+  );
+
+  for (const target of detailTargets) {
+    if (!isInstalledDetailTarget(target)) {
+      continue;
+    }
+    addRow(
+      { agent_id: target.agent_id, agent_name: target.agent_name },
+      target.install_path,
+    );
+  }
+
+  return rows;
+}
+
+function isInstalledDetailTarget(target: DesktopSkillTarget) {
+  return target.status !== "NotInstalled" && Boolean(target.skill_id);
 }

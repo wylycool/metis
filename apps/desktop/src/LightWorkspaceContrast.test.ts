@@ -622,6 +622,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.local-operations-card\.redesign-update-workbench\s*\{[\s\S]*padding:\s*20px;/,
     );
+    expect(latestBlockFor(".skill-detail-page .redesign-detail-agent-panel")).toContain(
+      "margin-top: -4px;",
+    );
     expect(stylesheet).toMatch(
       /\.source-drawer\.redesign-source-drawer\s*\{[\s\S]*width:\s*min\(440px,\s*100vw\);/,
     );

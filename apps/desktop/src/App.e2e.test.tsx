@@ -918,6 +918,38 @@ describe("Metis desktop GUI main flow", () => {
     expect(introCard.queryByText("opencode")).toBeNull();
     expect(introCard.queryByText("/Users/me/.opencode/skills/codex-planner")).toBeNull();
     expect(introCard.queryByText("/Users/me/.claude/skills/codex-planner")).toBeNull();
+    expect(
+      screen
+        .getByTestId("skill-intro-card-codex-planner")
+        .contains(screen.getByTestId("skill-detail-agent-panel-codex-planner")),
+    ).toBe(false);
+    expect(
+      screen.getByTestId("skill-detail-agent-toggle-codex-planner").getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(screen.queryByTestId("skill-detail-agent-paths-codex-planner")).toBeNull();
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-codex-planner"));
+    expect(
+      screen.getByTestId("skill-detail-agent-toggle-codex-planner").getAttribute("aria-expanded"),
+    ).toBe("true");
+    const formalAgentPaths = within(
+      await screen.findByTestId("skill-detail-agent-paths-codex-planner"),
+    );
+    expect(
+      within(formalAgentPaths.getByTestId("skill-detail-agent-path-codex-planner-codex")).getByTestId(
+        "agent-logo-codex",
+      ),
+    ).toBeTruthy();
+    expect(formalAgentPaths.getByText("Codex")).toBeTruthy();
+    expect(formalAgentPaths.getByText("/Users/me/.codex/skills/codex-planner")).toBeTruthy();
+    expect(
+      within(formalAgentPaths.getByTestId("skill-detail-agent-path-codex-planner-opencode")).getByTestId(
+        "agent-logo-opencode",
+      ),
+    ).toBeTruthy();
+    expect(formalAgentPaths.getByText("opencode")).toBeTruthy();
+    expect(formalAgentPaths.getByText("/Users/me/.opencode/skills/codex-planner")).toBeTruthy();
+    expect(formalAgentPaths.queryByText("Claude Code")).toBeNull();
+    expect(formalAgentPaths.queryByText("/Users/me/.claude/skills/codex-planner")).toBeNull();
     expect(screen.getByTestId("skill-operations-card-codex-planner")).toBeTruthy();
     const sourceSummary = within(screen.getByTestId("skill-source-summary-codex-planner"));
     expect(sourceSummary.getByText("来源")).toBeTruthy();

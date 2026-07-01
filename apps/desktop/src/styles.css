@@ -4650,6 +4650,10 @@ textarea {
   box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);
 }
 
+.skill-detail-page .redesign-detail-agent-panel {
+  margin-top: -4px;
+}
+
 .local-operations-card.redesign-update-workbench {
   display: grid;
   gap: 14px;
