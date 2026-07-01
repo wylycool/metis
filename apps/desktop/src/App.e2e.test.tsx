@@ -345,6 +345,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("metis-reference-sidebar").className).toContain("redesign-sidebar");
     expect(screen.queryByTestId("formal-redesign-theme-switcher")).toBeNull();
     expect(screen.getByTestId("workspace-skills").className).toContain("redesign-home");
+    expect(screen.getByTestId("workspace-topbar")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar-middle")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar-actions")).toBeTruthy();
     expect(screen.getByTestId("metis-brand-home")).toBeTruthy();
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
@@ -372,6 +375,11 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(screen.getByTestId("workspace-tab-settings"));
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar-middle")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar-actions")).toBeTruthy();
+    expect(screen.getByTestId("check-all-updates").className).toContain("topbar-secondary-action");
+    expect(screen.getByTestId("scan-skills").className).toContain("scan-button");
     expect(screen.getByTestId("settings-agent-path-table")).toBeTruthy();
     expect(screen.getByTestId("settings-agent-path-table").className).toContain(
       "redesign-agent-path-table",
@@ -384,6 +392,37 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("metis-brand-home"));
     expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
     expect(screen.queryByTestId("skill-status-filters")).toBeNull();
+  });
+
+  test("reuses the formal topbar layout across Skills, Updates, and Settings", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar").className).toContain("redesign-page-topbar");
+    expect(screen.getByTestId("workspace-topbar-middle").className).toContain(
+      "topbar-middle-slot",
+    );
+    expect(screen.getByTestId("workspace-topbar-actions").className).toContain(
+      "redesign-top-actions",
+    );
+    expect(screen.getByTestId("workspace-topbar-actions").children).toHaveLength(2);
+    expect(screen.getByTestId("skill-search-input")).toBeTruthy();
+
+    await user.click(screen.getByTestId("workspace-tab-governance-sidebar"));
+    expect(await screen.findByTestId("workspace-governance")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar-middle").className).toContain("is-empty");
+    expect(screen.getByTestId("workspace-topbar-actions").children).toHaveLength(2);
+    expect(screen.getByTestId("check-all-updates").className).toContain("topbar-secondary-action");
+    expect(screen.getByTestId("scan-skills").className).toContain("scan-button");
+
+    await user.click(screen.getByTestId("workspace-tab-settings"));
+    expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
+    expect(screen.getByTestId("workspace-topbar-middle").className).toContain("is-empty");
+    expect(screen.getByTestId("workspace-topbar-actions").children).toHaveLength(2);
+    expect(screen.getByTestId("check-all-updates").className).toContain("topbar-secondary-action");
+    expect(screen.getByTestId("scan-skills").className).toContain("scan-button");
   });
 
   test("limits the formal home first screen and expands with show more", async () => {

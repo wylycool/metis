@@ -1103,55 +1103,19 @@ function MetisApp() {
           </div>
         </aside>
         <div className="app-shell redesign-main">
-          {!isSkillDetailView && <header className="topbar redesign-page-topbar">
-            <div className="topbar-title">
-              <p>{activeWorkspace === "settings" ? "Settings" : activeWorkspace === "governance" ? "Updates" : "Skill Dashboard"}</p>
-              <h1>{activeWorkspace === "settings" ? "Agent 路径设置" : activeWorkspace === "governance" ? "更新与治理" : "Skills"}</h1>
-            </div>
-            <div className="topbar-actions">
-              {activeWorkspace === "skills" && (
-                <label className="topbar-search redesign-search-field" aria-label="搜索 skills">
-                  <SearchIcon />
-                  <input
-                    data-testid="skill-search-input"
-                    placeholder="搜索 skill、路径或来源"
-                    value={skillSearchQuery}
-                    onChange={(event) => setSkillSearchQuery(event.target.value)}
-                  />
-                  <span>{skills.length} results</span>
-                </label>
-              )}
-              <div className="redesign-top-actions">
-              <button
-                className="ghost-button topbar-secondary-action"
-                data-testid="check-all-updates"
-                disabled={
-                  state === "loading" || actionBusy === "check-updates" || skills.length === 0
-                }
-                onClick={() => handleCheckUpdates(skills.map((skill) => skill.id))}
-              >
-                {actionBusy === "check-updates" ? "检查中" : "检查更新"}
-              </button>
-              <button
-                className="scan-button"
-                data-testid="scan-skills"
-                disabled={state === "loading"}
-                onClick={handleScan}
-              >
-                {state === "loading" ? "扫描中" : "重新扫描"}
-              </button>
-              </div>
-              <button
-                aria-label="Settings"
-                aria-pressed={activeWorkspace === "settings"}
-                className="settings-icon-button"
-                data-testid="workspace-tab-settings"
-                onClick={() => setActiveWorkspace("settings")}
-              >
-                <span aria-hidden="true" />
-              </button>
-            </div>
-          </header>}
+          {!isSkillDetailView && (
+            <WorkspaceTopbar
+              actionBusy={actionBusy}
+              activeWorkspace={activeWorkspace}
+              isLoading={state === "loading"}
+              skillCount={skills.length}
+              skillSearchQuery={skillSearchQuery}
+              onCheckAllUpdates={() => handleCheckUpdates(skills.map((skill) => skill.id))}
+              onOpenSettings={() => setActiveWorkspace("settings")}
+              onScan={handleScan}
+              onSearchChange={setSkillSearchQuery}
+            />
+          )}
 
           <nav className="workspace-tabs" aria-hidden="true" hidden>
             <WorkspaceTab
@@ -1899,6 +1863,94 @@ function unknownDesktopError(detail: string): DesktopError {
     suggestion: "请确认目标目录、Git source 和本地数据库状态后重试。",
     debug_detail: detail,
   };
+}
+
+type WorkspaceTopbarProps = {
+  actionBusy: string | null;
+  activeWorkspace: WorkspaceKey;
+  isLoading: boolean;
+  skillCount: number;
+  skillSearchQuery: string;
+  onCheckAllUpdates: () => void;
+  onOpenSettings: () => void;
+  onScan: () => void;
+  onSearchChange: (value: string) => void;
+};
+
+const workspaceTopbarCopy: Record<WorkspaceKey, { eyebrow: string; title: string }> = {
+  skills: { eyebrow: "Skill Dashboard", title: "Skills" },
+  governance: { eyebrow: "Updates", title: "更新与治理" },
+  settings: { eyebrow: "Settings", title: "Agent 路径设置" },
+};
+
+function WorkspaceTopbar({
+  actionBusy,
+  activeWorkspace,
+  isLoading,
+  skillCount,
+  skillSearchQuery,
+  onCheckAllUpdates,
+  onOpenSettings,
+  onScan,
+  onSearchChange,
+}: WorkspaceTopbarProps) {
+  const copy = workspaceTopbarCopy[activeWorkspace];
+  const showSearch = activeWorkspace === "skills";
+
+  return (
+    <header className="topbar redesign-page-topbar" data-testid="workspace-topbar">
+      <div className="topbar-title">
+        <p>{copy.eyebrow}</p>
+        <h1>{copy.title}</h1>
+      </div>
+      <div className="topbar-actions">
+        <div
+          className={`topbar-middle-slot${showSearch ? "" : " is-empty"}`}
+          data-testid="workspace-topbar-middle"
+        >
+          {showSearch && (
+            <label className="topbar-search redesign-search-field" aria-label="搜索 skills">
+              <SearchIcon />
+              <input
+                data-testid="skill-search-input"
+                placeholder="搜索 skill、路径或来源"
+                value={skillSearchQuery}
+                onChange={(event) => onSearchChange(event.target.value)}
+              />
+              <span>{skillCount} results</span>
+            </label>
+          )}
+        </div>
+        <div className="redesign-top-actions" data-testid="workspace-topbar-actions">
+          <button
+            className="ghost-button topbar-secondary-action"
+            data-testid="check-all-updates"
+            disabled={isLoading || actionBusy === "check-updates" || skillCount === 0}
+            onClick={onCheckAllUpdates}
+          >
+            {actionBusy === "check-updates" ? "检查中" : "检查更新"}
+          </button>
+          <button
+            className="scan-button"
+            data-testid="scan-skills"
+            disabled={isLoading}
+            onClick={onScan}
+          >
+            {isLoading ? "扫描中" : "重新扫描"}
+          </button>
+        </div>
+        <button
+          aria-label="Settings"
+          aria-pressed={activeWorkspace === "settings"}
+          className="settings-icon-button"
+          data-testid="workspace-tab-settings"
+          onClick={onOpenSettings}
+        >
+          <span aria-hidden="true" />
+        </button>
+      </div>
+    </header>
+  );
 }
 
 function GridIcon() {

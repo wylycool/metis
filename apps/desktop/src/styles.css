@@ -4263,7 +4263,7 @@ textarea {
 .topbar.redesign-page-topbar {
   min-height: 60px;
   display: grid;
-  grid-template-columns: minmax(120px, 0.42fr) minmax(260px, 1fr) minmax(104px, auto) minmax(104px, auto);
+  grid-template-columns: minmax(120px, 0.42fr) minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 0;
@@ -4285,11 +4285,24 @@ textarea {
 }
 
 .topbar.redesign-page-topbar .topbar-actions {
-  display: contents;
+  grid-column: 2 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
 }
 
 .topbar.redesign-page-topbar .settings-icon-button {
   display: none;
+}
+
+.topbar-middle-slot {
+  min-width: 0;
+}
+
+.topbar-middle-slot.is-empty {
+  min-height: 52px;
 }
 
 .topbar-search.redesign-search-field {
@@ -5876,7 +5889,11 @@ textarea {
 }
 
 .redesign-top-actions {
-  display: contents;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(104px, auto));
+  gap: 12px;
+  align-items: center;
+  justify-content: end;
 }
 
 .redesign-top-actions button,

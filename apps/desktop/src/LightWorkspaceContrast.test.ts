@@ -460,10 +460,19 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
-      /\.topbar\.redesign-page-topbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(120px,\s*0\.42fr\) minmax\(260px,\s*1fr\) minmax\(104px,\s*auto\) minmax\(104px,\s*auto\);/,
+      /\.topbar\.redesign-page-topbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(120px,\s*0\.42fr\) minmax\(0,\s*1fr\) auto;/,
     );
     expect(stylesheet).toMatch(
-      /\.redesign-top-actions\s*\{[\s\S]*display:\s*contents;/,
+      /\.topbar\.redesign-page-topbar \.topbar-actions\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.topbar-middle-slot\s*\{[\s\S]*min-width:\s*0;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.topbar-middle-slot\.is-empty\s*\{[\s\S]*min-height:\s*52px;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.redesign-top-actions\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(104px,\s*auto\)\);/,
     );
     expect(stylesheet).toMatch(
       /\.redesign-top-actions button\s*\{[\s\S]*min-width:\s*104px;[\s\S]*white-space:\s*nowrap;/,
