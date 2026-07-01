@@ -1,0 +1,131 @@
+import { readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
+import { describe, expect, test } from "vitest";
+
+type Rgba = {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+};
+
+function readPngRgba(path: string): { width: number; height: number; pixels: Rgba[] } {
+  const buffer = readFileSync(path);
+  const signature = buffer.subarray(0, 8).toString("hex");
+
+  if (signature !== "89504e470d0a1a0a") {
+    throw new Error(`${path} is not a PNG file`);
+  }
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let colorType = 0;
+  const idatChunks: Buffer[] = [];
+
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.subarray(offset + 4, offset + 8).toString("ascii");
+    const data = buffer.subarray(offset + 8, offset + 8 + length);
+    offset += 12 + length;
+
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      colorType = data[9];
+    }
+
+    if (type === "IDAT") {
+      idatChunks.push(Buffer.from(data));
+    }
+
+    if (type === "IEND") {
+      break;
+    }
+  }
+
+  if (width === 0 || height === 0 || colorType !== 6) {
+    throw new Error(`Expected 8-bit RGBA PNG for ${path}`);
+  }
+
+  const bytesPerPixel = 4;
+  const stride = width * bytesPerPixel;
+  const inflated = inflateSync(Buffer.concat(idatChunks));
+  const pixels: Rgba[] = [];
+  let inputOffset = 0;
+  let previous = Buffer.alloc(stride);
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = inflated[inputOffset];
+    inputOffset += 1;
+    const scanline = Buffer.from(inflated.subarray(inputOffset, inputOffset + stride));
+    inputOffset += stride;
+
+    for (let x = 0; x < stride; x += 1) {
+      const left = x >= bytesPerPixel ? scanline[x - bytesPerPixel] : 0;
+      const up = previous[x];
+      const upLeft = x >= bytesPerPixel ? previous[x - bytesPerPixel] : 0;
+
+      if (filter === 1) {
+        scanline[x] = (scanline[x] + left) & 0xff;
+      } else if (filter === 2) {
+        scanline[x] = (scanline[x] + up) & 0xff;
+      } else if (filter === 3) {
+        scanline[x] = (scanline[x] + Math.floor((left + up) / 2)) & 0xff;
+      } else if (filter === 4) {
+        const p = left + up - upLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upLeft);
+        const predictor = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
+        scanline[x] = (scanline[x] + predictor) & 0xff;
+      } else if (filter !== 0) {
+        throw new Error(`Unsupported PNG filter ${filter} in ${path}`);
+      }
+    }
+
+    for (let x = 0; x < stride; x += bytesPerPixel) {
+      pixels.push({
+        r: scanline[x],
+        g: scanline[x + 1],
+        b: scanline[x + 2],
+        a: scanline[x + 3],
+      });
+    }
+
+    previous = scanline;
+  }
+
+  return { width, height, pixels };
+}
+
+describe("desktop app icon assets", () => {
+  test("uses the crystal skill stack artwork for favicon and Tauri bundle source", () => {
+    const favicon = readFileSync("public/metis-icon.svg", "utf8");
+    const tauriSource = readFileSync("src-tauri/icons/metis-icon.svg", "utf8");
+
+    for (const svg of [favicon, tauriSource]) {
+      expect(svg).toContain("metis-crystal-app-icon");
+      expect(svg).toContain("logo-layer-base");
+      expect(svg).toContain("logo-layer-top");
+      expect(svg).not.toContain("<text");
+      expect(svg).not.toContain(">M<");
+    }
+  });
+
+  test("renders the Tauri primary PNG with crystal blues instead of the old gold mark", () => {
+    const icon = readPngRgba("src-tauri/icons/icon.png");
+    const opaquePixels = icon.pixels.filter((pixel) => pixel.a > 220);
+    const crystalPixels = opaquePixels.filter(
+      (pixel) => pixel.b > 160 && pixel.g > 120 && pixel.r < 150,
+    );
+    const oldGoldPixels = opaquePixels.filter(
+      (pixel) => pixel.r > 180 && pixel.g > 135 && pixel.g < 190 && pixel.b < 110,
+    );
+
+    expect(icon.width).toBe(512);
+    expect(icon.height).toBe(512);
+    expect(crystalPixels.length / opaquePixels.length).toBeGreaterThan(0.08);
+    expect(oldGoldPixels.length / opaquePixels.length).toBeLessThan(0.02);
+  });
+});
