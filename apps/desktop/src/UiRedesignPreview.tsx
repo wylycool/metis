@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { AgentBadgeStack } from "./AgentBadge";
+import { AgentBadge, AgentBadgeStack, normalizeAgentId, type AgentIdentity } from "./AgentBadge";
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { GitHubIcon } from "./GitHubIcon";
 import { METIS_GITHUB_URL } from "./projectLinks";
@@ -494,6 +494,7 @@ function RedesignDetail({
           <span className="redesign-detail-kicker">Skill detail</span>
           <h1>{skill.name}</h1>
           <p>{skill.description}</p>
+          <DetailAgentPaths skill={skill} />
         </div>
         <div className="redesign-source-summary">
           <span>来源</span>
@@ -556,6 +557,29 @@ function CheckPanel({ skill }: { skill: PreviewSkill }) {
         <strong>{skill.diffSummary}</strong>
       </div>
       <p>安全检查通过，建议先查看 diff；本地没有未提交修改。</p>
+    </div>
+  );
+}
+
+function DetailAgentPaths({ skill }: { skill: PreviewSkill }) {
+  const installedAgents = skill.agents.map(previewAgentIdentity);
+
+  return (
+    <div className="redesign-detail-agent-paths" data-testid={`redesign-detail-agent-paths-${skill.id}`}>
+      {installedAgents.map((agent) => {
+        const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
+        return (
+          <div
+            className="redesign-detail-agent-path-row"
+            data-testid={`redesign-detail-agent-path-${skill.id}-${agentId}`}
+            key={agentId}
+          >
+            <AgentBadge agent={agent} />
+            <span>{agent.agent_name}</span>
+            <code>{previewAgentInstallPath(agent, skill.name)}</code>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -680,7 +704,7 @@ function AgentStack({ skill }: { skill: PreviewSkill }) {
   return <AgentBadgeStack agents={skill.agents.map(previewAgentIdentity)} testId={`redesign-agent-stack-${skill.id}`} />;
 }
 
-function previewAgentIdentity(agentId: string) {
+function previewAgentIdentity(agentId: string): AgentIdentity {
   const names: Record<string, string> = {
     "claude-code": "Claude Code",
     codex: "Codex",
@@ -691,6 +715,12 @@ function previewAgentIdentity(agentId: string) {
     opencode: "opencode",
   };
   return { agent_id: agentId, agent_name: names[agentId] ?? agentId };
+}
+
+function previewAgentInstallPath(agent: AgentIdentity, skillName: string) {
+  const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
+  const basePath = agentPaths.find((candidate) => candidate.id === agentId)?.path ?? "~/agent-skills";
+  return `${basePath}/${skillName}`;
 }
 
 function accentStyle(skill: PreviewSkill): CSSProperties {

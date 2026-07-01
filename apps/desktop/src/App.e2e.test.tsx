@@ -550,6 +550,25 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByTestId("redesign-skill-detail-memory-weaver")).toBeTruthy();
     expect(screen.getByTestId("redesign-detail-summary")).toBeTruthy();
+    const detailAgentPaths = within(screen.getByTestId("redesign-detail-agent-paths-memory-weaver"));
+    const codexInstall = within(
+      detailAgentPaths.getByTestId("redesign-detail-agent-path-memory-weaver-codex"),
+    );
+    expect(codexInstall.getByTestId("agent-logo-codex")).toBeTruthy();
+    expect(codexInstall.getByText("Codex")).toBeTruthy();
+    expect(codexInstall.getByText("~/.codex/skills/memory-weaver")).toBeTruthy();
+    const claudeInstall = within(
+      detailAgentPaths.getByTestId("redesign-detail-agent-path-memory-weaver-claude-code"),
+    );
+    expect(claudeInstall.getByTestId("agent-logo-claude-code")).toBeTruthy();
+    expect(claudeInstall.getByText("Claude Code")).toBeTruthy();
+    expect(claudeInstall.getByText("~/.claude/skills/memory-weaver")).toBeTruthy();
+    const opencodeInstall = within(
+      detailAgentPaths.getByTestId("redesign-detail-agent-path-memory-weaver-opencode"),
+    );
+    expect(opencodeInstall.getByTestId("agent-logo-opencode")).toBeTruthy();
+    expect(opencodeInstall.getByText("opencode")).toBeTruthy();
+    expect(opencodeInstall.getByText("~/.config/opencode/skills/memory-weaver")).toBeTruthy();
     expect(screen.getByTestId("redesign-update-workbench")).toBeTruthy();
 
     await user.click(screen.getByTestId("redesign-open-source-drawer"));

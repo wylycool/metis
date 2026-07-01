@@ -422,6 +422,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(/\.redesign-diff-viewer\s*\{[\s\S]*font-family:/);
     expect(latestBlockFor(".redesign-diff-line.added")).toContain("background:");
     expect(stylesheet).toMatch(/\.redesign-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
+    expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("display: grid;");
+    expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("gap: 8px;");
+    expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("background: rgba(248, 250, 252, 0.72);");
+    expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("grid-template-columns: auto minmax(96px, 0.28fr) minmax(0, 1fr);");
+    expect(latestBlockFor(".redesign-detail-agent-path-row .agent-badge")).toContain("margin-left: 0;");
+    expect(latestBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
   });
 

@@ -1,4 +1,4 @@
-type AgentIdentity = {
+export type AgentIdentity = {
   agent_id: string;
   agent_name: string;
 };
@@ -44,23 +44,29 @@ export function AgentBadgeStack({ agents, testId }: AgentBadgeStackProps) {
       data-testid={testId}
     >
       {uniqueAgents.map((agent) => {
-        const normalizedId = normalizeAgentId(agent.agent_id || agent.agent_name);
-        const descriptor = badgeDescriptor(normalizedId, agent.agent_name);
         return (
-          <span
-            className={`agent-badge ${descriptor.className}`}
-            data-testid={`agent-badge-${normalizedId}`}
-            key={normalizedId}
-            title={agent.agent_name}
-          >
-            {descriptor.logo ? (
-              <AgentBadgeLogo kind={descriptor.logo} />
-            ) : (
-              <span className="agent-badge-letter">{descriptor.label}</span>
-            )}
-          </span>
+          <AgentBadge agent={agent} key={normalizeAgentId(agent.agent_id || agent.agent_name)} />
         );
       })}
+    </span>
+  );
+}
+
+export function AgentBadge({ agent, testId }: { agent: AgentIdentity; testId?: string }) {
+  const normalizedId = normalizeAgentId(agent.agent_id || agent.agent_name);
+  const descriptor = badgeDescriptor(normalizedId, agent.agent_name);
+
+  return (
+    <span
+      className={`agent-badge ${descriptor.className}`}
+      data-testid={testId ?? `agent-badge-${normalizedId}`}
+      title={agent.agent_name}
+    >
+      {descriptor.logo ? (
+        <AgentBadgeLogo kind={descriptor.logo} />
+      ) : (
+        <span className="agent-badge-letter">{descriptor.label}</span>
+      )}
     </span>
   );
 }

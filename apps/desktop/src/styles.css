@@ -6316,6 +6316,53 @@ textarea {
   line-height: 1.6;
 }
 
+.redesign-detail-agent-paths {
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+  margin-top: 16px;
+}
+
+.redesign-detail-agent-path-row {
+  display: grid;
+  grid-template-columns: auto minmax(96px, 0.28fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid rgba(226, 232, 240, 0.78);
+  border-radius: 12px;
+  padding: 5px 10px 5px 6px;
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.redesign-detail-agent-path-row .agent-badge {
+  width: 26px;
+  height: 26px;
+  margin-left: 0;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  color: var(--agent-badge-foreground, #ffffff);
+  background: var(--agent-badge-background, linear-gradient(135deg, #3154df, #46bfa4));
+}
+
+.redesign-detail-agent-path-row span {
+  overflow: hidden;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.redesign-detail-agent-path-row code {
+  overflow: hidden;
+  color: #64748b;
+  font-family: "SF Mono", "Cascadia Code", monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .redesign-source-summary {
   display: grid;
   gap: 8px;
