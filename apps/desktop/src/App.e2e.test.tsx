@@ -349,8 +349,19 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("workspace-topbar-middle")).toBeTruthy();
     expect(screen.getByTestId("workspace-topbar-actions")).toBeTruthy();
     expect(screen.getByTestId("metis-brand-home")).toBeTruthy();
+    expect(screen.getByTestId("metis-brand-home").getAttribute("data-github-url")).toBe(
+      "https://github.com/wylycool/metis",
+    );
     expect(screen.getByTestId("metis-brand-crystal-logo")).toBeTruthy();
     expect(screen.queryByTestId("metis-brand-letter-logo")).toBeNull();
+    expect(screen.queryByText("Local library")).toBeNull();
+    expect(screen.queryByText(/trusted sources/)).toBeNull();
+    expect(screen.getByTestId("metis-github-link").getAttribute("aria-label")).toBe(
+      "打开 Metis GitHub 仓库",
+    );
+    expect(screen.getByTestId("metis-github-link").getAttribute("data-github-url")).toBe(
+      "https://github.com/wylycool/metis",
+    );
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expect(screen.queryByText(/\d+ results/)).toBeNull();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
@@ -467,8 +478,16 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByTestId("ui-redesign-preview")).toBeTruthy();
     expect(screen.getByTestId("redesign-app-window")).toBeTruthy();
     expect(screen.getByTestId("redesign-brand-logo")).toBeTruthy();
+    expect(screen.getByTestId("redesign-brand-logo").getAttribute("href")).toBe(
+      "https://github.com/wylycool/metis",
+    );
     expect(screen.getByTestId("redesign-brand-crystal-logo")).toBeTruthy();
     expect(screen.queryByTestId("redesign-brand-letter-logo")).toBeNull();
+    expect(screen.queryByText("Local library")).toBeNull();
+    expect(screen.queryByText(/trusted sources/)).toBeNull();
+    expect(screen.getByTestId("redesign-github-link").getAttribute("href")).toBe(
+      "https://github.com/wylycool/metis",
+    );
     expect(screen.getByTestId("redesign-home")).toBeTruthy();
     expect(screen.getByTestId("redesign-search-input")).toBeTruthy();
     expect(screen.getByTestId("redesign-stat-total")).toBeTruthy();

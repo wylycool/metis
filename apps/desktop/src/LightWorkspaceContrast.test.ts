@@ -413,6 +413,10 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".redesign-skill-card")).toContain("-webkit-line-clamp: 2;");
     expect(latestBlockFor(".redesign-agent-stack")).toContain("margin-left: -7px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("width: 42px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("height: 42px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("border-radius: 14px;");
+    expect(latestBlockFor(".redesign-github-link svg")).toContain("width: 20px;");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("position: fixed");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("right: 0");
     expect(stylesheet).toMatch(/\.redesign-diff-viewer\s*\{[\s\S]*font-family:/);
@@ -469,6 +473,10 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*28px 16px;/,
     );
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 42px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 42px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("border-radius: 14px;");
+    expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
       /\.topbar\.redesign-page-topbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(120px,\s*0\.42fr\) minmax\(0,\s*1fr\) auto;/,

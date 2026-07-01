@@ -4265,6 +4265,39 @@ textarea {
   transform: translateY(-1px);
 }
 
+.metis-sidebar-github {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  justify-self: start;
+  border: 1px solid rgba(206, 218, 231, 0.9);
+  border-radius: 14px;
+  padding: 0;
+  color: #172033;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 24px rgba(23, 32, 51, 0.08);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 200ms ease,
+    background 180ms ease;
+}
+
+.metis-sidebar-github:hover:not(:disabled) {
+  border-color: rgba(49, 84, 223, 0.34);
+  background: #ffffff;
+  box-shadow: 0 16px 28px rgba(49, 84, 223, 0.16);
+  transform: translateY(-1px);
+}
+
+.metis-sidebar-github svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
 .metis-sidebar-status.redesign-side-summary {
   display: grid;
   gap: 8px;
@@ -5800,6 +5833,39 @@ textarea {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
+}
+
+.redesign-github-link {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  justify-self: start;
+  border: 1px solid rgba(206, 218, 231, 0.9);
+  border-radius: 14px;
+  color: #172033;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 24px rgba(23, 32, 51, 0.08);
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 200ms ease,
+    background 180ms ease;
+}
+
+.redesign-github-link:hover {
+  border-color: rgba(49, 84, 223, 0.34);
+  background: #ffffff;
+  box-shadow: 0 16px 28px rgba(49, 84, 223, 0.16);
+  transform: translateY(-1px);
+}
+
+.redesign-github-link svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .redesign-side-summary {

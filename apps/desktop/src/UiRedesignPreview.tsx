@@ -1,6 +1,8 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { AgentBadgeStack } from "./AgentBadge";
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
+import { GitHubIcon } from "./GitHubIcon";
+import { METIS_GITHUB_URL } from "./projectLinks";
 
 type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string } | { kind: "settings" };
 type PreviewTheme = "frost" | "sage" | "dawn" | "graphite";
@@ -260,7 +262,7 @@ function RedesignSidebar({
       <a
         className="redesign-brand"
         data-testid="redesign-brand-logo"
-        href="https://github.com/example/metis"
+        href={METIS_GITHUB_URL}
         rel="noreferrer"
         target="_blank"
       >
@@ -287,11 +289,17 @@ function RedesignSidebar({
           <GearIcon /> Settings
         </button>
       </nav>
-      <div className="redesign-side-summary">
-        <span>Local library</span>
-        <strong>48 skills</strong>
-        <small>6 agents · 31 trusted sources · scanned 2 min ago</small>
-      </div>
+      <a
+        className="redesign-github-link"
+        data-testid="redesign-github-link"
+        href={METIS_GITHUB_URL}
+        rel="noreferrer"
+        target="_blank"
+        aria-label="打开 Metis GitHub 仓库"
+        title="GitHub"
+      >
+        <GitHubIcon />
+      </a>
     </aside>
   );
 }
