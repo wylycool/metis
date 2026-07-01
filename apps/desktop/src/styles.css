@@ -4192,11 +4192,11 @@ textarea {
   place-items: center;
   position: relative;
   border-radius: 16px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #335cff 0%, #42d6a4 46%, #f36aa0 100%);
-  box-shadow:
-    0 16px 32px rgba(51, 92, 255, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  filter: drop-shadow(0 14px 18px rgba(43, 89, 210, 0.18));
 }
 
 .metis-sidebar-nav.redesign-side-nav {
@@ -5696,27 +5696,42 @@ textarea {
   place-items: center;
   position: relative;
   border-radius: 16px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #335cff 0%, #42d6a4 46%, #f36aa0 100%);
-  box-shadow:
-    0 16px 32px rgba(51, 92, 255, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  filter: drop-shadow(0 14px 18px rgba(43, 89, 210, 0.18));
 }
 
 .redesign-logo-mark::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  border-left-color: transparent;
-  border-radius: 12px;
-  transform: rotate(-18deg);
+  content: none;
+}
+
+.redesign-logo-mark svg {
+  width: 50px;
+  height: 50px;
+  display: block;
+  overflow: visible;
 }
 
 .redesign-logo-mark span {
-  position: relative;
-  font-size: 22px;
-  font-weight: 950;
+  display: none;
+}
+
+.metis-crystal-logo-layer {
+  stroke: rgba(255, 255, 255, 0.62);
+  stroke-width: 1.15;
+  stroke-linejoin: round;
+}
+
+.metis-crystal-logo-crystal {
+  stroke: rgba(255, 255, 255, 0.66);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.metis-crystal-logo-highlight {
+  filter: drop-shadow(0 0 5px rgba(117, 236, 255, 0.42));
 }
 
 .redesign-side-nav {

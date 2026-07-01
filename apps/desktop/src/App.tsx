@@ -25,6 +25,7 @@ import {
   unbindSkillSource,
 } from "./api";
 import type { RemoteSyncDraft } from "./AddSkillPage";
+import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
 import { InlineError, type BindDraft } from "./SkillRow";
 import { UiRedesignPreview } from "./UiRedesignPreview";
@@ -1060,7 +1061,7 @@ function MetisApp() {
             }}
           >
             <span className="metis-brand-mark redesign-logo-mark" aria-hidden="true">
-              <span>M</span>
+              <CrystalSkillLogo testId="metis-brand-crystal-logo" />
             </span>
             <span>
               <strong>Metis</strong>

@@ -402,7 +402,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.redesign-sidebar\s*\{[\s\S]*border-radius:\s*28px 0 0 28px;/,
     );
-    expect(latestBlockFor(".redesign-logo-mark")).toContain("background: linear-gradient(135deg");
+    expect(latestBlockFor(".redesign-logo-mark")).toContain("overflow: visible");
+    expect(latestBlockFor(".redesign-logo-mark svg")).toContain("width: 50px;");
+    expect(latestBlockFor(".redesign-logo-mark span")).toContain("display: none;");
     expect(stylesheet).toMatch(
       /\.redesign-home-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
     );

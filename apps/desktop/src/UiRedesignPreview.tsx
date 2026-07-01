@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
+import { CrystalSkillLogo } from "./CrystalSkillLogo";
 
 type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string } | { kind: "settings" };
 type PreviewTheme = "frost" | "sage" | "dawn" | "graphite";
@@ -262,7 +263,9 @@ function RedesignSidebar({
         rel="noreferrer"
         target="_blank"
       >
-        <span className="redesign-logo-mark" aria-hidden="true"><span>M</span></span>
+        <span className="redesign-logo-mark" aria-hidden="true">
+          <CrystalSkillLogo testId="redesign-brand-crystal-logo" />
+        </span>
         <span>
           <strong>Metis</strong>
           <small>Skill Manager</small>
