@@ -659,9 +659,19 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.type(screen.getByTestId("skill-search-input"), "shared");
 
-    expect(await screen.findByTestId("skill-row-shared-codex")).toBeTruthy();
+    const sharedRow = await screen.findByTestId("skill-row-shared-codex");
     expect(screen.queryByTestId("skill-row-shared-claude")).toBeNull();
     expect(screen.queryByTestId("agent-category-bar")).toBeNull();
+    const sharedAgentStack = within(sharedRow).getByTestId("skill-agent-stack-shared-codex");
+    expect(sharedAgentStack.getAttribute("aria-label")).toBe("存在于 Codex、Claude Code");
+    expect(within(sharedAgentStack).getByTestId("agent-badge-codex").textContent).toBe("C");
+    expect(within(sharedAgentStack).getByTestId("agent-badge-claude-code").textContent).toBe("C");
+    expect(within(sharedAgentStack).getByTestId("agent-badge-codex").className).toContain(
+      "agent-badge-codex",
+    );
+    expect(within(sharedAgentStack).getByTestId("agent-badge-claude-code").className).toContain(
+      "agent-badge-claude-code",
+    );
 
     await user.clear(screen.getByTestId("skill-search-input"));
     await user.type(screen.getByTestId("skill-search-input"), "claude-only");

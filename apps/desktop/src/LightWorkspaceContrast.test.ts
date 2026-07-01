@@ -403,7 +403,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.redesign-sidebar\s*\{[\s\S]*border-radius:\s*28px 0 0 28px;/,
     );
     expect(latestBlockFor(".redesign-logo-mark")).toContain("overflow: visible");
-    expect(latestBlockFor(".redesign-logo-mark svg")).toContain("width: 50px;");
+    expect(latestBlockFor(".redesign-logo-mark img")).toContain("width: 50px;");
     expect(latestBlockFor(".redesign-logo-mark span")).toContain("display: none;");
     expect(stylesheet).toMatch(
       /\.redesign-home-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
@@ -419,6 +419,15 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-diff-line.added")).toContain("background:");
     expect(stylesheet).toMatch(/\.redesign-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
+  });
+
+  test("brands overlapping agent letter badges by agent identity", () => {
+    expect(latestBlockFor(".agent-badge-codex")).toContain(
+      "background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);",
+    );
+    expect(latestBlockFor(".agent-badge-claude-code")).toContain("background: #d97757;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("background: #111827;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("background: #00a88f;");
   });
 
   test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {

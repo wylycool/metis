@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
+import { AgentBadgeStack } from "./AgentBadge";
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
 
 type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string } | { kind: "settings" };
@@ -54,7 +55,7 @@ const previewSkills: PreviewSkill[] = [
     sourceRef: "main",
     trusted: true,
     autoUpdate: false,
-    agents: ["C", "CL", "O"],
+    agents: ["codex", "claude-code", "opencode"],
     accentStart: "#496ee8",
     accentEnd: "#7f5be8",
   },
@@ -73,7 +74,7 @@ const previewSkills: PreviewSkill[] = [
     sourceRef: "main",
     trusted: true,
     autoUpdate: true,
-    agents: ["CL", "G"],
+    agents: ["claude-code", "generic"],
     accentStart: "#f06498",
     accentEnd: "#c94f7d",
   },
@@ -92,7 +93,7 @@ const previewSkills: PreviewSkill[] = [
     sourceRef: "main",
     trusted: false,
     autoUpdate: false,
-    agents: ["O", "H"],
+    agents: ["opencode", "hermes"],
     accentStart: "#2db8a0",
     accentEnd: "#159a86",
   },
@@ -111,7 +112,7 @@ const previewSkills: PreviewSkill[] = [
     sourceRef: "main",
     trusted: true,
     autoUpdate: false,
-    agents: ["OC", "C"],
+    agents: ["openclaw", "codex"],
     accentStart: "#f0ad47",
     accentEnd: "#d98225",
   },
@@ -130,7 +131,7 @@ const previewSkills: PreviewSkill[] = [
     sourceRef: "",
     trusted: false,
     autoUpdate: false,
-    agents: ["H"],
+    agents: ["hermes"],
     accentStart: "#4c9fdb",
     accentEnd: "#2f75bf",
   },
@@ -149,7 +150,7 @@ const previewSkills: PreviewSkill[] = [
     sourceRef: "main",
     trusted: true,
     autoUpdate: true,
-    agents: ["G", "C", "CL"],
+    agents: ["generic", "codex", "claude-code"],
     accentStart: "#41bf80",
     accentEnd: "#1e9667",
   },
@@ -645,13 +646,19 @@ function RedesignSettings({
 }
 
 function AgentStack({ skill }: { skill: PreviewSkill }) {
-  return (
-    <span className="redesign-agent-stack" data-testid={`redesign-agent-stack-${skill.id}`}>
-      {skill.agents.map((agent) => (
-        <span key={agent}>{agent}</span>
-      ))}
-    </span>
-  );
+  return <AgentBadgeStack agents={skill.agents.map(previewAgentIdentity)} testId={`redesign-agent-stack-${skill.id}`} />;
+}
+
+function previewAgentIdentity(agentId: string) {
+  const names: Record<string, string> = {
+    "claude-code": "Claude Code",
+    codex: "Codex",
+    generic: "Generic Agent Skills",
+    hermes: "Hermes",
+    openclaw: "OpenClaw",
+    opencode: "opencode",
+  };
+  return { agent_id: agentId, agent_name: names[agentId] ?? agentId };
 }
 
 function accentStyle(skill: PreviewSkill): CSSProperties {

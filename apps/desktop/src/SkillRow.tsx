@@ -6,6 +6,7 @@ import type {
   DesktopUpdateCheckResult,
 } from "./types";
 import type { CSSProperties } from "react";
+import { AgentBadgeStack } from "./AgentBadge";
 
 export interface BindDraft {
   url: string;
@@ -19,9 +20,11 @@ export interface BindDraft {
 export function SkillRow({
   skill,
   updateResult,
+  agentMemberships = [skill],
   onOpenDetail,
 }: {
   skill: DesktopSkill;
+  agentMemberships?: Pick<DesktopSkill, "agent_id" | "agent_name">[];
   updateResult?: DesktopUpdateCheckResult;
   diffDetail?: DesktopDiffDetail;
   diffError?: DesktopError;
@@ -70,14 +73,7 @@ export function SkillRow({
 
       <span className="redesign-card-footer">
         <span>{skill.source?.repo_path || "未绑定来源"}</span>
-        <span
-          className="skill-agent-stack redesign-agent-stack"
-          data-testid={`skill-agent-stack-${skill.id}`}
-          aria-label={`存在于 ${skill.agent_name}`}
-        >
-          <span>{agentInitial(skill.agent_name)}</span>
-          <span>{skill.name.slice(0, 1).toUpperCase()}</span>
-        </span>
+        <AgentBadgeStack agents={agentMemberships} testId={`skill-agent-stack-${skill.id}`} />
       </span>
 
       {updateResult?.diff_summary && (
@@ -136,10 +132,6 @@ function hashText(value: string) {
     hash = (hash * 31 + value.charCodeAt(index)) | 0;
   }
   return hash;
-}
-
-function agentInitial(agentName: string) {
-  return (agentName.trim()[0] ?? "A").toUpperCase();
 }
 
 export function BackupPanel({

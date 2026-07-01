@@ -101,11 +101,17 @@ function readPngRgba(path: string): { width: number; height: number; pixels: Rgb
 
 describe("desktop app icon assets", () => {
   test("uses the crystal skill stack artwork for favicon and Tauri bundle source", () => {
+    const sharedLogo = readFileSync("src/assets/metis-crystal-logo.svg", "utf8");
     const favicon = readFileSync("public/metis-icon.svg", "utf8");
     const tauriSource = readFileSync("src-tauri/icons/metis-icon.svg", "utf8");
 
+    expect(sharedLogo).toContain("metis-crystal-logo-source");
+    expect(sharedLogo).toContain("logo-layer-base");
+    expect(sharedLogo).toContain("logo-layer-top");
+
     for (const svg of [favicon, tauriSource]) {
       expect(svg).toContain("metis-crystal-app-icon");
+      expect(svg).toContain("metis-crystal-logo-source");
       expect(svg).toContain("logo-layer-base");
       expect(svg).toContain("logo-layer-top");
       expect(svg).not.toContain("<text");
@@ -113,7 +119,7 @@ describe("desktop app icon assets", () => {
     }
   });
 
-  test("renders the Tauri primary PNG with crystal blues instead of the old gold mark", () => {
+  test("renders the Tauri primary PNG with a light app-icon background and crystal blues", () => {
     const icon = readPngRgba("src-tauri/icons/icon.png");
     const opaquePixels = icon.pixels.filter((pixel) => pixel.a > 220);
     const crystalPixels = opaquePixels.filter(
@@ -122,10 +128,18 @@ describe("desktop app icon assets", () => {
     const oldGoldPixels = opaquePixels.filter(
       (pixel) => pixel.r > 180 && pixel.g > 135 && pixel.g < 190 && pixel.b < 110,
     );
+    const darkBackgroundPixels = opaquePixels.filter(
+      (pixel) => pixel.r < 70 && pixel.g < 90 && pixel.b < 140,
+    );
+    const lightBackgroundPixels = opaquePixels.filter(
+      (pixel) => pixel.r > 225 && pixel.g > 220 && pixel.b > 210,
+    );
 
     expect(icon.width).toBe(512);
     expect(icon.height).toBe(512);
     expect(crystalPixels.length / opaquePixels.length).toBeGreaterThan(0.08);
     expect(oldGoldPixels.length / opaquePixels.length).toBeLessThan(0.02);
+    expect(darkBackgroundPixels.length / opaquePixels.length).toBeLessThan(0.18);
+    expect(lightBackgroundPixels.length / opaquePixels.length).toBeGreaterThan(0.45);
   });
 });

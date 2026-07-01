@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="metis-crystal-logo-source" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="logo-glow" cx="50%" cy="52%" r="58%">
+      <stop offset="0%" stop-color="#78f2ff" stop-opacity="0.48"/>
+      <stop offset="70%" stop-color="#6c8cff" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#1a2f73" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logo-layer-base-fill" x1="16" x2="50" y1="48" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5a4fe8"/>
+      <stop offset="52%" stop-color="#5b8dff"/>
+      <stop offset="100%" stop-color="#88f5ff"/>
+    </linearGradient>
+    <linearGradient id="logo-layer-mid-fill" x1="13" x2="51" y1="39" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6a55f0"/>
+      <stop offset="54%" stop-color="#3f8dff"/>
+      <stop offset="100%" stop-color="#9cf8ff"/>
+    </linearGradient>
+    <linearGradient id="logo-layer-top-fill" x1="18" x2="46" y1="30" y2="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#77dfff" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#f5ffff" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="logo-crystal-fill" x1="20" x2="44" y1="8" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8ea9ff"/>
+      <stop offset="45%" stop-color="#3bdcff"/>
+      <stop offset="100%" stop-color="#2858ee"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="32" cy="52" rx="24" ry="7" fill="url(#logo-glow)"/>
+  <path class="logo-layer-base metis-crystal-logo-layer" d="M14 40.5 32 31.5l18 9-18 10.8-18-10.8Z" fill="url(#logo-layer-base-fill)"/>
+  <path class="logo-layer-mid metis-crystal-logo-layer" d="M16 33.5 32 25.4l16 8.1-16 9.7-16-9.7Z" fill="url(#logo-layer-mid-fill)"/>
+  <path class="logo-layer-top metis-crystal-logo-layer" d="M18.8 27.1 32 20.4l13.2 6.7L32 35.2 18.8 27.1Z" fill="url(#logo-layer-top-fill)"/>
+  <path class="metis-crystal-logo-crystal" d="M32 6.5 43.5 20 32 34.4 20.5 20 32 6.5Z" fill="url(#logo-crystal-fill)"/>
+  <path class="metis-crystal-logo-facet" d="M32 6.5 32 34.4 20.5 20Z" fill="#c9fbff" opacity="0.38"/>
+  <path class="metis-crystal-logo-facet" d="M32 6.5 43.5 20 32 20Z" fill="#f6ffff" opacity="0.44"/>
+  <path class="metis-crystal-logo-facet" d="M32 20 43.5 20 32 34.4Z" fill="#1e52dc" opacity="0.26"/>
+  <path class="metis-crystal-logo-highlight" d="M23.8 20.1 32 10.4 40.2 20.1" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.55" stroke-width="1.2"/>
+</svg>
