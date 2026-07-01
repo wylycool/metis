@@ -4569,6 +4569,7 @@ textarea {
   padding: 24px;
   background:
     radial-gradient(circle at 0 0, color-mix(in srgb, var(--redesign-accent-start, #3154df), transparent 82%), transparent 32%),
+    radial-gradient(circle at 100% 10%, color-mix(in srgb, var(--redesign-accent-end, #4b7df0), transparent 88%), transparent 34%),
     #ffffff;
   box-shadow: 0 16px 34px rgba(30, 48, 78, 0.08);
 }

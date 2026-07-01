@@ -18,6 +18,7 @@ import {
   listAgents,
   listIndexedSkills,
   loadTeamManifestFromFile,
+  openExternalUrl,
   previewRemoteSkillSource,
   restoreSkillBackup,
   saveDesktopSettings,
@@ -1042,14 +1043,16 @@ function MetisApp() {
   const settingsAgentRows = agentPathRows(agents);
   const isSkillDetailView = activeWorkspace === "skills" && skillsViewKind === "detail";
   const openMetisGithub = () => {
-    if (navigator.userAgent.toLowerCase().includes("jsdom")) {
-      return;
-    }
-    try {
-      window.open(METIS_GITHUB_URL, "_blank", "noopener,noreferrer");
-    } catch {
-      // jsdom does not implement window.open; the app still handles local navigation.
-    }
+    void openExternalUrl(METIS_GITHUB_URL).catch(() => {
+      if (navigator.userAgent.toLowerCase().includes("jsdom")) {
+        return;
+      }
+      try {
+        window.open(METIS_GITHUB_URL, "_blank", "noopener,noreferrer");
+      } catch {
+        // Some embedded WebViews do not support window.open; the command above is preferred.
+      }
+    });
   };
 
   return (

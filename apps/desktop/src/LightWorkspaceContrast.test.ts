@@ -568,6 +568,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.skill-detail-card\.redesign-detail-summary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(320px,\s*0\.48fr\);/,
     );
+    expect(latestBlockFor(".skill-detail-card.redesign-detail-summary")).toContain(
+      "var(--redesign-accent-start, #3154df)",
+    );
+    expect(latestBlockFor(".skill-detail-card.redesign-detail-summary")).toContain(
+      "var(--redesign-accent-end, #4b7df0)",
+    );
     expect(stylesheet).toMatch(
       /\.local-operations-card\.redesign-update-workbench\s*\{[\s\S]*padding:\s*20px;/,
     );

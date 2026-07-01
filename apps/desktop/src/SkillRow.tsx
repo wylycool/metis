@@ -110,7 +110,7 @@ function cardStatusTone(updateResult: DesktopUpdateCheckResult | undefined, skil
   return "latest";
 }
 
-function skillAccentStyle(skill: DesktopSkill): CSSProperties {
+export function skillAccentStyle(skill: DesktopSkill): CSSProperties {
   const palette = [
     ["#496ee8", "#7f5be8"],
     ["#f06498", "#c94f7d"],

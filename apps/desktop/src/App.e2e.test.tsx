@@ -362,6 +362,10 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("metis-github-link").getAttribute("data-github-url")).toBe(
       "https://github.com/wylycool/metis",
     );
+    await user.click(screen.getByTestId("metis-github-link"));
+    expect(invokeMock).toHaveBeenCalledWith("open_external_url", {
+      url: "https://github.com/wylycool/metis",
+    });
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expect(screen.queryByText(/\d+ results/)).toBeNull();
     expect(screen.getByTestId("check-all-updates")).toBeTruthy();
@@ -809,6 +813,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByTestId("workspace-skills")).toBeTruthy();
     expect(screen.queryByTestId("skill-status-filters")).toBeNull();
     const row = await screen.findByTestId("skill-row-codex-planner");
+    const rowAccentStyle = row.getAttribute("style");
     expect(within(row).queryByText("备份/回滚")).toBeNull();
     expect(within(row).queryByText(/metadata:/)).toBeNull();
     expect(within(row).queryByText("Codex")).toBeNull();
@@ -828,6 +833,9 @@ describe("Metis desktop GUI main flow", () => {
       "redesign-detail",
     );
     expect(screen.getByTestId("skill-intro-card-codex-planner")).toBeTruthy();
+    expect(screen.getByTestId("skill-intro-card-codex-planner").getAttribute("style")).toBe(
+      rowAccentStyle,
+    );
     expect(screen.getByTestId("skill-intro-card-codex-planner").className).toContain(
       "redesign-detail-summary",
     );
@@ -1019,6 +1027,8 @@ function createMainFlowScenario(
           return indexedSkills;
         case "get_desktop_settings":
           return settings;
+        case "open_external_url":
+          return null;
         case "save_desktop_settings": {
           const request = args as { settings: DesktopSettings };
           settings = request.settings;
