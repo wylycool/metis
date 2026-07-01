@@ -550,7 +550,18 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByTestId("redesign-skill-detail-memory-weaver")).toBeTruthy();
     expect(screen.getByTestId("redesign-detail-summary")).toBeTruthy();
-    const detailAgentPaths = within(screen.getByTestId("redesign-detail-agent-paths-memory-weaver"));
+    expect(screen.getByTestId("redesign-detail-summary").contains(screen.getByTestId("redesign-detail-agent-panel-memory-weaver"))).toBe(
+      false,
+    );
+    expect(screen.getByTestId("redesign-detail-agent-toggle-memory-weaver").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+    expect(screen.queryByTestId("redesign-detail-agent-paths-memory-weaver")).toBeNull();
+    await user.click(screen.getByTestId("redesign-detail-agent-toggle-memory-weaver"));
+    expect(screen.getByTestId("redesign-detail-agent-toggle-memory-weaver").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    const detailAgentPaths = within(await screen.findByTestId("redesign-detail-agent-paths-memory-weaver"));
     const codexInstall = within(
       detailAgentPaths.getByTestId("redesign-detail-agent-path-memory-weaver-codex"),
     );

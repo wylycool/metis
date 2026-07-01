@@ -494,7 +494,6 @@ function RedesignDetail({
           <span className="redesign-detail-kicker">Skill detail</span>
           <h1>{skill.name}</h1>
           <p>{skill.description}</p>
-          <DetailAgentPaths skill={skill} />
         </div>
         <div className="redesign-source-summary">
           <span>来源</span>
@@ -505,6 +504,8 @@ function RedesignDetail({
           </button>
         </div>
       </header>
+
+      <DetailAgentPaths skill={skill} />
 
       <section className="redesign-update-workbench" data-testid="redesign-update-workbench">
         <div className="redesign-operation-tabs">
@@ -563,24 +564,49 @@ function CheckPanel({ skill }: { skill: PreviewSkill }) {
 
 function DetailAgentPaths({ skill }: { skill: PreviewSkill }) {
   const installedAgents = skill.agents.map(previewAgentIdentity);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="redesign-detail-agent-paths" data-testid={`redesign-detail-agent-paths-${skill.id}`}>
-      {installedAgents.map((agent) => {
-        const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
-        return (
-          <div
-            className="redesign-detail-agent-path-row"
-            data-testid={`redesign-detail-agent-path-${skill.id}-${agentId}`}
-            key={agentId}
-          >
-            <AgentBadge agent={agent} />
-            <span>{agent.agent_name}</span>
-            <code>{previewAgentInstallPath(agent, skill.name)}</code>
-          </div>
-        );
-      })}
-    </div>
+    <section className="redesign-detail-agent-panel" data-testid={`redesign-detail-agent-panel-${skill.id}`}>
+      <button
+        aria-controls={`redesign-detail-agent-paths-${skill.id}`}
+        aria-expanded={isExpanded}
+        className="redesign-detail-agent-toggle"
+        data-testid={`redesign-detail-agent-toggle-${skill.id}`}
+        onClick={() => setIsExpanded((current) => !current)}
+      >
+        <span>
+          <small>安装位置</small>
+          <strong>{installedAgents.length} 个 Agent 已安装此 skill</strong>
+        </span>
+        <span className="redesign-detail-agent-toggle-action">
+          {isExpanded ? "收起" : "展开"}
+          <span aria-hidden="true">{isExpanded ? "↑" : "↓"}</span>
+        </span>
+      </button>
+      {isExpanded && (
+        <div
+          className="redesign-detail-agent-paths"
+          data-testid={`redesign-detail-agent-paths-${skill.id}`}
+          id={`redesign-detail-agent-paths-${skill.id}`}
+        >
+          {installedAgents.map((agent) => {
+            const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
+            return (
+              <div
+                className="redesign-detail-agent-path-row"
+                data-testid={`redesign-detail-agent-path-${skill.id}-${agentId}`}
+                key={agentId}
+              >
+                <AgentBadge agent={agent} />
+                <span>{agent.agent_name}</span>
+                <code>{previewAgentInstallPath(agent, skill.name)}</code>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
