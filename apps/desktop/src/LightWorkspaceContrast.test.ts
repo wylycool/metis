@@ -397,7 +397,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.redesign-preview-shell\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
     );
     expect(stylesheet).toMatch(
-      /\.redesign-app-window\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
+      /\.redesign-app-window\s*\{[\s\S]*grid-template-columns:\s*188px minmax\(0,\s*1fr\);/,
     );
     expect(stylesheet).toMatch(
       /\.redesign-sidebar\s*\{[\s\S]*border-radius:\s*28px 0 0 28px;/,
@@ -421,7 +421,7 @@ describe("Phase 6 light workspace contrast", () => {
 
   test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {
     expect(stylesheet).toMatch(
-      /\.metis-shell\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
+      /\.metis-shell\s*\{[\s\S]*grid-template-columns:\s*188px minmax\(0,\s*1fr\);/,
     );
     expect(stylesheet).toMatch(
       /\.metis-sidebar\s*\{[\s\S]*border-radius:\s*28px 0 0 28px;/,
@@ -447,7 +447,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.metis-window\.redesign-preview-shell\s*\{[\s\S]*background:\s*#ffffff;/,
     );
     expect(stylesheet).toMatch(
-      /\.metis-shell\.redesign-app-window\s*\{[\s\S]*grid-template-columns:\s*220px minmax\(0,\s*1fr\);/,
+      /\.metis-shell\.redesign-app-window\s*\{[\s\S]*grid-template-columns:\s*188px minmax\(0,\s*1fr\);/,
     );
     expect(stylesheet).toMatch(
       /\.metis-shell\.redesign-app-window\s*\{[\s\S]*border-radius:\s*0;/,
@@ -456,7 +456,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.metis-shell\.redesign-app-window\s*\{[\s\S]*box-shadow:\s*none;/,
     );
     expect(stylesheet).toMatch(
-      /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*32px 22px;/,
+      /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*28px 16px;/,
     );
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(

@@ -3584,7 +3584,7 @@ textarea {
   width: min(1240px, 100%);
   min-height: calc(100vh - 36px);
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 188px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: 28px;
@@ -4143,7 +4143,7 @@ textarea {
   width: 100vw;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 188px minmax(0, 1fr);
   border: 0;
   border-radius: 0;
   overflow: hidden;
@@ -4155,10 +4155,10 @@ textarea {
   min-width: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 34px;
+  gap: 26px;
   border-right: 1px solid rgba(221, 230, 238, 0.76);
   border-radius: 0;
-  padding: 32px 22px;
+  padding: 28px 16px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 253, 0.82)),
     #f9fbfd;
@@ -5635,7 +5635,7 @@ textarea {
   width: min(1480px, 100%);
   min-height: min(860px, calc(100vh - 88px));
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 188px minmax(0, 1fr);
   border: 1px solid rgba(220, 229, 238, 0.88);
   border-radius: 28px;
   overflow: hidden;
@@ -5649,9 +5649,9 @@ textarea {
   min-width: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 34px;
+  gap: 26px;
   border-radius: 28px 0 0 28px;
-  padding: 32px 22px;
+  padding: 28px 16px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 253, 0.82)),
     #f9fbfd;
