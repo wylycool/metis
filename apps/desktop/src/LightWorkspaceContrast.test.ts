@@ -452,11 +452,15 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".agent-badge-logo")).toContain("stroke: currentColor;");
     expect(latestBlockFor(".agent-badge")).toContain("color: var(--agent-badge-foreground, #ffffff);");
     expect(latestBlockFor(".agent-logo-fill")).toContain("fill: currentColor;");
+    expect(latestBlockFor(".agent-logo-codex-cloud")).toContain("fill: var(--agent-logo-surface, currentColor);");
+    expect(latestBlockFor(".agent-logo-codex-terminal")).toContain("stroke: var(--agent-logo-primary, currentColor);");
     expect(latestBlockFor(".agent-badge-letter")).toContain("font-weight: 850;");
     expect(latestBlockFor(".agent-badge-codex")).toContain(
-      "--agent-badge-background: linear-gradient(135deg, #dfe7ff 0%, #ece7ff 100%);",
+      "--agent-badge-background: linear-gradient(135deg, #6f8df2 0%, #8b7cf2 100%);",
     );
-    expect(latestBlockFor(".agent-badge-codex")).toContain("--agent-badge-foreground: #5364d8;");
+    expect(latestBlockFor(".agent-badge-codex")).toContain("--agent-badge-foreground: #ffffff;");
+    expect(latestBlockFor(".agent-badge-codex")).toContain("--agent-logo-surface: #ffffff;");
+    expect(latestBlockFor(".agent-badge-codex")).toContain("--agent-logo-primary: #3867f4;");
     expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-background: #f4d7ca;");
     expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-foreground: #a9664d;");
     expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-background: #e7eaf0;");

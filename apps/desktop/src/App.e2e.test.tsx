@@ -534,6 +534,16 @@ describe("Metis desktop GUI main flow", () => {
     expect(previewAgentStack.getByTestId("agent-logo-hermes-profile-headset")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-opencode-terminal-mark")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-generic-path-folder")).toBeTruthy();
+    expect(
+      previewAgentStack
+        .getByTestId("agent-logo-codex-terminal-cloud")
+        .querySelector(".agent-logo-codex-cloud"),
+    ).toBeTruthy();
+    expect(
+      previewAgentStack
+        .getByTestId("agent-logo-codex-terminal-cloud")
+        .querySelectorAll(".agent-logo-codex-terminal"),
+    ).toHaveLength(2);
     expect(screen.queryByTestId("workspace-skills")).toBeNull();
 
     await user.type(screen.getByTestId("redesign-search-input"), "release");

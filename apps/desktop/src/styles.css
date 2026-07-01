@@ -3972,6 +3972,16 @@ textarea {
   stroke: none;
 }
 
+.agent-logo-codex-cloud {
+  fill: var(--agent-logo-surface, currentColor);
+  stroke: none;
+}
+
+.agent-logo-codex-terminal {
+  fill: none;
+  stroke: var(--agent-logo-primary, currentColor);
+}
+
 .agent-logo-eye {
   fill: #062f38;
   stroke: none;
@@ -3985,8 +3995,10 @@ textarea {
 }
 
 .agent-badge-codex {
-  --agent-badge-background: linear-gradient(135deg, #dfe7ff 0%, #ece7ff 100%);
-  --agent-badge-foreground: #5364d8;
+  --agent-badge-background: linear-gradient(135deg, #6f8df2 0%, #8b7cf2 100%);
+  --agent-badge-foreground: #ffffff;
+  --agent-logo-surface: #ffffff;
+  --agent-logo-primary: #3867f4;
 }
 
 .agent-badge-claude-code {

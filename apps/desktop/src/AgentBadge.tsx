@@ -82,12 +82,20 @@ function AgentBadgeLogo({ kind }: { kind: AgentLogoKind }) {
       {kind === "codex" && (
         <g data-testid="agent-logo-codex-terminal-cloud">
           <path
-            className="agent-logo-fill"
+            className="agent-logo-codex-cloud"
             d="M7.1 17.2h9.2a3.2 3.2 0 0 0 .8-6.3A4.9 4.9 0 0 0 7.7 9a4.1 4.1 0 0 0-.6 8.2Z"
             opacity="0.95"
           />
-          <path d="m8.5 10.1 2.2 2.1-2.2 2.1" stroke="#3867f4" strokeWidth="1.9" />
-          <path d="M13.2 14.2h3.1" stroke="#3867f4" strokeWidth="1.9" />
+          <path
+            className="agent-logo-codex-terminal"
+            d="m8.5 10.1 2.2 2.1-2.2 2.1"
+            strokeWidth="1.9"
+          />
+          <path
+            className="agent-logo-codex-terminal"
+            d="M13.2 14.2h3.1"
+            strokeWidth="1.9"
+          />
         </g>
       )}
       {kind === "claude-code" && (
