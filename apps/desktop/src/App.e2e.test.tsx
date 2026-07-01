@@ -521,6 +521,13 @@ describe("Metis desktop GUI main flow", () => {
     expect(previewAgentStack.getByTestId("agent-badge-hermes")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-badge-opencode")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-badge-generic")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-codex")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-claude-code")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-cursor")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-openclaw")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-hermes")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-opencode")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-generic")).toBeTruthy();
     expect(screen.queryByTestId("workspace-skills")).toBeNull();
 
     await user.type(screen.getByTestId("redesign-search-input"), "release");
@@ -708,8 +715,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByTestId("agent-category-bar")).toBeNull();
     const sharedAgentStack = within(sharedRow).getByTestId("skill-agent-stack-shared-codex");
     expect(sharedAgentStack.getAttribute("aria-label")).toBe("存在于 Codex、Claude Code");
-    expect(within(sharedAgentStack).getByTestId("agent-badge-codex").textContent).toBe("C");
-    expect(within(sharedAgentStack).getByTestId("agent-badge-claude-code").textContent).toBe("C");
+    expect(within(sharedAgentStack).getByTestId("agent-logo-codex")).toBeTruthy();
+    expect(within(sharedAgentStack).getByTestId("agent-logo-claude-code")).toBeTruthy();
     expect(within(sharedAgentStack).getByTestId("agent-badge-codex").className).toContain(
       "agent-badge-codex",
     );

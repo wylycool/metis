@@ -3943,7 +3943,7 @@ textarea {
   padding-right: 7px;
 }
 
-.skill-agent-stack span {
+.skill-agent-stack > .agent-badge {
   display: inline-grid;
   place-items: center;
   width: 28px;
@@ -3955,6 +3955,23 @@ textarea {
   background: var(--agent-badge-background, linear-gradient(135deg, #3e7bfa, #2dd4bf));
   font-size: 11px;
   font-weight: 900;
+}
+
+.agent-badge-logo {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.agent-badge-letter {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1;
 }
 
 .agent-badge-codex {
@@ -3986,7 +4003,7 @@ textarea {
   --agent-badge-background: #94a3b8;
 }
 
-.skill-agent-stack span:first-child {
+.skill-agent-stack > .agent-badge:first-child {
   margin-left: 0;
 }
 
@@ -6245,7 +6262,7 @@ textarea {
   margin-left: -7px;
 }
 
-.redesign-agent-stack span {
+.redesign-agent-stack > .agent-badge {
   width: 28px;
   height: 28px;
   display: grid;

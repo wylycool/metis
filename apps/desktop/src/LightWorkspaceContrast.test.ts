@@ -426,12 +426,15 @@ describe("Phase 6 light workspace contrast", () => {
   });
 
   test("brands overlapping agent letter badges by agent identity", () => {
-    expect(latestBlockFor(".skill-agent-stack span")).toContain(
+    expect(latestBlockFor(".skill-agent-stack > .agent-badge")).toContain(
       "background: var(--agent-badge-background, linear-gradient(135deg, #3e7bfa, #2dd4bf));",
     );
-    expect(latestBlockFor(".redesign-agent-stack span")).toContain(
+    expect(latestBlockFor(".redesign-agent-stack > .agent-badge")).toContain(
       "background: var(--agent-badge-background, linear-gradient(135deg, #3154df, #46bfa4));",
     );
+    expect(latestBlockFor(".agent-badge-logo")).toContain("width: 16px;");
+    expect(latestBlockFor(".agent-badge-logo")).toContain("stroke: currentColor;");
+    expect(latestBlockFor(".agent-badge-letter")).toContain("font-weight: 850;");
     expect(latestBlockFor(".agent-badge-codex")).toContain(
       "--agent-badge-background: linear-gradient(135deg, #8fa8ff 0%, #b7a4f3 100%);",
     );
