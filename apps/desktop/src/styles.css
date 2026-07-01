@@ -3985,36 +3985,39 @@ textarea {
 }
 
 .agent-badge-codex {
-  --agent-badge-background: linear-gradient(135deg, #3867f4 0%, #6d5cf6 100%);
+  --agent-badge-background: linear-gradient(135deg, #dfe7ff 0%, #ece7ff 100%);
+  --agent-badge-foreground: #5364d8;
 }
 
 .agent-badge-claude-code {
-  --agent-badge-background: #e8a88f;
+  --agent-badge-background: #f4d7ca;
+  --agent-badge-foreground: #a9664d;
 }
 
 .agent-badge-cursor {
-  --agent-badge-background: #1f2328;
-  --agent-badge-foreground: #f8fafc;
+  --agent-badge-background: #e7eaf0;
+  --agent-badge-foreground: #343a46;
 }
 
 .agent-badge-opencode {
-  --agent-badge-background: #111827;
-  --agent-badge-foreground: #f8fafc;
+  --agent-badge-background: #e3e8ef;
+  --agent-badge-foreground: #334155;
 }
 
 .agent-badge-openclaw {
-  --agent-badge-background: #ef4444;
+  --agent-badge-background: #f7cccc;
+  --agent-badge-foreground: #b94a4a;
 }
 
 .agent-badge-hermes {
   --agent-badge-background: #f8fafc;
-  --agent-badge-foreground: #111827;
+  --agent-badge-foreground: #334155;
 }
 
 .agent-badge-generic,
 .agent-badge-default {
-  --agent-badge-background: #e2e8f0;
-  --agent-badge-foreground: #475569;
+  --agent-badge-background: #eef2f7;
+  --agent-badge-foreground: #64748b;
 }
 
 .skill-agent-stack > .agent-badge:first-child {
