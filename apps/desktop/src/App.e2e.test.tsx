@@ -528,6 +528,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(previewAgentStack.getByTestId("agent-logo-hermes")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-opencode")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-generic")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-codex-terminal-cloud")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-cursor-hollow-square")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-openclaw-round-mark")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-hermes-profile-headset")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-opencode-terminal-mark")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-generic-path-folder")).toBeTruthy();
     expect(screen.queryByTestId("workspace-skills")).toBeNull();
 
     await user.type(screen.getByTestId("redesign-search-input"), "release");

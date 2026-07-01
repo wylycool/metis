@@ -74,10 +74,11 @@ function AgentBadgeLogo({ kind }: { kind: AgentLogoKind }) {
       viewBox="0 0 24 24"
     >
       {kind === "codex" && (
-        <>
-          <path d="M12 4.2 18.6 8v8L12 19.8 5.4 16V8L12 4.2Z" />
-          <path d="m8.2 8.8 7.6 6.4M15.8 8.8l-7.6 6.4M12 4.2v15.6" />
-        </>
+        <g data-testid="agent-logo-codex-terminal-cloud">
+          <path d="M7.2 16.8h8.7a3.1 3.1 0 0 0 .8-6 4.7 4.7 0 0 0-8.9-1.5A3.8 3.8 0 0 0 7.2 16.8Z" />
+          <path d="m8.8 10.3 2.2 2.1-2.2 2.1" />
+          <path d="M13.2 14.4h3.2" />
+        </g>
       )}
       {kind === "claude-code" && (
         <>
@@ -86,38 +87,44 @@ function AgentBadgeLogo({ kind }: { kind: AgentLogoKind }) {
         </>
       )}
       {kind === "cursor" && (
-        <>
-          <path d="M6.2 4.8 18.5 12l-5.2 1.2-2.5 5.2L6.2 4.8Z" />
-          <path d="m12.9 13.1 3.5 3.5" />
-        </>
+        <g data-testid="agent-logo-cursor-hollow-square">
+          <rect height="14" rx="3.2" width="14" x="5" y="5" />
+          <rect height="6.2" rx="0.8" width="5.2" x="9.4" y="8.8" />
+        </g>
       )}
       {kind === "openclaw" && (
-        <>
-          <path d="M7.2 5.8c-2 3.2-1.8 6.9.6 10.8" />
-          <path d="M12 4.8c-1.5 3.7-1.3 7.7.6 12" />
-          <path d="M16.8 5.8c-.8 3.5-.3 6.8 1.6 10" />
-        </>
+        <g data-testid="agent-logo-openclaw-round-mark">
+          <circle cx="12" cy="12" r="5.7" />
+          <path d="M7.4 10.4c-1.4-.1-2.4.7-2.4 1.8s.9 2 2.3 2" />
+          <path d="M16.6 10.4c1.4-.1 2.4.7 2.4 1.8s-.9 2-2.3 2" />
+          <path d="M9 6.4 7.4 4.8M15 6.4l1.6-1.6" />
+          <circle cx="10" cy="11.4" fill="currentColor" r="0.7" stroke="none" />
+          <circle cx="14" cy="11.4" fill="currentColor" r="0.7" stroke="none" />
+        </g>
       )}
       {kind === "hermes" && (
-        <>
-          <path d="M5 14.2c3.2-4.8 7.8-7.3 14-7.4" />
-          <path d="M5.2 14.2c4.1-.2 7.4.9 9.8 3.4" />
-          <path d="M8.6 10.6h6.7M6.8 13h7" />
-        </>
+        <g data-testid="agent-logo-hermes-profile-headset">
+          <path d="M16.4 7.4c-1.8-1.8-5.4-2.1-7.4-.2-1.8 1.6-2.1 4.6-.9 6.6" />
+          <path d="M8 13.4c1.7 1.8 3.7 2.6 6.4 2.5" />
+          <path d="M7.9 10.4c2.1-.7 4.3-.9 6.8-.4" />
+          <path d="M16.3 7.7c1.4 1.6 1.7 4 .8 6.5" />
+          <path d="M17.1 10.2h1.5v4h-1.5" />
+          <path d="M11.2 16.2v2.2" />
+        </g>
       )}
       {kind === "opencode" && (
-        <>
-          <path d="m9.4 7-4.2 5 4.2 5" />
-          <path d="m14.6 7 4.2 5-4.2 5" />
-          <path d="m13 5.8-2 12.4" />
-        </>
+        <g data-testid="agent-logo-opencode-terminal-mark">
+          <rect height="12" rx="2" width="15" x="4.5" y="6" />
+          <path d="m8.2 10 2.2 2-2.2 2" />
+          <path d="M12.7 14h3.2" />
+        </g>
       )}
       {kind === "generic" && (
-        <>
+        <g data-testid="agent-logo-generic-path-folder">
           <path d="M5 8.2h14v9.4H5z" />
           <path d="M5 8.2l2.3-2.4h4.2l1.5 2.4" />
           <path d="M8.2 12h7.6M8.2 15h4.8" />
-        </>
+        </g>
       )}
     </svg>
   );
