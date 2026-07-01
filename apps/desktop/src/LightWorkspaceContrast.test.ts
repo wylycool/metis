@@ -474,15 +474,17 @@ describe("Phase 6 light workspace contrast", () => {
       /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*28px 16px;/,
     );
     expect(latestBlockFor(".metis-sidebar-brand-row")).toContain(
-      "grid-template-columns: minmax(0, 1fr) 42px;",
+      "grid-template-columns: minmax(0, 1fr);",
     );
+    expect(latestBlockFor(".metis-sidebar-footer")).toContain("align-self: end;");
+    expect(latestBlockFor(".metis-sidebar-footer")).toContain("display: flex;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 42px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 42px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border-radius: 14px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border: 0;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("box-shadow: none;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("align-self: center;");
-    expect(latestBlockFor(".metis-sidebar-github")).toContain("justify-self: end;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("justify-self: start;");
     expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
@@ -528,7 +530,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.topbar-search\.redesign-search-field input:focus\s*\{[\s\S]*border-color:\s*transparent;[\s\S]*box-shadow:\s*none;/,
     );
     expect(stylesheet).toMatch(
-      /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*22px;/,
+      /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*12px;/,
     );
     expect(stylesheet).toMatch(
       /\.skill-dashboard-stats\.redesign-home-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
@@ -537,7 +539,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.skill-list\.redesign-skill-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
     );
     expect(stylesheet).toMatch(
-      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*104px;/,
+      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*88px;/,
     );
     expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
       "font-weight: 720;",
@@ -546,10 +548,10 @@ describe("Phase 6 light workspace contrast", () => {
       "font-weight: 620;",
     );
     expect(stylesheet).toMatch(
-      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*168px;/,
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*144px;/,
     );
     expect(stylesheet).toMatch(
-      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*grid-template-rows:\s*auto auto minmax\(36px,\s*1fr\) auto;/,
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*grid-template-rows:\s*auto auto minmax\(30px,\s*1fr\) auto;/,
     );
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card\s*\{[\s\S]*transition:[\s\S]*transform 220ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);/,

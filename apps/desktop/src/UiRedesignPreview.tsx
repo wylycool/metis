@@ -275,17 +275,6 @@ function RedesignSidebar({
             <small>Skill Manager</small>
           </span>
         </a>
-        <a
-          className="redesign-github-link"
-          data-testid="redesign-github-link"
-          href={METIS_GITHUB_URL}
-          rel="noreferrer"
-          target="_blank"
-          aria-label="打开 Metis GitHub 仓库"
-          title="GitHub"
-        >
-          <GitHubIcon />
-        </a>
       </div>
       <nav className="redesign-side-nav" aria-label="Preview navigation">
         <button className={route.kind !== "settings" ? "active" : ""} onClick={onHome}>
@@ -302,6 +291,19 @@ function RedesignSidebar({
           <GearIcon /> Settings
         </button>
       </nav>
+      <div className="redesign-sidebar-footer" data-testid="redesign-sidebar-footer">
+        <a
+          className="redesign-github-link"
+          data-testid="redesign-github-link"
+          href={METIS_GITHUB_URL}
+          rel="noreferrer"
+          target="_blank"
+          aria-label="打开 Metis GitHub 仓库"
+          title="GitHub"
+        >
+          <GitHubIcon />
+        </a>
+      </div>
     </aside>
   );
 }

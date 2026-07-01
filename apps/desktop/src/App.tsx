@@ -1078,16 +1078,6 @@ function MetisApp() {
                 <small>Skill Manager</small>
               </span>
             </button>
-            <button
-              className="metis-sidebar-github"
-              data-testid="metis-github-link"
-              data-github-url={METIS_GITHUB_URL}
-              aria-label="打开 Metis GitHub 仓库"
-              title="GitHub"
-              onClick={openMetisGithub}
-            >
-              <GitHubIcon />
-            </button>
           </div>
           <nav className="metis-sidebar-nav redesign-side-nav" aria-label="Workspace">
             <button
@@ -1118,6 +1108,18 @@ function MetisApp() {
               Settings
             </button>
           </nav>
+          <div className="metis-sidebar-footer" data-testid="metis-sidebar-footer">
+            <button
+              className="metis-sidebar-github"
+              data-testid="metis-github-link"
+              data-github-url={METIS_GITHUB_URL}
+              aria-label="打开 Metis GitHub 仓库"
+              title="GitHub"
+              onClick={openMetisGithub}
+            >
+              <GitHubIcon />
+            </button>
+          </div>
         </aside>
         <div className="app-shell redesign-main">
           {!isSkillDetailView && (
