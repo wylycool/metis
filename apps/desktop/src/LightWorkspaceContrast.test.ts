@@ -511,6 +511,12 @@ describe("Phase 6 light workspace contrast", () => {
       /\.skill-row\.redesign-skill-card\s*\{[\s\S]*grid-template-rows:\s*auto auto minmax\(36px,\s*1fr\) auto;/,
     );
     expect(stylesheet).toMatch(
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*transition:[\s\S]*transform 220ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);/,
+    );
+    expect(stylesheet).toMatch(
+      /\.skill-row\.redesign-skill-card:hover\s*\{[\s\S]*transform:\s*translateY\(-2px\);/,
+    );
+    expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card > small\s*\{[\s\S]*display:\s*none;/,
     );
     expect(stylesheet).toMatch(

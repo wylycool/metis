@@ -4413,13 +4413,18 @@ textarea {
   background: #ffffff;
   text-align: left;
   box-shadow: 0 12px 28px rgba(30, 48, 78, 0.06);
+  transition:
+    border-color 220ms ease,
+    box-shadow 240ms ease,
+    background 220ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .skill-row.redesign-skill-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--redesign-accent-start), #ffffff 58%);
   background: #ffffff;
-  box-shadow: 0 18px 36px rgba(30, 48, 78, 0.12);
+  box-shadow: 0 16px 32px rgba(30, 48, 78, 0.1);
 }
 
 .skill-row.redesign-skill-card .skill-row-main {
