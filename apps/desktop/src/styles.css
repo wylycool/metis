@@ -6113,6 +6113,27 @@ textarea {
   box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);
 }
 
+.redesign-top-actions button:hover:not(:disabled) {
+  color: #2f4b77;
+  border-color: #c9d7e8;
+  background: #f8fafc;
+}
+
+.redesign-top-actions button:first-child:hover:not(:disabled),
+.redesign-source-drawer footer button:last-child:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #2749cf, #416fed);
+  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
+}
+
+.redesign-source-summary button:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #2749cf, #416fed);
+  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
+}
+
 .redesign-home-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -6342,7 +6363,8 @@ textarea {
   text-align: left;
 }
 
-.redesign-detail-agent-toggle:hover {
+button.redesign-detail-agent-toggle:hover:not(:disabled) {
+  color: #172033;
   background:
     linear-gradient(90deg, #ffffff, rgba(248, 250, 252, 0.86)),
     radial-gradient(circle at 0 50%, color-mix(in srgb, var(--redesign-accent-start), transparent 84%), transparent 36%);

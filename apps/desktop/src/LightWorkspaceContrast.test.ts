@@ -426,12 +426,18 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-detail-agent-panel")).toContain("background: rgba(255, 255, 255, 0.82);");
     expect(latestBlockFor(".redesign-detail-agent-toggle")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
     expect(latestBlockFor(".redesign-detail-agent-toggle")).toContain("min-height: 56px;");
+    expect(latestBlockFor("button.redesign-detail-agent-toggle:hover:not(:disabled)")).toContain("color: #172033;");
+    expect(latestBlockFor("button.redesign-detail-agent-toggle:hover:not(:disabled)")).toContain("background:");
     expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("display: grid;");
     expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("gap: 8px;");
     expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("background: rgba(248, 250, 252, 0.72);");
     expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("grid-template-columns: auto minmax(96px, 0.28fr) minmax(0, 1fr);");
     expect(latestBlockFor(".redesign-detail-agent-path-row .agent-badge")).toContain("margin-left: 0;");
     expect(latestBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
+    expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("background: #f8fafc;");
+    expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("color: #2f4b77;");
+    expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
+    expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("color: #ffffff;");
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
   });
 
