@@ -3,10 +3,12 @@ import type {
   DesktopDiffDetail,
   DesktopError,
   DesktopSkill,
+  DesktopSourceConnectionTestResult,
   DesktopUpdateCheckResult,
 } from "./types";
 import type { CSSProperties } from "react";
 import { AgentBadgeStack } from "./AgentBadge";
+import { shortCommit } from "./commitDisplay";
 
 export interface BindDraft {
   url: string;
@@ -246,41 +248,50 @@ export function BindSourceForm({
   skillId,
   draft,
   busy,
+  testBusy,
+  testError,
+  testResult,
   onChange,
   onCancel,
   onSubmit,
+  onTestConnection,
 }: {
   skillId: string;
   draft: BindDraft;
   busy: boolean;
+  testBusy: boolean;
+  testError?: DesktopError;
+  testResult?: DesktopSourceConnectionTestResult;
   onChange: (draft: BindDraft) => void;
   onCancel: () => void;
   onSubmit: () => void;
+  onTestConnection: () => void;
 }) {
   const disabled = busy || !draft.url.trim() || !draft.repo_path.trim();
+  const testDisabled = disabled || testBusy;
 
   return (
     <div className="source-form">
       <label>
-        <span>Git URL</span>
+        <span>仓库 Clone 地址</span>
         <input
           data-testid={`bind-url-${skillId}`}
           value={draft.url}
-          placeholder="https://github.com/org/repo.git"
+          placeholder="git@gitlab.example:team/repo.git"
           onChange={(event) => onChange({ ...draft, url: event.target.value })}
         />
       </label>
       <label>
-        <span>Repo Path</span>
+        <span>Skill 在仓库内的路径</span>
         <input
           data-testid={`bind-repo-path-${skillId}`}
           value={draft.repo_path}
-          placeholder="skills/example"
+          placeholder="skills/example；根目录填 ."
           onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
         />
       </label>
       <label>
-        <span>Ref</span>
+        <span>分支 / Tag / Commit</span>
         <input
           data-testid={`bind-ref-${skillId}`}
           value={draft.ref_}
@@ -289,7 +300,7 @@ export function BindSourceForm({
         />
       </label>
       <label>
-        <span>Credential Ref</span>
+        <span>凭据引用（可选）</span>
         <input
           data-testid={`bind-credential-ref-${skillId}`}
           value={draft.credential_ref}
@@ -315,6 +326,28 @@ export function BindSourceForm({
         />
         <span>Auto update</span>
       </label>
+      <div className="source-connection-check">
+        <button
+          className="ghost-button compact"
+          data-testid={`test-source-connection-${skillId}`}
+          disabled={testDisabled}
+          onClick={onTestConnection}
+        >
+          {testBusy ? "测试中" : "测试连接"}
+        </button>
+        <p>测试 Metis 是否能访问这个仓库，并确认该路径下有 SKILL.md。不会安装、更新或修改任何文件。</p>
+      </div>
+      {testResult && (
+        <div className="source-connection-result success" data-testid={`source-connection-result-${skillId}`}>
+          <strong>{testResult.message}</strong>
+          <span>已找到 {testResult.skill_name}</span>
+        </div>
+      )}
+      {testError && (
+        <div className="source-connection-result failure" data-testid={`source-connection-error-${skillId}`}>
+          <InlineError error={testError} />
+        </div>
+      )}
       <div className="form-actions">
         <button className="ghost-button compact" onClick={onCancel}>
           取消
@@ -420,10 +453,6 @@ export function updateLabel(result: DesktopUpdateCheckResult | undefined, skill:
     return "未绑定来源";
   }
   return "未检查更新";
-}
-
-function shortCommit(commit: string) {
-  return commit.length > 10 ? commit.slice(0, 10) : commit;
 }
 
 function formatBytes(value: number) {

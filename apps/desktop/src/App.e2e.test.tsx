@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "./App";
 import type {
   DesktopAgentStatus,
@@ -10,6 +10,7 @@ import type {
   DesktopSettings,
   DesktopSkill,
   DesktopSource,
+  DesktopSourceConnectionTestResult,
   DesktopUpdateCheckResult,
 } from "./types";
 
@@ -18,6 +19,10 @@ const invokeMock = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: invokeMock,
 }));
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Metis desktop GUI main flow", () => {
   beforeEach(() => {
@@ -51,7 +56,7 @@ describe("Metis desktop GUI main flow", () => {
     );
     expect(screen.queryByTestId("apply-update-e2e-skill")).toBeNull();
     expect((screen.getByTestId("check-updates-e2e-skill") as HTMLButtonElement).disabled).toBe(
-      true,
+      false,
     );
     expect((screen.getByTestId("toggle-diff-e2e-skill") as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByTestId("toggle-backups-e2e-skill") as HTMLButtonElement).disabled).toBe(
@@ -59,10 +64,25 @@ describe("Metis desktop GUI main flow", () => {
     );
 
     await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    expect(screen.getByText("测试连接")).toBeTruthy();
+    expect(
+      screen.getByText("测试 Metis 是否能访问这个仓库，并确认该路径下有 SKILL.md。不会安装、更新或修改任何文件。"),
+    ).toBeTruthy();
     await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
     await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
     await user.clear(screen.getByTestId("bind-ref-e2e-skill"));
     await user.type(screen.getByTestId("bind-ref-e2e-skill"), "main");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("连接成功，可以保存来源。")).toBeTruthy();
+    expect(screen.getByText("已找到 e2e-skill")).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith("test_source_connection", {
+      request: {
+        url: "file:///tmp/metis-e2e-repo",
+        repo_path: "skills/e2e-skill",
+        ref_: "main",
+      },
+    });
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
 
     expect(await screen.findByText("修改来源")).toBeTruthy();
@@ -75,11 +95,13 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(screen.getByTestId("check-updates-e2e-skill"));
 
-    expect((await screen.findAllByText("待更新")).length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText("有 Agent 需要更新")).toBeTruthy();
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-e2e-skill"));
+    expect(within(screen.getByTestId("skill-detail-agent-path-e2e-skill-generic")).getByText("需要更新")).toBeTruthy();
     expect(screen.getByText("+1")).toBeTruthy();
     expect(screen.getByText("~1")).toBeTruthy();
     expect(screen.getByText("2 commits behind")).toBeTruthy();
-    expect(await screen.findByTestId("apply-update-e2e-skill")).toBeTruthy();
+    expect(await screen.findByTestId("apply-needed-agent-updates-e2e-skill")).toBeTruthy();
 
     await user.click(screen.getByTestId("toggle-diff-e2e-skill"));
 
@@ -90,8 +112,9 @@ describe("Metis desktop GUI main flow", () => {
       screen.getByText((content) => content.includes("+description: Updated skill")),
     ).toBeTruthy();
 
-    await user.click(screen.getByTestId("apply-update-e2e-skill"));
-    expect(await screen.findByText(/更新完成：aaa111 -> bbb222/)).toBeTruthy();
+    await user.click(screen.getByTestId("apply-needed-agent-updates-e2e-skill"));
+    expect(await screen.findByText(/已更新 1 个需要更新的 Agent/)).toBeTruthy();
+    await user.click(screen.getByTestId("toggle-backups-e2e-skill"));
     expect(await screen.findByText("pre-update")).toBeTruthy();
 
     await user.click(screen.getByTestId("restore-backup-e2e-skill-backup-pre-update"));
@@ -123,6 +146,28 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("install-selected-targets"));
 
     expect(await screen.findByText(/Codex：Installed/)).toBeTruthy();
+  });
+
+  test("explains source connection test failures in user language", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ sourceConnectionFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "https://gitlab.example/private/sdd.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/missing");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("Metis 访问不了这个仓库")).toBeTruthy();
+    expect(screen.getByText("请确认你有访问权限，或先在本机 Git 工具中完成登录。")).toBeTruthy();
   });
 
   test("exports environment report and runs trusted auto updates only", async () => {
@@ -820,6 +865,14 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByTestId("check-panel-codex-planner")).toBeTruthy();
   });
 
+  test("redesign toast automatically dismisses after a short delay", async () => {
+    render(<App />);
+
+    expect(await screen.findByTestId("redesign-toast")).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 3100));
+    expect(screen.queryByTestId("redesign-toast")).toBeNull();
+  });
+
   test("reuses an existing source when opening the same skill from another agent", async () => {
     const user = userEvent.setup();
     const scenario = createAgentDetailScenario({ includeUnboundDuplicate: true });
@@ -1003,7 +1056,7 @@ describe("Metis desktop GUI error paths", () => {
 
     await user.click(await screen.findByTestId("skill-row-e2e-skill"));
     expect(await screen.findByTestId("skill-detail-e2e-skill")).toBeTruthy();
-    expect(screen.queryByTestId("apply-update-e2e-skill")).toBeNull();
+    expect(screen.queryByTestId("apply-needed-agent-updates-e2e-skill")).toBeNull();
 
     await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
     await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
@@ -1011,10 +1064,10 @@ describe("Metis desktop GUI error paths", () => {
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
     await user.click(await screen.findByTestId("check-updates-e2e-skill"));
 
-    expect(await screen.findByTestId("apply-update-e2e-skill")).toBeTruthy();
+    expect(await screen.findByTestId("apply-needed-agent-updates-e2e-skill")).toBeTruthy();
   });
 
-  test("keeps manual apply update available when local files are modified", async () => {
+  test("shows local modified agent status without including it in normal bulk updates", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({ localModifiedAfterCheck: true });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -1030,19 +1083,47 @@ describe("Metis desktop GUI error paths", () => {
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
     await user.click(await screen.findByTestId("check-updates-e2e-skill"));
 
-    const applyButton = await screen.findByTestId("apply-update-e2e-skill");
-    expect(screen.getByText("本地修改，可手动覆盖")).toBeTruthy();
-    expect((applyButton as HTMLButtonElement).disabled).toBe(false);
-
-    await user.click(applyButton);
-    expect(await screen.findByText(/更新完成：aaa111 -> bbb222/)).toBeTruthy();
-    expect(await screen.findByText("pre-update")).toBeTruthy();
+    expect(await screen.findByText("有 Agent 存在本地修改")).toBeTruthy();
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-e2e-skill"));
+    expect(within(screen.getByTestId("skill-detail-agent-path-e2e-skill-generic")).getByText("本地已修改")).toBeTruthy();
+    expect(screen.queryByTestId("apply-needed-agent-updates-e2e-skill")).toBeNull();
   });
 
-  test("shows manual apply update when remote is current but local files are modified", async () => {
+  test("allows a local modified agent row to be overwritten from source", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ localModifiedAfterCheck: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-e2e-skill"));
+
+    const localModifiedRow = screen.getByTestId("skill-detail-agent-path-e2e-skill-generic");
+    expect(within(localModifiedRow).getByText("本地已修改")).toBeTruthy();
+
+    await user.click(within(localModifiedRow).getByTestId("overwrite-local-agent-e2e-skill"));
+
+    expect(invokeMock).toHaveBeenCalledWith("apply_skill_update", {
+      skillId: "e2e-skill",
+    });
+    expect(await screen.findByText(/已用来源版本覆盖本地修改/)).toBeTruthy();
+    expect(within(localModifiedRow).getByText("无需更新")).toBeTruthy();
+    expect(within(localModifiedRow).queryByText("未检查")).toBeNull();
+  });
+
+  test("shows local modified agent status when remote is current", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({
       localModifiedAfterCheck: true,
+      sameCommitApply: true,
       upToDateAfterCheck: true,
     });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -1058,15 +1139,89 @@ describe("Metis desktop GUI error paths", () => {
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
     await user.click(await screen.findByTestId("check-updates-e2e-skill"));
 
-    const applyButton = await screen.findByTestId("apply-update-e2e-skill");
-    expect(screen.getByText("本地修改，可手动覆盖")).toBeTruthy();
-    expect((applyButton as HTMLButtonElement).disabled).toBe(false);
+    expect(await screen.findByText("有 Agent 存在本地修改")).toBeTruthy();
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-e2e-skill"));
+    expect(within(screen.getByTestId("skill-detail-agent-path-e2e-skill-generic")).getByText("本地已修改")).toBeTruthy();
+    expect(screen.queryByTestId("apply-needed-agent-updates-e2e-skill")).toBeNull();
+    expect(screen.queryByText(/aaa111 -> aaa111/)).toBeNull();
+  });
+
+  test("checks every installed agent path from the skill detail page and bulk updates only outdated agents", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ multiAgentSameSkill: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-claude-memory"));
+    expect(await screen.findByTestId("skill-detail-claude-memory")).toBeTruthy();
+
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-claude-memory"));
+    await user.click(screen.getByTestId("check-updates-claude-memory"));
+
+    expect(await screen.findByText("有 Agent 需要更新")).toBeTruthy();
+    expect(within(screen.getByTestId("skill-detail-agent-path-claude-memory-claude-code")).getByText("无需更新")).toBeTruthy();
+    expect(within(screen.getByTestId("skill-detail-agent-path-claude-memory-codex")).getByText("需要更新")).toBeTruthy();
+
+    expect(invokeMock).toHaveBeenCalledWith("check_skill_updates", {
+      request: { skill_ids: ["claude-memory", "codex-memory"] },
+    });
+    await user.click(await screen.findByTestId("apply-needed-agent-updates-claude-memory"));
+
+    expect(invokeMock).toHaveBeenCalledWith("apply_skill_update", {
+      skillId: "codex-memory",
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith("apply_skill_update", {
+      skillId: "claude-memory",
+    });
+  });
+
+  test("displays source commit versions as 8 characters", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({
+      localModifiedAfterCheck: true,
+      longCommitHashes: true,
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+
+    const checkPanel = within(await screen.findByTestId("check-panel-e2e-skill"));
+    expect(checkPanel.getByText("12345678")).toBeTruthy();
+    expect(checkPanel.getByText("abcdef12")).toBeTruthy();
+    expect(screen.queryByText("1234567890")).toBeNull();
+    expect(screen.queryByText("abcdef1234")).toBeNull();
+
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-e2e-skill"));
+    await user.click(
+      within(screen.getByTestId("skill-detail-agent-path-e2e-skill-generic")).getByTestId(
+        "overwrite-local-agent-e2e-skill",
+      ),
+    );
+
+    expect(await screen.findByText(/已用来源版本覆盖本地修改：abcdef12/)).toBeTruthy();
+    expect(screen.queryByText(/abcdef1234/)).toBeNull();
   });
 });
 
 function createMainFlowScenario(
   options: {
     localModifiedAfterCheck?: boolean;
+    longCommitHashes?: boolean;
+    multiAgentSameSkill?: boolean;
+    sameCommitApply?: boolean;
+    sourceConnectionFails?: boolean;
     slowBind?: boolean;
     slowDiff?: boolean;
     upToDateAfterCheck?: boolean;
@@ -1078,7 +1233,7 @@ function createMainFlowScenario(
     url: "file:///tmp/metis-e2e-repo",
     repo_path: "skills/e2e-skill",
     ref_: "main",
-    current_commit: "aaa111",
+    current_commit: options.longCommitHashes ? "1234567890abcdef" : "aaa111",
     remote_commit: null,
     last_checked_at: null,
     trusted: false,
@@ -1102,6 +1257,35 @@ function createMainFlowScenario(
   };
   let backups: DesktopBackupSummary[] = [backup("backup-pre-update", "pre-update", "aaa111")];
   let indexedSkills: DesktopSkill[] = [];
+  const claudeMemorySource: DesktopSource = {
+    ...source,
+    id: "source-shared-example-skill",
+    repo_path: "skills/shared-example-skill",
+    current_commit: "799ae9",
+    remote_commit: "799ae9",
+  };
+  const claudeMemorySkill: DesktopSkill = {
+    ...skill,
+    id: "claude-memory",
+    agent_id: "claude-code",
+    agent_name: "Claude Code",
+    name: "shared-example-skill",
+    description: "Python team memory",
+    install_path: "/Users/example/.claude/skills/shared-example-skill",
+    metadata_path: "/Users/example/.claude/skills/shared-example-skill/SKILL.md",
+    source_id: claudeMemorySource.id,
+    source: claudeMemorySource,
+    local_modified: false,
+  };
+  const codexMemorySkill: DesktopSkill = {
+    ...claudeMemorySkill,
+    id: "codex-memory",
+    agent_id: "codex",
+    agent_name: "Codex",
+    install_path: "/Users/example/.codex/skills/shared-example-skill",
+    metadata_path: "/Users/example/.codex/skills/shared-example-skill/SKILL.md",
+    local_modified: false,
+  };
   const calls = new Map<string, number>();
 
   const agents: DesktopAgentStatus[] = [
@@ -1202,8 +1386,10 @@ function createMainFlowScenario(
             ],
           };
         case "scan_skills":
-          indexedSkills = [skill];
-          return { skills: [skill], warnings: [] };
+          indexedSkills = options.multiAgentSameSkill
+            ? [claudeMemorySkill, codexMemorySkill]
+            : [skill];
+          return { skills: indexedSkills, warnings: [] };
         case "bind_skill_source": {
           if (options.slowBind) {
             await delay(80);
@@ -1233,6 +1419,32 @@ function createMainFlowScenario(
           skill = { ...skill, source_id: source.id, source };
           indexedSkills = [skill];
           return source;
+        }
+        case "test_source_connection": {
+          if (options.sourceConnectionFails) {
+            throw JSON.stringify({
+              category: "authentication",
+              title: "认证失败",
+              message: "Metis 访问不了这个仓库",
+              suggestion: "请确认你有访问权限，或先在本机 Git 工具中完成登录。",
+              debug_detail: "authentication failed: could not read Username",
+            });
+          }
+          const request = args as {
+            request: {
+              url: string;
+              repo_path: string;
+              ref_: string;
+            };
+          };
+          return {
+            ok: true,
+            message: "连接成功，可以保存来源。",
+            skill_name: "e2e-skill",
+            description: "E2E skill",
+            commit: "abc123",
+            repo_path: request.request.repo_path,
+          } satisfies DesktopSourceConnectionTestResult;
         }
         case "preview_remote_skill_source":
           return {
@@ -1283,12 +1495,21 @@ function createMainFlowScenario(
             ],
           };
         case "check_skill_updates":
+          if (options.multiAgentSameSkill) {
+            const request = args as { request: { skill_ids: string[] } };
+            return request.request.skill_ids.map((skillId) =>
+              skillId === "codex-memory"
+                ? updateResult(codexMemorySkill, claudeMemorySource)
+                : updateResult(claudeMemorySkill, claudeMemorySource, false, "UpToDate"),
+            );
+          }
           return [
             updateResult(
               skill,
               source,
               options.localModifiedAfterCheck === true,
               options.upToDateAfterCheck === true ? "UpToDate" : "UpdateAvailable",
+              options.longCommitHashes ? "abcdef1234567890" : undefined,
             ),
           ];
         case "get_skill_diff":
@@ -1297,18 +1518,34 @@ function createMainFlowScenario(
           }
           return diffDetail();
         case "apply_skill_update": {
+          if (options.multiAgentSameSkill) {
+            const request = args as { skillId: string };
+            const target = request.skillId === "codex-memory" ? codexMemorySkill : claudeMemorySkill;
+            return {
+              skill_id: target.id,
+              previous_commit: "799ae9",
+              new_commit: "799ae9",
+              backup_id: "backup-pre-update",
+              security_findings: [],
+              warnings: [],
+            } satisfies DesktopApplyUpdateResult;
+          }
           const result: DesktopApplyUpdateResult = {
             skill_id: "e2e-skill",
-            previous_commit: "aaa111",
-            new_commit: "bbb222",
+            previous_commit: options.longCommitHashes ? "1234567890abcdef" : "aaa111",
+            new_commit: options.longCommitHashes
+              ? "abcdef1234567890"
+              : options.sameCommitApply
+                ? "aaa111"
+                : "bbb222",
             backup_id: "backup-pre-update",
             security_findings: [],
             warnings: [],
           };
           source = {
             ...source,
-            current_commit: "bbb222",
-            remote_commit: "bbb222",
+            current_commit: options.longCommitHashes ? "abcdef1234567890" : "bbb222",
+            remote_commit: options.longCommitHashes ? "abcdef1234567890" : "bbb222",
           };
           skill = {
             ...skill,
@@ -1973,6 +2210,7 @@ function updateResult(
   source: DesktopSource,
   localModified = false,
   status: DesktopUpdateCheckResult["status"] = "UpdateAvailable",
+  remoteCommit?: string,
 ): DesktopUpdateCheckResult {
   return {
     skill_id: skill.id,
@@ -1992,7 +2230,7 @@ function updateResult(
         : null,
     source: {
       ...source,
-      remote_commit: status === "UpdateAvailable" ? "bbb222" : source.current_commit,
+      remote_commit: status === "UpdateAvailable" ? remoteCommit ?? "bbb222" : source.current_commit,
     },
   };
 }

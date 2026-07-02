@@ -222,6 +222,16 @@ pub struct DesktopRemoteSkillPreview {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSourceConnectionTestResult {
+    pub ok: bool,
+    pub message: String,
+    pub skill_name: String,
+    pub description: Option<String>,
+    pub commit: String,
+    pub repo_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopSkillTargetsRequest {
     pub url: String,
     pub repo_path: String,
@@ -742,6 +752,25 @@ pub fn preview_remote_skill_source_for_state_with_checker<C: RemoteCommitChecker
     .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
+pub fn test_source_connection_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    request: DesktopPreviewRemoteSkillSourceRequest,
+    checker: &C,
+) -> Result<DesktopSourceConnectionTestResult, String> {
+    state.ensure_dirs()?;
+    core_preview_remote_skill_source(
+        PreviewRemoteSkillSourceOptions {
+            url: request.url,
+            repo_path: request.repo_path,
+            ref_: request.ref_,
+            cache_dir: state.cache_root().to_string_lossy().to_string(),
+        },
+        checker,
+    )
+    .map(desktop_source_connection_test_result)
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
 pub fn get_skill_targets_for_source_for_state(
     state: &DesktopAppState,
     request: DesktopSkillTargetsRequest,
@@ -1092,6 +1121,15 @@ fn preview_remote_skill_source(
 }
 
 #[tauri::command]
+fn test_source_connection(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopPreviewRemoteSkillSourceRequest,
+) -> Result<DesktopSourceConnectionTestResult, String> {
+    let checker = system_git_checker_for_state(&state)?;
+    test_source_connection_for_state_with_checker(&state, request, &checker)
+}
+
+#[tauri::command]
 fn get_skill_targets_for_source(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopSkillTargetsRequest,
@@ -1377,6 +1415,19 @@ fn desktop_remote_skill_preview(preview: CoreRemoteSkillPreview) -> DesktopRemot
         name: preview.name,
         description: preview.description,
         install_name: preview.install_name,
+        commit: preview.commit,
+        repo_path: preview.repo_path,
+    }
+}
+
+fn desktop_source_connection_test_result(
+    preview: CoreRemoteSkillPreview,
+) -> DesktopSourceConnectionTestResult {
+    DesktopSourceConnectionTestResult {
+        ok: true,
+        message: "连接成功，可以保存来源。".to_string(),
+        skill_name: preview.name,
+        description: preview.description,
         commit: preview.commit,
         repo_path: preview.repo_path,
     }
@@ -1721,8 +1772,18 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         return desktop_error(
             "authentication",
             "认证失败",
-            "无法访问该 Git source，请确认本机 Git 认证可以正常读取仓库。",
-            "检查仓库权限、SSH agent 或 Git credential helper；凭据引用只作为备注名保存，Metis 不会读取 Keychain/token。",
+            "Metis 访问不了这个仓库",
+            "请确认你有访问权限，或先在本机 Git 工具中完成登录。",
+            message,
+        );
+    }
+
+    if lower.contains("git unavailable") {
+        return desktop_error(
+            "git_unavailable",
+            "无法使用 Git",
+            "这台电脑还不能使用 Git。",
+            "请先安装 Git，或确认 Git 可以在终端中正常运行。",
             message,
         );
     }
@@ -1757,15 +1818,35 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         );
     }
 
-    if lower.contains("repo_path")
+    if lower.contains("not a skill directory") {
+        return desktop_error(
+            "repo_path",
+            "没有找到 SKILL.md",
+            "仓库能访问，但这个路径下没有找到 SKILL.md。",
+            "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。",
+            message,
+        );
+    }
+
+    if lower.contains("repo path not found")
+        || lower.contains("repo_path")
         || lower.contains("repo path")
-        || lower.contains("not a skill directory")
     {
         return desktop_error(
-            "git_source",
-            "Git source 错误",
-            "Metis 无法根据当前来源信息预览远端 skill。",
-            "检查 Git URL、ref、repo path，并确认目标目录包含 SKILL.md。",
+            "repo_path",
+            "仓库路径不存在",
+            "仓库能访问，但这个路径不存在。",
+            "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。",
+            message,
+        );
+    }
+
+    if lower.contains("remote ref not found") {
+        return desktop_error(
+            "git_ref",
+            "分支不存在",
+            "Metis 能访问仓库，但找不到这个分支、Tag 或 Commit。",
+            "请检查“分支 / Tag / Commit”是否填写正确。",
             message,
         );
     }
@@ -1859,6 +1940,7 @@ pub fn run() {
             bind_skill_source,
             unbind_skill_source,
             preview_remote_skill_source,
+            test_source_connection,
             get_skill_targets_for_source,
             install_remote_skill_to_targets,
             check_skill_updates,
@@ -2038,6 +2120,51 @@ mod tests {
         assert_eq!(preview.install_name, "example");
         assert_eq!(preview.commit, "abc123");
         assert_eq!(preview.repo_path, "skills/example");
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn test_source_connection_for_state_returns_user_safe_success() {
+        let workspace = temp_dir("test-source-connection");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let skill_dir = write_skill(
+            &workspace.join("checkout").join("skills"),
+            "example",
+            "example",
+            "Remote skill preview",
+        );
+        let checker = FakeUpdateChecker {
+            commits: HashMap::from([("remote-preview".to_string(), "abc123".to_string())]),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: Some(CheckoutResult {
+                checkout_dir: workspace.join("checkout").to_string_lossy().to_string(),
+                skill_dir: skill_dir.to_string_lossy().to_string(),
+            }),
+        };
+
+        let result = test_source_connection_for_state_with_checker(
+            &state,
+            DesktopPreviewRemoteSkillSourceRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/example".to_string(),
+                ref_: "main".to_string(),
+            },
+            &checker,
+        )
+        .expect("source connection test should succeed");
+
+        assert!(result.ok);
+        assert_eq!(result.message, "连接成功，可以保存来源。");
+        assert_eq!(result.skill_name, "example");
+        assert_eq!(result.commit, "abc123");
+        assert_eq!(result.repo_path, "skills/example");
         fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
 
@@ -2910,7 +3037,7 @@ description: {description}
         assert_eq!(results[0].status, "CheckFailed");
         assert_eq!(
             results[0].failure_reason.as_deref(),
-            Some("无法访问该 Git source，请确认本机 Git 认证可以正常读取仓库。")
+            Some("Metis 访问不了这个仓库")
         );
     }
 
@@ -2922,13 +3049,10 @@ description: {description}
 
         assert_eq!(error.category, "authentication");
         assert_eq!(error.title, "认证失败");
-        assert_eq!(
-            error.message,
-            "无法访问该 Git source，请确认本机 Git 认证可以正常读取仓库。"
-        );
+        assert_eq!(error.message, "Metis 访问不了这个仓库");
         assert_eq!(
             error.suggestion,
-            "检查仓库权限、SSH agent 或 Git credential helper；凭据引用只作为备注名保存，Metis 不会读取 Keychain/token。"
+            "请确认你有访问权限，或先在本机 Git 工具中完成登录。"
         );
         assert_eq!(
             error.debug_detail.as_deref(),

@@ -19,6 +19,7 @@ import type {
   DesktopSkillTarget,
   DesktopSkillTargetsRequest,
   DesktopSource,
+  DesktopSourceConnectionTestResult,
   DesktopAuditLogExportRequest,
   DesktopTeamComplianceReportExportRequest,
   DesktopTeamPolicyAuditReport,
@@ -71,6 +72,12 @@ export function previewRemoteSkillSource(
   request: DesktopPreviewRemoteSkillSourceRequest,
 ): Promise<DesktopRemoteSkillPreview> {
   return invoke("preview_remote_skill_source", { request });
+}
+
+export function testSourceConnection(
+  request: DesktopPreviewRemoteSkillSourceRequest,
+): Promise<DesktopSourceConnectionTestResult> {
+  return invoke("test_source_connection", { request });
 }
 
 export function getSkillTargetsForSource(

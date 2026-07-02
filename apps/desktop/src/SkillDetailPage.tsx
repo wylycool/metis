@@ -1,16 +1,15 @@
 import { useMemo, useState } from "react";
 import { AgentBadge, normalizeAgentId, type AgentIdentity } from "./AgentBadge";
+import { shortCommit } from "./commitDisplay";
 import {
   BackupPanel,
   BindSourceForm,
   DiffPanel,
   InlineError,
   StatusBadge,
-  localModifiedLabel,
   skillAccentStyle,
-  updateLabel,
-  updateTone,
   type BindDraft,
+  type StatusBadgeTone,
 } from "./SkillRow";
 import type {
   DesktopBackupSummary,
@@ -19,6 +18,7 @@ import type {
   DesktopInstallRemoteSkillResult,
   DesktopSkill,
   DesktopSkillTarget,
+  DesktopSourceConnectionTestResult,
   DesktopUpdateCheckResult,
 } from "./types";
 
@@ -34,17 +34,22 @@ export function SkillDetailPage({
   diffDetail,
   diffError,
   isBinding,
+  sourceConnectionError,
+  sourceConnectionResult,
   agentMemberships,
   selectedDetailTargetIds,
   skill,
   updateResult,
+  updateResults,
   onBack,
   onBind,
   onCancelBind,
   onCheck,
   onDraftChange,
+  onTestSourceConnection,
   onInstallDetailTargets,
   onApplyUpdate,
+  onApplyNeededAgentUpdates,
   onOpenBind,
   onRestoreBackup,
   onToggleBackups,
@@ -64,17 +69,26 @@ export function SkillDetailPage({
   diffDetail?: DesktopDiffDetail;
   diffError?: DesktopError;
   isBinding: boolean;
-  agentMemberships: Pick<DesktopSkill, "agent_id" | "agent_name" | "install_path">[];
+  sourceConnectionError?: DesktopError;
+  sourceConnectionResult?: DesktopSourceConnectionTestResult;
+  agentMemberships: Pick<
+    DesktopSkill,
+    "agent_id" | "agent_name" | "id" | "install_path" | "local_modified"
+    | "source_id"
+  >[];
   selectedDetailTargetIds: string[];
   skill: DesktopSkill;
   updateResult?: DesktopUpdateCheckResult;
+  updateResults: Record<string, DesktopUpdateCheckResult>;
   onBack: () => void;
   onBind: () => void;
   onCancelBind: () => void;
   onCheck: () => void;
   onDraftChange: (draft: BindDraft) => void;
+  onTestSourceConnection: () => void;
   onInstallDetailTargets: () => void;
-  onApplyUpdate: () => void;
+  onApplyUpdate: (skillId: string, mode?: "overwrite-local") => void;
+  onApplyNeededAgentUpdates: (skillIds: string[]) => void;
   onOpenBind: () => void;
   onRestoreBackup: (backupId: string) => void;
   onToggleBackups: () => void;
@@ -86,22 +100,17 @@ export function SkillDetailPage({
   const source = skill.source;
   const checkBusy = actionBusy === "check-updates";
   const bindBusy = actionBusy === `bind:${skill.id}`;
+  const testSourceBusy = actionBusy === `test-source:${skill.id}`;
   const unbindBusy = actionBusy === `unbind:${skill.id}`;
   const diffBusy = actionBusy === `diff:${skill.id}`;
   const backupBusy = actionBusy === `backups:${skill.id}`;
-  const applyBusy = actionBusy === `apply:${skill.id}`;
-  const canApplyUpdate =
-    source &&
-    (updateResult?.status === "UpdateAvailable" || updateResult?.local_modified === true);
-  const showLocalModifiedStatus = skill.local_modified === true || updateResult?.local_modified;
-  const showUpdateStatus =
-    updateResult?.status === "UpToDate" ||
-    updateResult?.status === "UpdateAvailable" ||
-    updateResult?.status === "CheckFailed";
   const installedAgentRows = useMemo(
-    () => detailInstalledAgentRows(skill, agentMemberships, detailTargets),
-    [agentMemberships, detailTargets, skill],
+    () => detailInstalledAgentRows(skill, agentMemberships, detailTargets, updateResults),
+    [agentMemberships, detailTargets, skill, updateResults],
   );
+  const detailSummary = detailAggregateSummary(installedAgentRows);
+  const outdatedAgentRows = installedAgentRows.filter((row) => row.statusKind === "update");
+  const applyNeededBusy = actionBusy === "apply-needed-agent-updates";
   void detailInstallResult;
   void detailTargetError;
   void selectedDetailTargetIds;
@@ -130,6 +139,7 @@ export function SkillDetailPage({
           <span className="redesign-detail-kicker">Skill detail</span>
           <h1>{skill.name}</h1>
           <p>{skill.description || "暂无描述"}</p>
+          <p className="redesign-detail-summary-message">{detailSummary.message}</p>
         </div>
         <div
           className="intro-source-corner redesign-source-summary"
@@ -146,21 +156,17 @@ export function SkillDetailPage({
             {source ? "修改来源" : "添加来源"}
           </button>
         </div>
-        {(showLocalModifiedStatus || showUpdateStatus) && (
-          <div className="detail-status-strip">
-            {showLocalModifiedStatus && (
-              <StatusBadge tone="warning">{localModifiedLabel(true)}</StatusBadge>
-            )}
-            {showUpdateStatus && (
-              <StatusBadge tone={updateTone(updateResult, skill)}>
-                {updateLabel(updateResult, skill)}
-              </StatusBadge>
-            )}
-          </div>
-        )}
+        <div className="detail-status-strip">
+          <StatusBadge tone={detailSummary.tone}>{detailSummary.label}</StatusBadge>
+        </div>
       </header>
 
-      <FormalDetailAgentPaths skill={skill} rows={installedAgentRows} />
+      <FormalDetailAgentPaths
+        actionBusy={actionBusy}
+        onApplyUpdate={onApplyUpdate}
+        skill={skill}
+        rows={installedAgentRows}
+      />
 
       <div className="skill-detail-grid">
         <section
@@ -183,10 +189,10 @@ export function SkillDetailPage({
             <button
               className={`operation-button compact ${!diffDetail && !backupOpen ? "active" : ""}`}
               data-testid={`check-updates-${skill.id}`}
-              disabled={!source || checkBusy}
+              disabled={installedAgentRows.length === 0 || checkBusy}
               onClick={onCheck}
             >
-              {checkBusy ? "检查中" : "检查更新"}
+            {checkBusy ? "检查中" : "检查更新"}
             </button>
             <button
               className={`operation-button compact ${diffDetail ? "active" : ""}`}
@@ -196,14 +202,14 @@ export function SkillDetailPage({
             >
               {diffBusy ? "加载 diff" : diffDetail ? "隐藏 diff" : "查看 diff"}
             </button>
-            {canApplyUpdate && (
+            {outdatedAgentRows.length > 0 && (
               <button
                 className="operation-button compact"
-                data-testid={`apply-update-${skill.id}`}
-                disabled={!canApplyUpdate || applyBusy}
-                onClick={onApplyUpdate}
+                data-testid={`apply-needed-agent-updates-${skill.id}`}
+                disabled={applyNeededBusy}
+                onClick={() => onApplyNeededAgentUpdates(outdatedAgentRows.map((row) => row.skillId))}
               >
-                {applyBusy ? "更新中" : "应用更新"}
+                {applyNeededBusy ? "更新中" : "更新需要更新的 Agent"}
               </button>
             )}
             <button
@@ -257,9 +263,13 @@ export function SkillDetailPage({
               busy={bindBusy}
               draft={bindDraft}
               skillId={skill.id}
+              testBusy={testSourceBusy}
+              testError={sourceConnectionError}
+              testResult={sourceConnectionResult}
               onCancel={onCancelBind}
               onChange={onDraftChange}
               onSubmit={onBind}
+              onTestConnection={onTestSourceConnection}
             />
           </aside>
         </div>
@@ -270,9 +280,13 @@ export function SkillDetailPage({
 }
 
 function FormalDetailAgentPaths({
+  actionBusy,
+  onApplyUpdate,
   rows,
   skill,
 }: {
+  actionBusy: string | null;
+  onApplyUpdate: (skillId: string, mode?: "overwrite-local") => void;
   rows: DetailAgentInstallRow[];
   skill: DesktopSkill;
 }) {
@@ -307,13 +321,26 @@ function FormalDetailAgentPaths({
         >
           {rows.map((row) => (
             <div
-              className="redesign-detail-agent-path-row"
+              className={`redesign-detail-agent-path-row ${row.statusKind}`}
               data-testid={`skill-detail-agent-path-${skill.id}-${row.agentId}`}
               key={row.agentId}
             >
               <AgentBadge agent={row.agent} />
               <span>{row.agent.agent_name}</span>
               <code>{row.installPath}</code>
+              <small>{row.statusLabel}</small>
+              {row.statusKind === "local-modified" && row.hasSource && (
+                <button
+                  aria-label={`用来源版本覆盖 ${row.agent.agent_name} 中的本地修改`}
+                  className="redesign-detail-agent-row-action"
+                  data-testid={`overwrite-local-agent-${row.skillId}`}
+                  disabled={actionBusy === `apply:${row.skillId}`}
+                  onClick={() => onApplyUpdate(row.skillId, "overwrite-local")}
+                  title="会先创建备份，再用来源版本覆盖这个安装目录"
+                >
+                  {actionBusy === `apply:${row.skillId}` ? "覆盖中" : "覆盖更新"}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -362,43 +389,72 @@ function FormalCheckPanel({
   );
 }
 
-function shortCommit(value: string) {
-  return value.length > 7 ? value.slice(0, 7) : value;
-}
-
 type DetailAgentInstallRow = {
   agent: AgentIdentity;
   agentId: string;
+  hasSource: boolean;
   installPath: string;
+  localModified: boolean;
+  statusKind: DetailAgentStatusKind;
+  statusLabel: string;
+  skillId: string;
+  updateResult?: DesktopUpdateCheckResult;
 };
 
 function detailInstalledAgentRows(
   skill: DesktopSkill,
-  agentMemberships: Pick<DesktopSkill, "agent_id" | "agent_name" | "install_path">[],
+  agentMemberships: Pick<
+    DesktopSkill,
+    "agent_id" | "agent_name" | "id" | "install_path" | "local_modified" | "source_id"
+  >[],
   detailTargets: DesktopSkillTarget[],
+  updateResults: Record<string, DesktopUpdateCheckResult>,
 ) {
   const rows: DetailAgentInstallRow[] = [];
   const seen = new Set<string>();
 
-  function addRow(agent: AgentIdentity, installPath: string) {
+  function addRow(
+    agent: AgentIdentity,
+    installPath: string,
+    skillId: string,
+    localModified: boolean,
+    hasSource: boolean,
+  ) {
     const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
     if (!agentId || seen.has(agentId)) {
       return;
     }
     seen.add(agentId);
-    rows.push({ agent, agentId, installPath });
+    const updateResult = updateResults[skillId];
+    const status = detailAgentStatus({ hasSource, localModified, updateResult });
+    rows.push({
+      agent,
+      agentId,
+      hasSource,
+      installPath,
+      localModified,
+      skillId,
+      updateResult,
+      ...status,
+    });
   }
 
   for (const membership of agentMemberships) {
     addRow(
       { agent_id: membership.agent_id, agent_name: membership.agent_name },
       membership.install_path,
+      membership.id,
+      membership.local_modified === true,
+      Boolean(membership.source_id),
     );
   }
 
   addRow(
     { agent_id: skill.agent_id, agent_name: skill.agent_name },
     skill.install_path,
+    skill.id,
+    skill.local_modified === true,
+    Boolean(skill.source_id),
   );
 
   for (const target of detailTargets) {
@@ -408,6 +464,9 @@ function detailInstalledAgentRows(
     addRow(
       { agent_id: target.agent_id, agent_name: target.agent_name },
       target.install_path,
+      target.skill_id ?? skill.id,
+      target.local_modified,
+      Boolean(target.source_id),
     );
   }
 
@@ -416,4 +475,83 @@ function detailInstalledAgentRows(
 
 function isInstalledDetailTarget(target: DesktopSkillTarget) {
   return target.status !== "NotInstalled" && Boolean(target.skill_id);
+}
+
+type DetailAgentStatusKind =
+  | "unknown"
+  | "latest"
+  | "update"
+  | "local-modified"
+  | "no-source"
+  | "failed";
+
+function detailAgentStatus({
+  hasSource,
+  localModified,
+  updateResult,
+}: {
+  hasSource: boolean;
+  localModified: boolean;
+  updateResult?: DesktopUpdateCheckResult;
+}): Pick<DetailAgentInstallRow, "statusKind" | "statusLabel"> {
+  const effectiveLocalModified = updateResult ? updateResult.local_modified : localModified;
+  if (effectiveLocalModified) {
+    return { statusKind: "local-modified", statusLabel: "本地已修改" };
+  }
+  if (!hasSource || updateResult?.status === "NoSource") {
+    return { statusKind: "no-source", statusLabel: "来源未绑定" };
+  }
+  if (!updateResult) {
+    return { statusKind: "unknown", statusLabel: "未检查" };
+  }
+  if (updateResult.status === "UpdateAvailable") {
+    return { statusKind: "update", statusLabel: "需要更新" };
+  }
+  if (updateResult.status === "UpToDate") {
+    return { statusKind: "latest", statusLabel: "无需更新" };
+  }
+  if (updateResult.status === "CheckFailed") {
+    return { statusKind: "failed", statusLabel: "检查失败" };
+  }
+  return { statusKind: "unknown", statusLabel: "未检查" };
+}
+
+function detailAggregateSummary(rows: DetailAgentInstallRow[]): {
+  label: string;
+  message: string;
+  tone: StatusBadgeTone;
+} {
+  if (rows.some((row) => row.statusKind === "local-modified")) {
+    return {
+      label: "有 Agent 存在本地修改",
+      message: "展开安装位置查看哪些 Agent 被改过；如果是误修改，可在对应行点击覆盖更新。",
+      tone: "warning",
+    };
+  }
+  if (rows.some((row) => row.statusKind === "update")) {
+    return {
+      label: "有 Agent 需要更新",
+      message: "展开安装位置查看哪些 Agent 需要更新，并可一键更新需要处理的项。",
+      tone: "warning",
+    };
+  }
+  if (rows.length > 0 && rows.every((row) => row.statusKind === "latest")) {
+    return {
+      label: "所有 Agent 均无需更新",
+      message: "已安装此 skill 的 Agent 都与来源版本一致。",
+      tone: "good",
+    };
+  }
+  if (rows.some((row) => row.statusKind === "failed" || row.statusKind === "no-source")) {
+    return {
+      label: "部分 Agent 暂无法判断",
+      message: "展开安装位置查看原因，例如来源未绑定、Git 访问失败或路径不可访问。",
+      tone: "muted",
+    };
+  }
+  return {
+    label: "尚未检查 Agent 状态",
+    message: "点击检查更新后，Metis 会分别检查每个已安装 Agent 的版本和来源状态。",
+    tone: "muted",
+  };
 }

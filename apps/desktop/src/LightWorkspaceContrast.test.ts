@@ -431,14 +431,21 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("display: grid;");
     expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("gap: 8px;");
     expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("background: rgba(248, 250, 252, 0.72);");
-    expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("grid-template-columns: auto minmax(96px, 0.28fr) minmax(0, 1fr);");
+    expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("grid-template-columns: auto minmax(96px, 0.24fr) minmax(0, 1fr) auto auto;");
+    expect(latestBlockFor(".redesign-detail-agent-path-row.update")).toContain("background: rgba(239, 246, 255, 0.88);");
+    expect(latestBlockFor(".redesign-detail-agent-path-row.latest small")).toContain("color: #157a58;");
     expect(latestBlockFor(".redesign-detail-agent-path-row .agent-badge")).toContain("margin-left: 0;");
     expect(latestBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
+    expect(latestBlockFor(".redesign-detail-agent-row-action")).toContain("white-space: nowrap;");
+    expect(latestBlockFor(".redesign-backup-panel .backup-row")).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;");
     expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("background: #f8fafc;");
     expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("color: #2f4b77;");
     expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
     expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("color: #ffffff;");
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
+    expect(latestBlockFor(".redesign-toast")).toContain("background: rgba(255, 255, 255, 0.96);");
+    expect(latestBlockFor(".redesign-toast")).toContain("color: #263247;");
+    expect(latestBlockFor(".redesign-toast")).toContain("box-shadow: 0 12px 28px rgba(30, 48, 78, 0.14);");
   });
 
   test("brands overlapping agent letter badges by agent identity", () => {

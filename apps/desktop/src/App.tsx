@@ -23,9 +23,11 @@ import {
   restoreSkillBackup,
   saveDesktopSettings,
   scanSkills,
+  testSourceConnection,
   unbindSkillSource,
 } from "./api";
 import type { RemoteSyncDraft } from "./AddSkillPage";
+import { shortCommit } from "./commitDisplay";
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { GitHubIcon } from "./GitHubIcon";
 import { METIS_GITHUB_URL } from "./projectLinks";
@@ -34,6 +36,7 @@ import { InlineError, type BindDraft } from "./SkillRow";
 import { UiRedesignPreview } from "./UiRedesignPreview";
 import type {
   DesktopAgentStatus,
+  DesktopApplyUpdateResult,
   DesktopBackupSummary,
   DesktopDiffDetail,
   DesktopError,
@@ -44,6 +47,7 @@ import type {
   DesktopSettings,
   DesktopSkill,
   DesktopSource,
+  DesktopSourceConnectionTestResult,
   DesktopSkillTarget,
   DesktopTeamManifestComplianceReport,
   DesktopTeamManifestComplianceItem,
@@ -93,6 +97,12 @@ function MetisApp() {
     useState<DesktopTeamPolicyAuditReport | null>(null);
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
+  const [sourceConnectionResults, setSourceConnectionResults] = useState<
+    Record<string, DesktopSourceConnectionTestResult>
+  >({});
+  const [sourceConnectionErrors, setSourceConnectionErrors] = useState<Record<string, DesktopError>>(
+    {},
+  );
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<DesktopError | null>(null);
   const [state, setState] = useState<LoadState>("idle");
@@ -149,6 +159,15 @@ function MetisApp() {
     void bootstrap();
   }, []);
 
+  useEffect(() => {
+    if (!actionMessage) {
+      return;
+    }
+    const toastTimer = window.setTimeout(() => {
+      setActionMessage(null);
+    }, 3000);
+    return () => window.clearTimeout(toastTimer);
+  }, [actionMessage]);
 
   async function bootstrap() {
     setState("loading");
@@ -266,6 +285,7 @@ function MetisApp() {
     const source = skill.source ?? reusableSourceForSkill(skill);
     setBindingSkillId(skill.id);
     setActionError(null);
+    clearSourceConnectionState(skill.id);
     setBindDraft({
       url: source?.url ?? "",
       repo_path: source?.repo_path ?? "",
@@ -274,6 +294,48 @@ function MetisApp() {
       trusted: source?.trusted ?? false,
       auto_update: source?.auto_update ?? false,
     });
+  }
+
+  function handleBindDraftChange(draft: BindDraft) {
+    setBindDraft(draft);
+    if (bindingSkillId) {
+      clearSourceConnectionState(bindingSkillId);
+    }
+  }
+
+  function clearSourceConnectionState(skillId: string) {
+    setSourceConnectionResults((current) => {
+      const next = { ...current };
+      delete next[skillId];
+      return next;
+    });
+    setSourceConnectionErrors((current) => {
+      const next = { ...current };
+      delete next[skillId];
+      return next;
+    });
+  }
+
+  async function handleTestSourceConnection(skillId: string) {
+    setActionBusy(`test-source:${skillId}`);
+    setActionError(null);
+    clearSourceConnectionState(skillId);
+
+    try {
+      const result = await testSourceConnection({
+        url: bindDraft.url.trim(),
+        repo_path: bindDraft.repo_path.trim(),
+        ref_: bindDraft.ref_.trim() || "main",
+      });
+      setSourceConnectionResults((current) => ({ ...current, [skillId]: result }));
+    } catch (caught) {
+      setSourceConnectionErrors((current) => ({
+        ...current,
+        [skillId]: desktopError(caught),
+      }));
+    } finally {
+      setActionBusy(null);
+    }
   }
 
   async function handlePreviewTeamPolicy() {
@@ -451,19 +513,22 @@ function MetisApp() {
     }
   }
 
-  async function handleCheckDetailUpdates(skill: DesktopSkill) {
+  async function handleCheckDetailUpdates(detailSkills: DesktopSkill[]) {
+    if (detailSkills.length === 0) {
+      return;
+    }
     setActionBusy("check-updates");
     setActionError(null);
     setActionMessage(null);
 
     try {
-      const readySkill = await ensureReusableSourceBound(skill);
-      if (!readySkill.source) {
-        const results = await checkSkillUpdates({ skill_ids: [skill.id] });
-        setUpdateResults((current) => ({ ...current, [skill.id]: results[0] }));
-        return;
+      const readySkills: DesktopSkill[] = [];
+      for (const detailSkill of detailSkills) {
+        readySkills.push(await ensureReusableSourceBound(detailSkill));
       }
-      const results = await checkSkillUpdates({ skill_ids: [readySkill.id] });
+      const results = await checkSkillUpdates({
+        skill_ids: readySkills.map((readySkill) => readySkill.id),
+      });
       setUpdateResults((current) => {
         const next = { ...current };
         for (const result of results) {
@@ -473,7 +538,10 @@ function MetisApp() {
       });
       setDiffError({});
       await refreshIndexedSkills();
-      setActionMessage("检查完成：远端更新状态已刷新");
+      const updateCount = results.filter(
+        (result) => result.status === "UpdateAvailable" && !result.local_modified,
+      ).length;
+      setActionMessage(`检查完成：${updateCount} 个 Agent 需要更新`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -799,9 +867,10 @@ function MetisApp() {
           continue;
         }
         try {
-          await applySkillUpdate(result.skill_id);
+          const appliedResult = await applySkillUpdate(result.skill_id);
           applied += 1;
-          clearSkillRuntimeState(result.skill_id);
+          markSkillUpToDate(appliedResult);
+          clearSkillDetailArtifacts(result.skill_id);
         } catch {
           failed += 1;
         }
@@ -978,22 +1047,51 @@ function MetisApp() {
     };
   }
 
-  async function handleApplyUpdate(skillId: string) {
+  async function handleApplyUpdate(skillId: string, mode?: "overwrite-local") {
     setActionBusy(`apply:${skillId}`);
     setActionError(null);
     setActionMessage(null);
 
     try {
       const result = await applySkillUpdate(skillId);
-      setActionMessage(
-        `更新完成：${shortCommit(result.previous_commit)} -> ${shortCommit(
-          result.new_commit,
-        )}，已创建备份 ${result.backup_id}`,
-      );
-      clearSkillRuntimeState(skillId);
+      setActionMessage(mode === "overwrite-local" ? overwriteLocalUpdateMessage(result) : applyUpdateMessage(result));
+      markSkillUpToDate(result);
+      clearSkillDetailArtifacts(skillId);
       setBackupPanels((current) => ({ ...current, [skillId]: true }));
       await refreshIndexedSkills();
       await loadBackups(skillId);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleApplyNeededAgentUpdates(skillIds: string[]) {
+    if (skillIds.length === 0) {
+      return;
+    }
+    setActionBusy("apply-needed-agent-updates");
+    setActionError(null);
+    setActionMessage(null);
+
+    let applied = 0;
+    let failed = 0;
+    for (const skillId of skillIds) {
+      try {
+        const result = await applySkillUpdate(skillId);
+        applied += 1;
+        markSkillUpToDate(result);
+        clearSkillDetailArtifacts(skillId);
+      } catch {
+        failed += 1;
+      }
+    }
+
+    try {
+      await refreshIndexedSkills();
+      const failureText = failed > 0 ? `，失败 ${failed} 个` : "";
+      setActionMessage(`已更新 ${applied} 个需要更新的 Agent${failureText}`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1028,6 +1126,10 @@ function MetisApp() {
       delete next[skillId];
       return next;
     });
+    clearSkillDetailArtifacts(skillId);
+  }
+
+  function clearSkillDetailArtifacts(skillId: string) {
     setDiffDetails((current) => {
       const next = { ...current };
       delete next[skillId];
@@ -1037,6 +1139,33 @@ function MetisApp() {
       const next = { ...current };
       delete next[skillId];
       return next;
+    });
+  }
+
+  function markSkillUpToDate(result: DesktopApplyUpdateResult) {
+    setUpdateResults((current) => {
+      const existing = current[result.skill_id];
+      const indexedSkill = skills.find((skill) => skill.id === result.skill_id);
+      const source = existing?.source ?? indexedSkill?.source ?? null;
+      return {
+        ...current,
+        [result.skill_id]: {
+          skill_id: result.skill_id,
+          skill_name: existing?.skill_name ?? indexedSkill?.name ?? result.skill_id,
+          status: "UpToDate",
+          failure_reason: null,
+          local_modified: false,
+          commits_behind: null,
+          diff_summary: null,
+          source: source
+            ? {
+                ...source,
+                current_commit: result.new_commit,
+                remote_commit: result.new_commit,
+              }
+            : null,
+        },
+      };
     });
   }
 
@@ -1574,17 +1703,20 @@ function MetisApp() {
           selectedDetailTargetIds={selectedDetailTargetIds}
           selectedRemoteTargetIds={selectedRemoteTargetIds}
           skillSearchQuery={skillSearchQuery}
+          sourceConnectionErrors={sourceConnectionErrors}
+          sourceConnectionResults={sourceConnectionResults}
           skills={skills}
           state={state}
           updateResults={updateResults}
           onApplyUpdate={handleApplyUpdate}
+          onApplyNeededAgentUpdates={handleApplyNeededAgentUpdates}
           onBackupsDetailToggle={handleToggleDetailBackups}
           onBackupsToggle={handleToggleBackups}
           onBind={handleBindSource}
           onCancelBind={() => setBindingSkillId(null)}
           onCheckUpdates={handleCheckUpdates}
           onCheckDetailUpdates={handleCheckDetailUpdates}
-          onDraftChange={setBindDraft}
+          onDraftChange={handleBindDraftChange}
           onInstallDetailTargets={handleInstallDetailTargets}
           onInstallRemoteTargets={handleInstallRemoteTargets}
           onLoadDetailTargets={loadDetailTargets}
@@ -1599,6 +1731,7 @@ function MetisApp() {
           onToggleDetailDiff={handleToggleDetailDiff}
           onToggleDiff={handleToggleDiff}
           onToggleRemoteTarget={toggleRemoteTarget}
+          onTestSourceConnection={handleTestSourceConnection}
           onUnbind={handleUnbindSource}
         />
       )}
@@ -1793,8 +1926,17 @@ function emptyEnterpriseNetworkSettings() {
   };
 }
 
-function shortCommit(commit: string) {
-  return commit.length > 10 ? commit.slice(0, 10) : commit;
+function applyUpdateMessage(result: DesktopApplyUpdateResult) {
+  if (result.previous_commit === result.new_commit) {
+    return `已用来源版本覆盖本地修改：${shortCommit(result.new_commit)}，已创建备份 ${result.backup_id}`;
+  }
+  return `更新完成：${shortCommit(result.previous_commit)} -> ${shortCommit(
+    result.new_commit,
+  )}，已创建备份 ${result.backup_id}`;
+}
+
+function overwriteLocalUpdateMessage(result: DesktopApplyUpdateResult) {
+  return `已用来源版本覆盖本地修改：${shortCommit(result.new_commit)}，已创建备份 ${result.backup_id}`;
 }
 
 function shortPath(path: string) {

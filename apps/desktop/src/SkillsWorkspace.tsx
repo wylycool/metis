@@ -10,6 +10,7 @@ import type {
   DesktopInstallRemoteSkillResult,
   DesktopRemoteSkillPreview,
   DesktopSkill,
+  DesktopSourceConnectionTestResult,
   DesktopSource,
   DesktopSkillTarget,
   DesktopUpdateCheckResult,
@@ -39,6 +40,8 @@ export function SkillsWorkspace({
   selectedDetailTargetIds,
   selectedRemoteTargetIds,
   skillSearchQuery,
+  sourceConnectionErrors,
+  sourceConnectionResults,
   skills,
   state,
   updateResults,
@@ -56,6 +59,7 @@ export function SkillsWorkspace({
   onOpenBind,
   onOpenSettings,
   onPreviewRemoteSync,
+  onApplyNeededAgentUpdates,
   onRestoreBackup,
   onRouteKindChange,
   onScan,
@@ -64,6 +68,7 @@ export function SkillsWorkspace({
   onToggleDetailDiff,
   onToggleDiff,
   onToggleRemoteTarget,
+  onTestSourceConnection,
   onUnbind,
 }: {
   actionBusy: string | null;
@@ -85,15 +90,18 @@ export function SkillsWorkspace({
   selectedDetailTargetIds: Record<string, string[]>;
   selectedRemoteTargetIds: string[];
   skillSearchQuery: string;
+  sourceConnectionErrors: Record<string, DesktopError>;
+  sourceConnectionResults: Record<string, DesktopSourceConnectionTestResult>;
   skills: DesktopSkill[];
   state: LoadState;
   updateResults: Record<string, DesktopUpdateCheckResult>;
-  onApplyUpdate: (skillId: string) => void;
+  onApplyUpdate: (skillId: string, mode?: "overwrite-local") => void;
+  onApplyNeededAgentUpdates: (skillIds: string[]) => void;
   onBackupsDetailToggle: (skill: DesktopSkill) => void;
   onBackupsToggle: (skillId: string) => void;
   onBind: (skillId: string) => void;
   onCancelBind: () => void;
-  onCheckDetailUpdates: (skill: DesktopSkill) => void;
+  onCheckDetailUpdates: (skills: DesktopSkill[]) => void;
   onCheckUpdates: (skillIds: string[]) => void;
   onDraftChange: (draft: BindDraft) => void;
   onInstallDetailTargets: (skill: DesktopSkill) => void;
@@ -110,6 +118,7 @@ export function SkillsWorkspace({
   onToggleDetailDiff: (skill: DesktopSkill) => void;
   onToggleDiff: (skillId: string) => void;
   onToggleRemoteTarget: (target: DesktopSkillTarget) => void;
+  onTestSourceConnection: (skillId: string) => void;
   onUnbind: (skillId: string) => void;
 }) {
   const [route, setRoute] = useState<SkillsRoute>({ kind: "list" });
@@ -158,6 +167,12 @@ export function SkillsWorkspace({
   const detailTargetsFailed = routedDetailSkill
     ? Boolean(detailTargetErrors[routedDetailSkill.id])
     : false;
+  const routedAgentMemberships =
+    routedSkill && routedDetailSkill
+      ? allAgentMembershipsByKey.get(skillIdentityKey(routedSkill)) ?? [routedDetailSkill]
+      : routedDetailSkill
+        ? [routedDetailSkill]
+        : [];
 
   useEffect(() => {
     onRouteKindChange(route.kind);
@@ -205,21 +220,22 @@ export function SkillsWorkspace({
           diffDetail={diffDetails[routedDetailSkill.id]}
           diffError={diffError[routedDetailSkill.id]}
           isBinding={bindingSkillId === routedDetailSkill.id}
-          agentMemberships={
-            routedSkill
-              ? allAgentMembershipsByKey.get(skillIdentityKey(routedSkill)) ?? [routedDetailSkill]
-              : [routedDetailSkill]
-          }
+          sourceConnectionError={sourceConnectionErrors[routedDetailSkill.id]}
+          sourceConnectionResult={sourceConnectionResults[routedDetailSkill.id]}
+          agentMemberships={routedAgentMemberships}
           selectedDetailTargetIds={selectedDetailTargetIds[routedDetailSkill.id] ?? []}
           skill={routedDetailSkill}
           updateResult={updateResults[routedDetailSkill.id]}
+          updateResults={updateResults}
           onBack={() => setRoute({ kind: "list" })}
           onBind={() => onBind(routedDetailSkill.id)}
           onCancelBind={onCancelBind}
-          onCheck={() => onCheckDetailUpdates(routedDetailSkill)}
+          onCheck={() => onCheckDetailUpdates(routedAgentMemberships)}
           onDraftChange={onDraftChange}
+          onTestSourceConnection={() => onTestSourceConnection(routedDetailSkill.id)}
           onInstallDetailTargets={() => onInstallDetailTargets(routedDetailSkill)}
-          onApplyUpdate={() => onApplyUpdate(routedDetailSkill.id)}
+          onApplyUpdate={onApplyUpdate}
+          onApplyNeededAgentUpdates={onApplyNeededAgentUpdates}
           onOpenBind={() => onOpenBind(routedDetailSkill)}
           onRefreshDetailTargets={() => onLoadDetailTargets(routedDetailSkill)}
           onRestoreBackup={(backupId) => onRestoreBackup(routedDetailSkill.id, backupId)}

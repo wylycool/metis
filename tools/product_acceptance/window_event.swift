@@ -8,7 +8,7 @@ func fail(_ message: String) -> Never {
 
 let args = CommandLine.arguments
 guard args.count >= 2 else {
-    fail("usage: window_event.swift click <x> <y> | hotkey <keyCode>")
+    fail("usage: window_event.swift click <x> <y> | hotkey <keyCode> | scroll <dy>")
 }
 
 let source = CGEventSource(stateID: .hidSystemState)
@@ -33,6 +33,18 @@ case "hotkey":
     let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
     up?.flags = .maskCommand
     up?.post(tap: .cghidEventTap)
+case "scroll":
+    guard args.count == 3, let dy = Int32(args[2]) else {
+        fail("usage: window_event.swift scroll <dy>")
+    }
+    CGEvent(
+        scrollWheelEvent2Source: source,
+        units: .pixel,
+        wheelCount: 1,
+        wheel1: dy,
+        wheel2: 0,
+        wheel3: 0
+    )?.post(tap: .cghidEventTap)
 default:
     fail("unknown command: \(args[1])")
 }

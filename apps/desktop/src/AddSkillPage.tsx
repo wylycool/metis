@@ -1,4 +1,5 @@
 import { CrossAgentTargetMatrix } from "./CrossAgentTargetMatrix";
+import { shortCommit } from "./commitDisplay";
 import type {
   DesktopInstallRemoteSkillResult,
   DesktopRemoteSkillPreview,
@@ -109,8 +110,4 @@ export function AddSkillPage({
       </section>
     </section>
   );
-}
-
-function shortCommit(commit: string) {
-  return commit.length > 10 ? commit.slice(0, 10) : commit;
 }

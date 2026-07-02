@@ -10,6 +10,10 @@ use metis_security::findings::{SecurityFinding, SecuritySeverity};
 use metis_storage::backup::replace_skill_directory;
 use metis_storage::db::{SkillIndexStore, SourceRecord};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io;
+use std::path::Path;
+use std::time::SystemTime;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateCheckOptions {
@@ -578,6 +582,8 @@ pub fn apply_update<C: RemoteCommitChecker>(
             }),
         };
     }
+    refresh_regular_file_mtimes(&skill.install_path)
+        .map_err(|error| ApplyUpdateError::SourceCheckFailed(error.to_string()))?;
 
     store
         .update_source_check_result(
@@ -610,6 +616,32 @@ pub fn apply_update<C: RemoteCommitChecker>(
         security_findings: security_report.findings,
         warnings: vec![],
     })
+}
+
+fn refresh_regular_file_mtimes(root: impl AsRef<Path>) -> io::Result<()> {
+    let now = SystemTime::now();
+    refresh_regular_file_mtimes_inner(root.as_ref(), now)
+}
+
+fn refresh_regular_file_mtimes_inner(path: &Path, modified_time: SystemTime) -> io::Result<()> {
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let metadata = entry.metadata()?;
+        if metadata.is_dir() {
+            refresh_regular_file_mtimes_inner(&entry_path, modified_time)?;
+            continue;
+        }
+        if !metadata.is_file() {
+            continue;
+        }
+        let file = fs::File::open(&entry_path)?;
+        let times = fs::FileTimes::new()
+            .set_modified(modified_time)
+            .set_accessed(modified_time);
+        file.set_times(times)?;
+    }
+    Ok(())
 }
 
 fn diff_summary_from_git(summary: GitDiffSummary) -> DiffSummary {
@@ -673,7 +705,7 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     struct FakeRemoteChecker {
         commits: HashMap<String, Result<String, String>>,
@@ -798,6 +830,16 @@ mod tests {
             fs::create_dir_all(parent).expect("parent directory should be created");
         }
         fs::write(path, contents).expect("test file should be writable");
+    }
+
+    fn set_file_modified_time(path: &Path, time: SystemTime) {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(path)
+            .expect("test file should open for time update");
+        let times = fs::FileTimes::new().set_modified(time).set_accessed(time);
+        file.set_times(times)
+            .expect("test file modified time should update");
     }
 
     fn git(repo: &Path, args: &[&str]) -> String {
@@ -1154,6 +1196,8 @@ mod tests {
         write_file(&skill_dir.join("SKILL.md"), "# Old\n");
         write_file(&candidate_dir.join("SKILL.md"), "# New\n");
         write_file(&candidate_dir.join("new.md"), "new");
+        let old_candidate_time = UNIX_EPOCH + Duration::from_secs(60);
+        set_file_modified_time(&candidate_dir.join("SKILL.md"), old_candidate_time);
         let mut store = store_with_skill_and_optional_source(&skill_dir, Some("abc123"));
         capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
         store
@@ -1178,6 +1222,7 @@ mod tests {
             )]),
         );
 
+        let before_apply = SystemTime::now();
         let result = apply_update(
             ApplyUpdateOptions {
                 skill_id: "skill-1".to_string(),
@@ -1198,6 +1243,14 @@ mod tests {
         assert_eq!(
             fs::read_to_string(skill_dir.join("new.md")).expect("new file should read"),
             "new"
+        );
+        let installed_modified_time = fs::metadata(skill_dir.join("SKILL.md"))
+            .expect("updated skill metadata should read")
+            .modified()
+            .expect("updated skill modified time should read");
+        assert!(
+            installed_modified_time >= before_apply,
+            "updated file mtime should reflect apply time, got {installed_modified_time:?} before {before_apply:?}"
         );
         let source = store
             .get_source("source-1")
@@ -1261,6 +1314,67 @@ mod tests {
 
         assert_eq!(result.previous_commit, "abc123");
         assert_eq!(result.new_commit, "def456");
+        assert_eq!(
+            fs::read_to_string(skill_dir.join("SKILL.md")).expect("updated skill should read"),
+            "# Remote\n"
+        );
+        let skill = store
+            .get_skill("skill-1")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        assert_eq!(skill.local_modified, Some(false));
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn apply_update_overwrites_local_changes_when_commits_match() {
+        let root = temp_dir("apply-local-modified-same-commit");
+        let skill_dir = root.join("skill");
+        let candidate_dir = root.join("candidate");
+        let backup_root = root.join("backups");
+        write_file(&skill_dir.join("SKILL.md"), "# Remote\n");
+        write_file(&candidate_dir.join("SKILL.md"), "# Remote\n");
+        let mut store = store_with_skill_and_optional_source(&skill_dir, Some("abc123"));
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        write_file(&skill_dir.join("SKILL.md"), "# Local accidental edit\n");
+        let local_state =
+            check_local_modification("skill-1", &mut store).expect("local state should refresh");
+        assert!(local_state.local_modified);
+        store
+            .update_source_check_result(
+                "source-1",
+                Some("abc123"),
+                Some("abc123"),
+                "2026-06-19T12:00:00Z",
+            )
+            .expect("source check should update");
+        let checker = FakeRemoteChecker::with_all(
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::from([(
+                "source-1".to_string(),
+                Ok(CheckoutResult {
+                    checkout_dir: root.join("checkout").to_string_lossy().to_string(),
+                    skill_dir: candidate_dir.to_string_lossy().to_string(),
+                }),
+            )]),
+        );
+
+        let result = apply_update(
+            ApplyUpdateOptions {
+                skill_id: "skill-1".to_string(),
+                backup_root: backup_root.to_string_lossy().to_string(),
+                cache_dir: root.join("cache").to_string_lossy().to_string(),
+            },
+            &mut store,
+            &checker,
+        )
+        .expect("same-commit update should overwrite local changes after backup");
+
+        assert_eq!(result.previous_commit, "abc123");
+        assert_eq!(result.new_commit, "abc123");
         assert_eq!(
             fs::read_to_string(skill_dir.join("SKILL.md")).expect("updated skill should read"),
             "# Remote\n"

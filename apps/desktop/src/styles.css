@@ -1189,6 +1189,52 @@ h1 {
   justify-content: flex-end;
 }
 
+.source-connection-check,
+.source-connection-result {
+  grid-column: 1 / -1;
+}
+
+.source-connection-check {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+}
+
+.source-connection-check p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.source-connection-result {
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.source-connection-result.success {
+  border-color: rgba(34, 166, 111, 0.28);
+  color: var(--success-fg);
+  background: var(--success-bg);
+}
+
+.source-connection-result.failure {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.source-connection-result strong,
+.source-connection-result span {
+  display: block;
+}
+
+.source-connection-result span {
+  margin-top: 4px;
+}
+
 .diff-panel {
   border-top: 1px solid #323b45;
   padding-top: 12px;
@@ -6432,14 +6478,33 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .redesign-detail-agent-path-row {
   display: grid;
-  grid-template-columns: auto minmax(96px, 0.28fr) minmax(0, 1fr);
+  grid-template-columns: auto minmax(96px, 0.24fr) minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   min-height: 36px;
   border: 1px solid rgba(226, 232, 240, 0.78);
   border-radius: 12px;
   padding: 5px 10px 5px 6px;
+  color: inherit;
   background: rgba(248, 250, 252, 0.72);
+  box-shadow: none;
+  text-align: left;
+}
+
+.redesign-detail-agent-path-row.update {
+  border-color: rgba(49, 84, 223, 0.36);
+  background: rgba(239, 246, 255, 0.88);
+}
+
+.redesign-detail-agent-path-row.latest {
+  border-color: rgba(34, 166, 111, 0.22);
+  background: rgba(236, 253, 245, 0.72);
+}
+
+.redesign-detail-agent-path-row.local-modified,
+.redesign-detail-agent-path-row.failed {
+  border-color: rgba(217, 95, 95, 0.24);
+  background: rgba(255, 247, 237, 0.78);
 }
 
 .redesign-detail-agent-path-row .agent-badge {
@@ -6468,6 +6533,66 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.redesign-detail-agent-path-row small {
+  justify-self: end;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #3154df;
+  background: rgba(49, 84, 223, 0.08);
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.redesign-detail-agent-path-row.latest small {
+  color: #157a58;
+  background: rgba(34, 166, 111, 0.12);
+}
+
+.redesign-detail-agent-path-row.local-modified small,
+.redesign-detail-agent-path-row.failed small {
+  color: #b9465a;
+  background: rgba(217, 95, 95, 0.1);
+}
+
+.redesign-detail-agent-path-row.no-source small,
+.redesign-detail-agent-path-row.unknown small {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.1);
+}
+
+.redesign-detail-agent-row-action {
+  justify-self: end;
+  border: 1px solid rgba(217, 95, 95, 0.2);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #b9465a;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.redesign-detail-agent-row-action:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #d95f5f, #b9465a);
+  box-shadow: 0 8px 18px rgba(185, 70, 90, 0.18);
+}
+
+.redesign-detail-agent-row-action:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.redesign-detail-summary-message {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .redesign-source-summary {
@@ -6622,7 +6747,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   gap: 12px;
 }
 
-.redesign-backup-panel div {
+.redesign-backup-panel .backup-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
   gap: 12px;
@@ -6714,14 +6839,16 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   right: 34px;
   bottom: 34px;
   z-index: 60;
-  border: 1px solid rgba(255, 255, 255, 0.44);
+  max-width: min(420px, calc(100vw - 48px));
+  border: 1px solid rgba(49, 84, 223, 0.14);
   border-radius: 16px;
   padding: 13px 16px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #172033, #3154df);
-  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.24);
+  color: #263247;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(30, 48, 78, 0.14);
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 760;
+  line-height: 1.45;
 }
 
 .redesign-agent-path-table {

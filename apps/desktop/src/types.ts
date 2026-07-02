@@ -73,6 +73,15 @@ export interface DesktopPreviewRemoteSkillSourceRequest {
   ref_: string;
 }
 
+export interface DesktopSourceConnectionTestResult {
+  ok: boolean;
+  message: string;
+  skill_name: string;
+  description?: string | null;
+  commit: string;
+  repo_path: string;
+}
+
 export interface DesktopRemoteSkillPreview {
   name: string;
   description?: string | null;
