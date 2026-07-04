@@ -48,7 +48,7 @@ pub fn scan_directory(root: impl AsRef<Path>) -> Result<SecurityReport, Security
             findings.push(finding(
                 SecuritySeverity::Info,
                 "script-file",
-                "Script file requires review before update",
+                "Script file included in update",
                 &relative_path,
                 None,
             ));
@@ -58,7 +58,7 @@ pub fn scan_directory(root: impl AsRef<Path>) -> Result<SecurityReport, Security
             findings.push(finding(
                 SecuritySeverity::Info,
                 "executable-file",
-                "Executable file requires review before update",
+                "Executable file included in update",
                 &relative_path,
                 None,
             ));
@@ -87,9 +87,9 @@ fn scan_file_contents(relative_path: &str, contents: &str, findings: &mut Vec<Se
 
         if contains_network_exec(&normalized) {
             findings.push(finding(
-                SecuritySeverity::High,
+                SecuritySeverity::Warning,
                 "network-exec",
-                "Network download piped into shell execution",
+                "Script downloads content and passes it to a shell",
                 relative_path,
                 line_number,
             ));
@@ -107,9 +107,9 @@ fn scan_file_contents(relative_path: &str, contents: &str, findings: &mut Vec<Se
 
         if contains_secret_literal(&normalized) {
             findings.push(finding(
-                SecuritySeverity::High,
+                SecuritySeverity::Warning,
                 "secret-literal",
-                "Possible hard-coded secret or token",
+                "Configuration field contains a secret-looking value",
                 relative_path,
                 line_number,
             ));
@@ -132,7 +132,35 @@ fn contains_secret_literal(line: &str) -> bool {
         .iter()
         .any(|keyword| line.contains(keyword));
     let has_assignment = line.contains('=') || line.contains(':');
-    has_secret_key && has_assignment
+    if line.contains("-----begin") && line.contains("private key") {
+        return true;
+    }
+    if !has_secret_key || !has_assignment {
+        return false;
+    }
+    let Some((_, value)) = line.split_once('=').or_else(|| line.split_once(':')) else {
+        return false;
+    };
+    let normalized_value = value
+        .trim()
+        .trim_matches(|character| character == '"' || character == '\'' || character == '`');
+    if normalized_value.len() < 24 {
+        return false;
+    }
+    ![
+        "$",
+        "${",
+        "{{",
+        "env.",
+        "env(",
+        "process.env",
+        "your_",
+        "example",
+        "placeholder",
+        "<",
+    ]
+    .iter()
+    .any(|pattern| normalized_value.contains(pattern))
 }
 
 fn finding(
@@ -219,13 +247,17 @@ mod tests {
     }
 
     #[test]
-    fn scan_directory_reports_network_execution_sensitive_paths_and_secrets() {
+    fn scan_directory_reports_attention_items_without_alarmist_severity() {
         let root = temp_dir("rules");
         write_file(
             &root.join("install.sh"),
             "curl https://example.com/install.sh | sh\ncat ~/.ssh/id_rsa\n",
         );
-        write_file(&root.join("SKILL.md"), "token = \"sk-test-secret-value\"\n");
+        write_file(&root.join("SKILL.md"), "token = \"${METIS_TOKEN}\"\n");
+        write_file(
+            &root.join("config.env"),
+            "api_key = \"REMOVED_TEST_SECRET\"\n",
+        );
 
         let report = scan_directory(&root).expect("security scan should succeed");
         fs::remove_dir_all(&root).expect("temp directory should be removed");
@@ -241,7 +273,7 @@ mod tests {
             &report.findings,
             "network-exec",
             "install.sh",
-            SecuritySeverity::High,
+            SecuritySeverity::Warning,
             Some(1),
         );
         assert_finding(
@@ -254,9 +286,34 @@ mod tests {
         assert_finding(
             &report.findings,
             "secret-literal",
-            "SKILL.md",
-            SecuritySeverity::High,
+            "config.env",
+            SecuritySeverity::Warning,
             Some(1),
+        );
+        assert!(
+            !report
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id == "secret-literal"
+                    && finding.relative_path == "SKILL.md"),
+            "placeholder token fields should not be reported as hard-coded secrets"
+        );
+    }
+
+    #[test]
+    fn scan_directory_does_not_flag_plain_network_downloads() {
+        let root = temp_dir("plain-curl");
+        write_file(
+            &root.join("README.md"),
+            "Fetch docs with curl https://example.com/SKILL.md\n",
+        );
+
+        let report = scan_directory(&root).expect("security scan should succeed");
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert!(
+            report.findings.is_empty(),
+            "plain curl mentions without shell execution should not create scary findings"
         );
     }
 

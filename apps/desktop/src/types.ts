@@ -25,10 +25,19 @@ export interface DesktopSkill {
   metadata_path?: string | null;
   metadata_status: string;
   metadata_error?: string | null;
+  file_count?: number | null;
+  total_size_bytes?: number | null;
   source_id?: string | null;
   source?: DesktopSource | null;
   local_modified?: boolean | null;
   last_scanned_at: string;
+  local_updated_at?: string | null;
+}
+
+export interface DesktopSkillSize {
+  skill_id: string;
+  file_count: number;
+  total_size_bytes: number;
 }
 
 export interface DesktopSource {
@@ -47,8 +56,21 @@ export interface DesktopSource {
 
 export interface DesktopSettings {
   custom_scan_paths: string[];
+  agent_path_overrides?: DesktopAgentPathOverride[];
+  custom_monitored_paths?: DesktopCustomMonitoredPath[];
   team_policy_path?: string | null;
   enterprise_network?: DesktopEnterpriseNetworkSettings | null;
+}
+
+export interface DesktopAgentPathOverride {
+  agent_id: string;
+  path: string;
+}
+
+export interface DesktopCustomMonitoredPath {
+  id: string;
+  name: string;
+  path: string;
 }
 
 export interface DesktopEnterpriseNetworkSettings {
@@ -342,6 +364,18 @@ export interface DesktopAuditLogExportRequest {
   output_path: string;
   limit: number;
   offset: number;
+}
+
+export interface DesktopAuditEvent {
+  id: string;
+  skill_id: string;
+  action: string;
+  detail?: string | null;
+  commit_before?: string | null;
+  commit_after?: string | null;
+  status: string;
+  risk_summary?: string | null;
+  created_at?: string | null;
 }
 
 export interface DesktopError {

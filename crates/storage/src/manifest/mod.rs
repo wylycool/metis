@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Component, Path};
+use std::time::SystemTime;
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,6 +76,28 @@ pub fn compute_manifest(root: impl AsRef<Path>) -> Result<ManifestSnapshot, Mani
     })
 }
 
+pub fn compute_local_updated_at(root: impl AsRef<Path>) -> Result<Option<String>, ManifestError> {
+    let root = root.as_ref();
+    let mut latest: Option<SystemTime> = None;
+
+    for entry in WalkDir::new(root).follow_links(false) {
+        let entry = entry?;
+        let path = entry.path();
+
+        if is_in_git_dir(path) || !entry.file_type().is_file() {
+            continue;
+        }
+
+        let modified_at = entry.metadata()?.modified()?;
+        latest = Some(match latest {
+            Some(current) => current.max(modified_at),
+            None => modified_at,
+        });
+    }
+
+    Ok(latest.map(|time| DateTime::<Utc>::from(time).to_rfc3339()))
+}
+
 fn compute_fingerprint(entries: &[ManifestEntry]) -> String {
     let mut hasher = Sha256::new();
 
@@ -131,7 +154,7 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::{Path, PathBuf};
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     fn temp_dir(name: &str) -> PathBuf {
         let suffix = SystemTime::now()
@@ -148,6 +171,14 @@ mod tests {
             fs::create_dir_all(parent).expect("parent directory should be created");
         }
         fs::write(path, contents).expect("test file should be writable");
+    }
+
+    fn set_modified(path: &Path, modified_time: SystemTime) {
+        let file = fs::File::open(path).expect("test file should open");
+        let times = fs::FileTimes::new()
+            .set_modified(modified_time)
+            .set_accessed(modified_time);
+        file.set_times(times).expect("test file time should update");
     }
 
     #[test]
@@ -202,5 +233,28 @@ mod tests {
         assert_eq!(first.fingerprint, second.fingerprint);
         assert_eq!(first.entries.len(), 1);
         assert_eq!(first.entries[0].relative_path, "SKILL.md");
+    }
+
+    #[test]
+    fn compute_local_updated_at_uses_deepest_regular_file_and_ignores_git() {
+        let root = temp_dir("local-updated-at");
+        let base_time = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        let skill = root.join("SKILL.md");
+        let nested = root.join("references/deep/note.md");
+        let git_config = root.join(".git/config");
+        write_file(&skill, "# Example\n");
+        write_file(&nested, "newest visible file");
+        write_file(&git_config, "ignored newest file");
+        set_modified(&skill, base_time + Duration::from_secs(10));
+        set_modified(&nested, base_time + Duration::from_secs(20));
+        set_modified(&git_config, base_time + Duration::from_secs(30));
+
+        let updated_at = compute_local_updated_at(&root).expect("local updated at should compute");
+        let nested_updated_at =
+            DateTime::<Utc>::from(base_time + Duration::from_secs(20)).to_rfc3339();
+
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(updated_at.as_deref(), Some(nested_updated_at.as_str()));
     }
 }

@@ -10,6 +10,7 @@ use metis_security::checker::scan_directory;
 use metis_security::findings::SecuritySeverity;
 use metis_storage::backup::replace_skill_directory;
 use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
+use metis_storage::manifest::compute_local_updated_at;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -179,6 +180,8 @@ fn try_install_one_target<C: RemoteCommitChecker>(
         local_fingerprint: None,
         local_modified: Some(false),
         last_scanned_at: Utc::now().to_rfc3339(),
+        local_updated_at: compute_local_updated_at(install_path)
+            .map_err(|error| error.to_string())?,
     };
     store
         .upsert_skill(&skill_record)
@@ -415,6 +418,7 @@ mod tests {
                 local_fingerprint: Some("old".to_string()),
                 local_modified: Some(true),
                 last_scanned_at: "now".to_string(),
+                local_updated_at: None,
             })
             .expect("skill should upsert");
 

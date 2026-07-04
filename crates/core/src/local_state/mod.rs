@@ -47,6 +47,9 @@ pub fn capture_local_baseline(
     store
         .update_skill_local_fingerprint(skill_id, &snapshot.fingerprint, false)
         .map_err(LocalStateError::from)?;
+    store
+        .update_skill_local_updated_at(skill_id, latest_modified_at(&snapshot.entries))
+        .map_err(LocalStateError::from)?;
 
     Ok(LocalStateResult {
         skill_id: skill_id.to_string(),
@@ -85,6 +88,9 @@ pub fn check_local_modification(
     store
         .update_skill_local_modified(skill_id, local_modified)
         .map_err(LocalStateError::from)?;
+    store
+        .update_skill_local_updated_at(skill_id, latest_modified_at(&snapshot.entries))
+        .map_err(LocalStateError::from)?;
 
     Ok(LocalStateResult {
         skill_id: skill_id.to_string(),
@@ -119,6 +125,10 @@ pub(crate) fn manifest_records(
             is_executable: entry.is_executable,
         })
         .collect()
+}
+
+fn latest_modified_at(entries: &[ManifestEntry]) -> Option<&str> {
+    entries.iter().map(|entry| entry.modified_at.as_str()).max()
 }
 
 fn stable_manifest_entry_id(
@@ -200,6 +210,7 @@ mod tests {
             local_fingerprint: None,
             local_modified: None,
             last_scanned_at: "2026-06-19T10:00:00Z".to_string(),
+            local_updated_at: None,
         }
     }
 

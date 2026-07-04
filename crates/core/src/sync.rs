@@ -415,6 +415,7 @@ mod tests {
             local_fingerprint: None,
             local_modified: None,
             last_scanned_at: "2026-06-21T10:00:00Z".to_string(),
+            local_updated_at: None,
         }
     }
 }

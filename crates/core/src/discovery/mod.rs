@@ -5,9 +5,11 @@ use metis_adapters::generic::GenericAgentSkillsAdapter;
 use metis_adapters::hermes::HermesAdapter;
 use metis_adapters::openclaw::OpenClawAdapter;
 use metis_adapters::opencode::OpencodeAdapter;
+use metis_adapters::standard::{discover_standard_skill_dirs, parse_standard_skill_metadata};
 use metis_adapters::traits::SkillCategory;
 use metis_adapters::{AdapterError, AdapterRegistry, AgentAdapter, SkillScope};
 use metis_storage::db::{SkillIndexStore, SkillRecord, StorageError};
+use metis_storage::manifest::compute_local_updated_at;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -18,12 +20,29 @@ use std::path::{Path, PathBuf};
 pub struct ListAgentsOptions {
     pub enabled_agent_ids: Option<Vec<String>>,
     pub custom_paths: Vec<String>,
+    pub agent_path_overrides: Vec<AgentPathOverride>,
+    pub custom_monitored_paths: Vec<CustomMonitoredPath>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct ScanOptions {
     pub agent_ids: Option<Vec<String>>,
     pub custom_paths: Vec<String>,
+    pub agent_path_overrides: Vec<AgentPathOverride>,
+    pub custom_monitored_paths: Vec<CustomMonitoredPath>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentPathOverride {
+    pub agent_id: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomMonitoredPath {
+    pub id: String,
+    pub name: String,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,18 +126,18 @@ pub enum DiscoveryStorageError {
 
 pub fn list_agents(options: ListAgentsOptions) -> Vec<AgentStatus> {
     let registry = build_registry(options.custom_paths);
-
-    registry
+    let mut agents = registry
         .all()
         .iter()
-        .map(|adapter| {
-            let enabled = options
+        .filter(|adapter| {
+            options
                 .enabled_agent_ids
                 .as_ref()
                 .map(|ids| ids.iter().any(|id| id == adapter.agent_id()))
-                .unwrap_or(true);
-            let paths = adapter
-                .candidate_paths()
+                .unwrap_or(true)
+        })
+        .map(|adapter| {
+            let paths = effective_candidate_paths(adapter.as_ref(), &options.agent_path_overrides)
                 .into_iter()
                 .map(|path| {
                     let expanded = expand_path_template(&path.path_template);
@@ -135,21 +154,27 @@ pub fn list_agents(options: ListAgentsOptions) -> Vec<AgentStatus> {
             AgentStatus {
                 agent_id: adapter.agent_id().to_string(),
                 agent_name: adapter.agent_name().to_string(),
-                enabled,
+                enabled: true,
                 paths,
             }
         })
-        .collect()
+        .collect::<Vec<_>>();
+
+    agents.extend(custom_monitored_agent_statuses(
+        &options.custom_monitored_paths,
+        options.enabled_agent_ids.as_deref(),
+    ));
+    agents
 }
 
 pub fn scan_skills(options: ScanOptions) -> ScanResult {
-    let registry = build_registry(options.custom_paths);
+    let registry = build_registry(options.custom_paths.clone());
     let adapters = selected_adapters(&registry, options.agent_ids.as_deref());
     let mut skills = Vec::new();
     let mut warnings = Vec::new();
 
     for adapter in adapters {
-        for search_path in adapter.candidate_paths() {
+        for search_path in effective_candidate_paths(adapter, &options.agent_path_overrides) {
             let root = expand_path_template(&search_path.path_template);
             let root_display = root.to_string_lossy().to_string();
             let discovered = match adapter.discover_skill_dirs(&root_display) {
@@ -207,6 +232,7 @@ pub fn scan_skills(options: ScanOptions) -> ScanResult {
             }
         }
     }
+    scan_custom_monitored_paths(&options, &mut skills, &mut warnings);
 
     skills.sort_by(|left, right| {
         left.agent_id
@@ -270,32 +296,164 @@ fn cleanup_stale_indexed_skills(
 
 fn scanned_roots_for_options(options: &ScanOptions) -> Vec<(String, PathBuf)> {
     let registry = build_registry(options.custom_paths.clone());
-    selected_adapters(&registry, options.agent_ids.as_deref())
+    let mut roots = selected_adapters(&registry, options.agent_ids.as_deref())
         .into_iter()
         .flat_map(|adapter| {
-            adapter
-                .candidate_paths()
+            effective_candidate_paths(adapter, &options.agent_path_overrides)
                 .into_iter()
                 .map(move |search_path| (adapter.agent_id().to_string(), search_path))
         })
         .map(|(agent_id, search_path)| (agent_id, expand_path_template(&search_path.path_template)))
         .filter(|(_, root)| is_readable_dir(root))
-        .collect()
+        .collect::<Vec<_>>();
+    roots.extend(
+        options
+            .custom_monitored_paths
+            .iter()
+            .filter(|path| {
+                options
+                    .agent_ids
+                    .as_ref()
+                    .map(|ids| ids.iter().any(|id| id == &custom_agent_id(&path.id)))
+                    .unwrap_or(true)
+            })
+            .map(|path| (custom_agent_id(&path.id), expand_path_template(&path.path)))
+            .filter(|(_, root)| is_readable_dir(root)),
+    );
+    roots
 }
 
 fn build_registry(custom_paths: Vec<String>) -> AdapterRegistry {
-    if custom_paths.is_empty() {
-        return AdapterRegistry::default();
-    }
-
     let mut registry = AdapterRegistry::new();
     registry.register(Box::new(CodexAdapter::new()));
     registry.register(Box::new(ClaudeCodeAdapter::new()));
     registry.register(Box::new(OpenClawAdapter::new()));
     registry.register(Box::new(HermesAdapter::new()));
     registry.register(Box::new(OpencodeAdapter::new()));
-    registry.register(Box::new(GenericAgentSkillsAdapter::new(custom_paths)));
+    if !custom_paths.is_empty() {
+        registry.register(Box::new(GenericAgentSkillsAdapter::new(custom_paths)));
+    }
     registry
+}
+
+fn effective_candidate_paths(
+    adapter: &dyn AgentAdapter,
+    overrides: &[AgentPathOverride],
+) -> Vec<metis_adapters::SkillSearchPath> {
+    let override_path = overrides
+        .iter()
+        .find(|override_path| override_path.agent_id == adapter.agent_id())
+        .map(|override_path| override_path.path.trim())
+        .filter(|path| !path.is_empty());
+    match override_path {
+        Some(path) => vec![metis_adapters::SkillSearchPath {
+            path_template: path.to_string(),
+            scope: SkillScope::User,
+            priority: 0,
+            description: format!("{} 用户自定义 skills", adapter.agent_name()),
+        }],
+        None => adapter.candidate_paths(),
+    }
+}
+
+fn custom_monitored_agent_statuses(
+    custom_paths: &[CustomMonitoredPath],
+    enabled_agent_ids: Option<&[String]>,
+) -> Vec<AgentStatus> {
+    custom_paths
+        .iter()
+        .filter(|custom_path| {
+            !custom_path.name.trim().is_empty() && !custom_path.path.trim().is_empty()
+        })
+        .filter(|custom_path| {
+            enabled_agent_ids
+                .map(|ids| ids.iter().any(|id| id == &custom_agent_id(&custom_path.id)))
+                .unwrap_or(true)
+        })
+        .map(|custom_path| {
+            let expanded = expand_path_template(custom_path.path.trim());
+            AgentStatus {
+                agent_id: custom_agent_id(&custom_path.id),
+                agent_name: custom_path.name.trim().to_string(),
+                enabled: true,
+                paths: vec![AgentPath {
+                    path: expanded.to_string_lossy().to_string(),
+                    scope: PathScope::User,
+                    exists: expanded.exists(),
+                    readable: is_readable_dir(&expanded),
+                    writable: is_writable_dir(&expanded),
+                }],
+            }
+        })
+        .collect()
+}
+
+fn scan_custom_monitored_paths(
+    options: &ScanOptions,
+    skills: &mut Vec<Skill>,
+    warnings: &mut Vec<ScanWarning>,
+) {
+    for custom_path in &options.custom_monitored_paths {
+        let agent_id = custom_agent_id(&custom_path.id);
+        if options
+            .agent_ids
+            .as_ref()
+            .map(|ids| !ids.iter().any(|id| id == &agent_id))
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        if custom_path.name.trim().is_empty() || custom_path.path.trim().is_empty() {
+            continue;
+        }
+        let root = expand_path_template(custom_path.path.trim());
+        let root_display = root.to_string_lossy().to_string();
+        let discovered = match discover_standard_skill_dirs(&root_display) {
+            Ok(discovered) => discovered,
+            Err(error) => {
+                warnings.push(ScanWarning {
+                    agent_id: agent_id.clone(),
+                    path: root_display,
+                    skill_path: None,
+                    kind: ScanWarningKind::DiscoveryError,
+                    message: error.to_string(),
+                });
+                continue;
+            }
+        };
+        for relative_skill_dir in discovered {
+            let skill_path = root.join(&relative_skill_dir);
+            let skill_path_display = skill_path.to_string_lossy().to_string();
+            match parse_standard_skill_metadata(&skill_path_display) {
+                Ok(metadata) => skills.push(Skill {
+                    id: stable_skill_id(&agent_id, &skill_path_display),
+                    agent_id: agent_id.clone(),
+                    name: metadata.name,
+                    description: metadata.description,
+                    version: metadata.version,
+                    author: metadata.author,
+                    license: metadata.license,
+                    tags: metadata.tags,
+                    category: metadata.category.as_ref().map(skill_category_to_storage),
+                    install_path: skill_path_display.clone(),
+                    scope: PathScope::User,
+                    metadata_path: Some(skill_path.join("SKILL.md").to_string_lossy().to_string()),
+                    metadata_status: MetadataStatus::Found,
+                    source_id: None,
+                    local_fingerprint: None,
+                    local_modified: None,
+                    last_scanned_at: Utc::now(),
+                }),
+                Err(error) => warnings.push(ScanWarning {
+                    agent_id: agent_id.clone(),
+                    path: root_display.clone(),
+                    skill_path: Some(skill_path_display),
+                    kind: warning_kind_for_error(&error),
+                    message: error.to_string(),
+                }),
+            }
+        }
+    }
 }
 
 fn selected_adapters<'a>(
@@ -309,6 +467,30 @@ fn selected_adapters<'a>(
             .iter()
             .map(|adapter| adapter.as_ref())
             .collect(),
+    }
+}
+
+fn custom_agent_id(id: &str) -> String {
+    let slug = id
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if slug.is_empty() {
+        "custom-monitor".to_string()
+    } else {
+        format!("custom-{}", slug)
     }
 }
 
@@ -397,6 +579,7 @@ fn skill_to_record(skill: &Skill) -> SkillRecord {
         local_fingerprint: skill.local_fingerprint.clone(),
         local_modified: skill.local_modified,
         last_scanned_at: skill.last_scanned_at.to_rfc3339(),
+        local_updated_at: compute_local_updated_at(&skill.install_path).ok().flatten(),
     }
 }
 
@@ -498,15 +681,86 @@ mod tests {
 
         assert_eq!(
             agent_ids,
-            vec![
-                "codex",
-                "claude-code",
-                "openclaw",
-                "hermes",
-                "opencode",
-                "generic"
-            ]
+            vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
         );
+    }
+
+    #[test]
+    fn list_agents_uses_builtin_agent_path_overrides_and_named_custom_monitors() {
+        let codex_root = temp_dir("codex-override-root");
+        let team_root = temp_dir("team-monitor-root");
+        fs::create_dir_all(&codex_root).expect("codex override root should be created");
+        fs::create_dir_all(&team_root).expect("custom monitor root should be created");
+
+        let result = list_agents(ListAgentsOptions {
+            enabled_agent_ids: None,
+            custom_paths: vec![],
+            agent_path_overrides: vec![AgentPathOverride {
+                agent_id: "codex".to_string(),
+                path: codex_root.to_string_lossy().to_string(),
+            }],
+            custom_monitored_paths: vec![CustomMonitoredPath {
+                id: "team-memory".to_string(),
+                name: "团队记忆".to_string(),
+                path: team_root.to_string_lossy().to_string(),
+            }],
+        });
+
+        fs::remove_dir_all(&codex_root).expect("codex override root should be removed");
+        fs::remove_dir_all(&team_root).expect("custom monitor root should be removed");
+
+        let codex = result
+            .iter()
+            .find(|agent| agent.agent_id == "codex")
+            .expect("codex agent should exist");
+        assert_eq!(codex.paths.len(), 1);
+        assert_eq!(codex.paths[0].path, codex_root.to_string_lossy());
+
+        let custom = result
+            .iter()
+            .find(|agent| agent.agent_id == "custom-team-memory")
+            .expect("named custom monitor should exist");
+        assert_eq!(custom.agent_name, "团队记忆");
+        assert_eq!(custom.paths[0].path, team_root.to_string_lossy());
+    }
+
+    #[test]
+    fn scan_skills_uses_builtin_agent_path_overrides_and_named_custom_monitors() {
+        let workspace = temp_dir("scan-agent-path-overrides");
+        let codex_root = workspace.join("codex-skills");
+        let custom_root = workspace.join("team-skills");
+        let codex_skill = codex_root.join("planner");
+        let custom_skill = custom_root.join("memory");
+        fs::create_dir_all(&codex_skill).expect("codex skill directory should be created");
+        fs::create_dir_all(&custom_skill).expect("custom skill directory should be created");
+        write_file(&codex_skill.join("SKILL.md"), "# Planner\n");
+        write_file(&custom_skill.join("SKILL.md"), "# Team Memory\n");
+
+        let result = scan_skills(ScanOptions {
+            agent_ids: None,
+            custom_paths: vec![],
+            agent_path_overrides: vec![AgentPathOverride {
+                agent_id: "codex".to_string(),
+                path: codex_root.to_string_lossy().to_string(),
+            }],
+            custom_monitored_paths: vec![CustomMonitoredPath {
+                id: "team-memory".to_string(),
+                name: "团队记忆".to_string(),
+                path: custom_root.to_string_lossy().to_string(),
+            }],
+        });
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(result.warnings.is_empty());
+        assert!(result
+            .skills
+            .iter()
+            .any(|skill| skill.agent_id == "codex" && skill.name == "Planner"));
+        assert!(result
+            .skills
+            .iter()
+            .any(|skill| skill.agent_id == "custom-team-memory" && skill.name == "Team Memory"));
     }
 
     #[test]
@@ -527,6 +781,7 @@ category: workflow
         let result = scan_skills(ScanOptions {
             agent_ids: Some(vec!["generic".to_string()]),
             custom_paths: vec![root.to_string_lossy().to_string()],
+            ..Default::default()
         });
 
         fs::remove_dir_all(&root).expect("temp directory should be removed");
@@ -565,6 +820,7 @@ name: [broken
         let result = scan_skills(ScanOptions {
             agent_ids: Some(vec!["generic".to_string()]),
             custom_paths: vec![root.to_string_lossy().to_string()],
+            ..Default::default()
         });
 
         fs::remove_dir_all(&root).expect("temp directory should be removed");
@@ -598,6 +854,7 @@ description: Stored in SQLite
             ScanOptions {
                 agent_ids: Some(vec!["generic".to_string()]),
                 custom_paths: vec![root.to_string_lossy().to_string()],
+                ..Default::default()
             },
             &store,
         )
@@ -643,6 +900,7 @@ category: tool
             ScanOptions {
                 agent_ids: Some(vec!["generic".to_string()]),
                 custom_paths: vec![root.to_string_lossy().to_string()],
+                ..Default::default()
             },
             &store,
         )
@@ -680,6 +938,7 @@ description: First description
         let options = ScanOptions {
             agent_ids: Some(vec!["generic".to_string()]),
             custom_paths: vec![root.to_string_lossy().to_string()],
+            ..Default::default()
         };
 
         let first = scan_and_index_skills(options.clone(), &store)
@@ -724,6 +983,7 @@ description: First description
         let options = ScanOptions {
             agent_ids: Some(vec!["generic".to_string()]),
             custom_paths: vec![root.to_string_lossy().to_string()],
+            ..Default::default()
         };
 
         let first = scan_and_index_skills(options.clone(), &store)
@@ -774,6 +1034,7 @@ description: Updated description
         let options = ScanOptions {
             agent_ids: Some(vec!["generic".to_string()]),
             custom_paths: vec![root.to_string_lossy().to_string()],
+            ..Default::default()
         };
 
         scan_and_index_skills(options.clone(), &store).expect("first scan should index");
@@ -809,6 +1070,7 @@ name: [broken
             ScanOptions {
                 agent_ids: Some(vec!["generic".to_string()]),
                 custom_paths: vec![root.to_string_lossy().to_string()],
+                ..Default::default()
             },
             &store,
         )

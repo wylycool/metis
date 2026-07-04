@@ -1,3 +1,4 @@
+import { AgentBadge } from "./AgentBadge";
 import { InlineError } from "./SkillRow";
 import type {
   DesktopError,
@@ -35,11 +36,11 @@ export function CrossAgentTargetMatrix({
       <div className="target-matrix-header">
         <div>
           <h3>{title}</h3>
-          <p>同一远端 source 在各 Agent 根目录下的安装与更新状态。</p>
+          <p>选择要安装或更新的位置。自定义路径会和内置 Agent 一起显示。</p>
         </div>
         <button
           aria-busy={loading}
-          className="ghost-button compact"
+          className="ghost-button compact target-matrix-refresh"
           data-testid="refresh-target-matrix"
           disabled={loading}
           onClick={onRefresh}
@@ -49,7 +50,9 @@ export function CrossAgentTargetMatrix({
         </button>
       </div>
       {error && <InlineError error={error} />}
-      {loading && targets.length === 0 && <p className="matrix-muted">正在检查跨 Agent 状态</p>}
+      {loading && targets.length === 0 && (
+        <p className="matrix-muted">正在读取远端 Git，并计算可安装的 Agent / 目录</p>
+      )}
       {!loading && !error && targets.length === 0 && (
         <p className="matrix-muted">没有可用安装目标</p>
       )}
@@ -61,24 +64,24 @@ export function CrossAgentTargetMatrix({
             const isCurrent = currentAgentId === target.agent_id;
             return (
               <label
-                className={`remote-target-row ${isCurrent ? "current" : ""}`}
+                className={`remote-target-row redesign-detail-agent-path-row ${remoteTargetDetailTone(target)} ${isCurrent ? "current" : ""}`}
                 data-testid={`target-row-${target.agent_id}`}
                 key={id}
               >
                 <input
+                  className="remote-target-checkbox"
                   data-testid={`target-checkbox-${target.agent_id}`}
                   type="checkbox"
                   checked={selectedTargetIds.includes(id)}
                   disabled={!selectable}
                   onChange={() => onToggleTarget(target)}
                 />
-                <span>
-                  <strong>
-                    {target.agent_name}
-                    {isCurrent && <em>当前查看</em>}
-                  </strong>
-                  <small>{target.install_path}</small>
+                <AgentBadge agent={{ agent_id: target.agent_id, agent_name: target.agent_name }} />
+                <span className="remote-target-agent-name">
+                  {target.agent_name}
+                  {isCurrent && <em>当前查看</em>}
                 </span>
+                <code>{target.install_path}</code>
                 <b
                   className={`target-status-badge ${remoteTargetStatusTone(target)}`}
                   data-testid={`target-status-${target.agent_id}`}
@@ -92,9 +95,9 @@ export function CrossAgentTargetMatrix({
       )}
       {targets.length > 0 && (
         <div className="target-action-bar">
-          <span>已选 {selectedCount} 个 Agent</span>
+          <span>已选 {selectedCount} 个 Agent / 目录</span>
           <button
-            className="compact"
+            className="compact target-install-button"
             data-testid="install-selected-targets"
             disabled={loading || selectedCount === 0}
             onClick={onInstall}
@@ -107,7 +110,7 @@ export function CrossAgentTargetMatrix({
         <div className="remote-install-result">
           {installResult.targets.map((target) => (
             <span key={`${target.agent_id}:${target.install_path}`}>
-              {agentNameFromId(target.agent_id)}：{target.status}
+              {remoteInstallTargetName(target, targets)}：{target.status}
               {target.reason ? ` (${target.reason})` : ""}
             </span>
           ))}
@@ -160,6 +163,25 @@ function remoteTargetStatusTone(target: DesktopSkillTarget) {
   return "target-status-muted";
 }
 
+function remoteTargetDetailTone(target: DesktopSkillTarget) {
+  if (target.local_modified) {
+    return "local-modified";
+  }
+  if (target.status === "UpdateAvailable") {
+    return "update";
+  }
+  if (["UpToDate", "InstalledBound"].includes(target.status)) {
+    return "latest";
+  }
+  if (["ConflictNonSkill", "AgentRootUnavailable"].includes(target.status)) {
+    return "failed";
+  }
+  if (target.status === "InstalledUnbound") {
+    return "no-source";
+  }
+  return "unknown";
+}
+
 function agentNameFromId(agentId: string) {
   const names: Record<string, string> = {
     codex: "Codex",
@@ -170,4 +192,17 @@ function agentNameFromId(agentId: string) {
     generic: "Generic Agent Skills",
   };
   return names[agentId] ?? agentId;
+}
+
+function remoteInstallTargetName(
+  resultTarget: DesktopInstallRemoteSkillResult["targets"][number],
+  targets: DesktopSkillTarget[],
+) {
+  return (
+    targets.find(
+      (target) =>
+        target.agent_id === resultTarget.agent_id &&
+        target.install_path === resultTarget.install_path,
+    )?.agent_name ?? agentNameFromId(resultTarget.agent_id)
+  );
 }

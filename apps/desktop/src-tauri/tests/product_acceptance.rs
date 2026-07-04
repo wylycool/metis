@@ -47,7 +47,7 @@ fn run_p0_product_acceptance(fixture: &ProductAcceptanceFixture) -> Result<(), S
 
     let initial_scan = scan_skills_for_state(&state, DesktopScanRequest::default())
         .map_err(|error| format!("首次启动与扫描失败: {error}"))?;
-    assert_at_least_skill_count(&initial_scan.skills, 3)?;
+    assert_at_least_skill_count(&initial_scan.skills, 2)?;
     assert!(
         initial_scan.warnings.iter().any(|warning| warning
             .skill_path
@@ -301,7 +301,7 @@ fn write_product_acceptance_report(report: &ProductAcceptanceReport) -> Result<(
          - 备份数: {}\n\
          - 回滚备份: `{}`\n\n\
          ## 覆盖范围\n\n\
-         - 首次启动与扫描：真实 HOME 下 Codex / Claude / Generic fixture。\n\
+         - 首次启动与扫描：真实 HOME 下 Codex / Claude fixture。\n\
          - 绑定来源：真实本地 Git repo。\n\
          - 检查更新：真实 Git ref / commits behind / diff summary。\n\
          - 查看 diff：真实 `git diff` 输出。\n\

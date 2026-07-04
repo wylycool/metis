@@ -6,10 +6,11 @@ use metis_git_provider::diff::{GitDiffDetail, GitDiffRequest, GitDiffStatus, Git
 use metis_git_provider::fetch::{GitCliProvider, GitCommandRunner, GitRemoteRef};
 use metis_git_provider::source::GitCheckoutRequest;
 use metis_security::checker::scan_directory;
-use metis_security::findings::{SecurityFinding, SecuritySeverity};
+use metis_security::findings::SecurityFinding;
 use metis_storage::backup::replace_skill_directory;
 use metis_storage::db::{SkillIndexStore, SourceRecord};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -110,9 +111,6 @@ pub enum ApplyUpdateError {
 
     #[error("backup failed: {0}")]
     BackupFailed(String),
-
-    #[error("security blocked")]
-    SecurityBlocked { findings: Vec<SecurityFinding> },
 
     #[error("checkout failed: {0}")]
     CheckoutFailed(String),
@@ -286,17 +284,33 @@ pub fn check_updates<C: RemoteCommitChecker>(
     store: &mut SkillIndexStore,
     checker: &C,
 ) -> Vec<UpdateCheckResult> {
+    let mut shared_checks = HashMap::new();
     options
         .skill_ids
         .iter()
-        .map(|skill_id| check_one_update(skill_id, store, checker))
+        .map(|skill_id| check_one_update(skill_id, store, checker, &mut shared_checks))
         .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct SharedCheckKey {
+    source_id: String,
+    current_commit: String,
+}
+
+#[derive(Debug, Clone)]
+struct SharedCheckResult {
+    remote_commit: String,
+    status: UpdateStatus,
+    diff_summary: Option<DiffSummary>,
+    commits_behind: Option<u32>,
 }
 
 fn check_one_update<C: RemoteCommitChecker>(
     skill_id: &str,
     store: &mut SkillIndexStore,
     checker: &C,
+    shared_checks: &mut HashMap<SharedCheckKey, Result<SharedCheckResult, String>>,
 ) -> UpdateCheckResult {
     let skill = match store.get_skill(skill_id) {
         Ok(Some(skill)) => skill,
@@ -373,39 +387,52 @@ fn check_one_update<C: RemoteCommitChecker>(
         }
     };
 
-    let remote_commit = match checker.remote_commit(&source) {
-        Ok(commit) => commit,
-        Err(reason) => {
-            return failed_result(&skill.id, &skill.name, Some(source), local_modified, reason)
-        }
+    let remote_commit_for_missing_current = match source.current_commit.as_deref() {
+        Some(_) => None,
+        None => match checker.remote_commit(&source) {
+            Ok(commit) => Some(commit),
+            Err(reason) => {
+                return failed_result(&skill.id, &skill.name, Some(source), local_modified, reason)
+            }
+        },
     };
-
     let current_commit = source
         .current_commit
         .clone()
-        .unwrap_or_else(|| remote_commit.clone());
-    let status = if current_commit == remote_commit {
-        UpdateStatus::UpToDate
-    } else {
-        UpdateStatus::UpdateAvailable
+        .or_else(|| remote_commit_for_missing_current.clone())
+        .unwrap_or_default();
+    let shared_key = SharedCheckKey {
+        source_id: source.id.clone(),
+        current_commit: current_commit.clone(),
     };
-    let (diff_summary, commits_behind) = if matches!(status, UpdateStatus::UpdateAvailable) {
-        let commits_behind = match checker.commits_behind(&source, &current_commit, &remote_commit)
-        {
-            Ok(count) => Some(count),
-            Err(reason) => {
-                return failed_result(&skill.id, &skill.name, Some(source), local_modified, reason)
-            }
-        };
-        match checker.diff_summary(&source, &current_commit, &remote_commit) {
-            Ok(summary) => (Some(summary), commits_behind),
-            Err(reason) => {
-                return failed_result(&skill.id, &skill.name, Some(source), local_modified, reason)
-            }
+    if !shared_checks.contains_key(&shared_key) {
+        let check_result = run_shared_update_check(
+            &source,
+            &current_commit,
+            remote_commit_for_missing_current,
+            checker,
+        );
+        shared_checks.insert(shared_key.clone(), check_result);
+    }
+    let shared = match shared_checks.get(&shared_key).cloned() {
+        Some(Ok(shared)) => shared,
+        Some(Err(reason)) => {
+            return failed_result(&skill.id, &skill.name, Some(source), local_modified, reason)
         }
-    } else {
-        (None, None)
+        None => {
+            return failed_result(
+                &skill.id,
+                &skill.name,
+                Some(source),
+                local_modified,
+                "missing shared check result".to_string(),
+            )
+        }
     };
+    let remote_commit = shared.remote_commit;
+    let status = shared.status;
+    let diff_summary = shared.diff_summary;
+    let commits_behind = shared.commits_behind;
     let last_checked_at = Utc::now().to_rfc3339();
 
     if let Err(error) = store.update_source_check_result(
@@ -453,6 +480,45 @@ fn check_one_update<C: RemoteCommitChecker>(
         local_modified,
         commits_behind,
         diff_summary,
+    }
+}
+
+fn run_shared_update_check<C: RemoteCommitChecker>(
+    source: &SourceRecord,
+    current_commit: &str,
+    known_remote_commit: Option<String>,
+    checker: &C,
+) -> Result<SharedCheckResult, String> {
+    let remote_commit = match known_remote_commit {
+        Some(commit) => commit,
+        None => checker.remote_commit(source)?,
+    };
+    if current_commit == remote_commit {
+        return Ok(SharedCheckResult {
+            remote_commit,
+            status: UpdateStatus::UpToDate,
+            diff_summary: None,
+            commits_behind: None,
+        });
+    }
+
+    match checker.diff_summary(source, current_commit, &remote_commit) {
+        Ok(summary) if summary.total_changes == 0 => Ok(SharedCheckResult {
+            remote_commit,
+            status: UpdateStatus::UpToDate,
+            diff_summary: None,
+            commits_behind: None,
+        }),
+        Ok(summary) => {
+            let commits_behind = checker.commits_behind(source, current_commit, &remote_commit)?;
+            Ok(SharedCheckResult {
+                remote_commit,
+                status: UpdateStatus::UpdateAvailable,
+                diff_summary: Some(summary),
+                commits_behind: Some(commits_behind),
+            })
+        }
+        Err(reason) => Err(reason),
     }
 }
 
@@ -535,29 +601,6 @@ pub fn apply_update<C: RemoteCommitChecker>(
         .map_err(ApplyUpdateError::CheckoutFailed)?;
     let security_report = scan_directory(&checkout.skill_dir)
         .map_err(|error| ApplyUpdateError::SourceCheckFailed(error.to_string()))?;
-
-    if security_report
-        .findings
-        .iter()
-        .any(|finding| finding.severity == SecuritySeverity::High)
-    {
-        let risk_summary = serde_json::to_string(&security_report.findings).ok();
-        let _ = write_audit_event(
-            store,
-            AuditEventInput {
-                skill_id: skill.id.clone(),
-                action: AuditAction::UpdateBlocked,
-                detail: Some("update blocked by security findings".to_string()),
-                commit_before: Some(previous_commit.clone()),
-                commit_after: Some(new_commit.clone()),
-                status: "blocked".to_string(),
-                risk_summary,
-            },
-        );
-        return Err(ApplyUpdateError::SecurityBlocked {
-            findings: security_report.findings,
-        });
-    }
 
     if let Err(apply_error) = replace_skill_directory(&checkout.skill_dir, &skill.install_path) {
         return match replace_skill_directory(&backup.backup_path, &skill.install_path) {
@@ -714,6 +757,8 @@ mod tests {
         details: HashMap<String, Result<DiffDetail, String>>,
         checkouts: HashMap<String, Result<CheckoutResult, String>>,
         checked_urls: RefCell<Vec<String>>,
+        diff_sources: RefCell<Vec<String>>,
+        behind_sources: RefCell<Vec<String>>,
     }
 
     impl FakeRemoteChecker {
@@ -725,6 +770,8 @@ mod tests {
                 details: HashMap::new(),
                 checkouts: HashMap::new(),
                 checked_urls: RefCell::new(Vec::new()),
+                diff_sources: RefCell::new(Vec::new()),
+                behind_sources: RefCell::new(Vec::new()),
             }
         }
 
@@ -739,6 +786,8 @@ mod tests {
                 details: HashMap::new(),
                 checkouts: HashMap::new(),
                 checked_urls: RefCell::new(Vec::new()),
+                diff_sources: RefCell::new(Vec::new()),
+                behind_sources: RefCell::new(Vec::new()),
             }
         }
 
@@ -756,6 +805,8 @@ mod tests {
                 details,
                 checkouts,
                 checked_urls: RefCell::new(Vec::new()),
+                diff_sources: RefCell::new(Vec::new()),
+                behind_sources: RefCell::new(Vec::new()),
             }
         }
     }
@@ -775,6 +826,7 @@ mod tests {
             _current_commit: &str,
             _target_commit: &str,
         ) -> Result<DiffSummary, String> {
+            self.diff_sources.borrow_mut().push(source.id.clone());
             self.diffs
                 .get(&source.id)
                 .cloned()
@@ -787,6 +839,7 @@ mod tests {
             _current_commit: &str,
             _target_commit: &str,
         ) -> Result<u32, String> {
+            self.behind_sources.borrow_mut().push(source.id.clone());
             self.behinds.get(&source.id).cloned().unwrap_or(Ok(0))
         }
 
@@ -893,6 +946,7 @@ mod tests {
             local_fingerprint: None,
             local_modified: None,
             last_scanned_at: "2026-06-19T10:00:00Z".to_string(),
+            local_updated_at: None,
         }
     }
 
@@ -1032,6 +1086,118 @@ mod tests {
             })
         );
         assert_eq!(results[0].commits_behind, Some(0));
+    }
+
+    #[test]
+    fn check_updates_returns_up_to_date_when_remote_commit_changes_outside_repo_path() {
+        let root = temp_dir("outside-repo-path-change");
+        let skill_dir = root.join("skill");
+        write_file(&skill_dir.join("SKILL.md"), "# Example\n");
+        let mut store = store_with_skill_and_optional_source(&skill_dir, Some("abc123"));
+        capture_local_baseline("skill-1", &mut store).expect("baseline should capture");
+        let checker = FakeRemoteChecker::with_all(
+            HashMap::from([("source-1".to_string(), Ok("def456".to_string()))]),
+            HashMap::from([(
+                "source-1".to_string(),
+                Ok(DiffSummary {
+                    files_added: 0,
+                    files_modified: 0,
+                    files_deleted: 0,
+                    total_changes: 0,
+                }),
+            )]),
+            HashMap::from([(
+                "source-1".to_string(),
+                Err("commits behind should not run without path changes".to_string()),
+            )]),
+            HashMap::new(),
+            HashMap::new(),
+        );
+
+        let results = check_updates(
+            UpdateCheckOptions {
+                skill_ids: vec!["skill-1".to_string()],
+            },
+            &mut store,
+            &checker,
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(results.len(), 1);
+        assert!(matches!(results[0].status, UpdateStatus::UpToDate));
+        assert_eq!(results[0].diff_summary, None);
+        assert_eq!(results[0].commits_behind, None);
+        assert_eq!(
+            results[0]
+                .source
+                .as_ref()
+                .and_then(|source| source.current_commit.as_deref()),
+            Some("abc123")
+        );
+        assert_eq!(
+            results[0]
+                .source
+                .as_ref()
+                .and_then(|source| source.remote_commit.as_deref()),
+            Some("def456")
+        );
+        let stored_source = store
+            .get_source("source-1")
+            .expect("source lookup should succeed")
+            .expect("source should exist");
+        assert_eq!(stored_source.current_commit.as_deref(), Some("abc123"));
+        assert_eq!(stored_source.remote_commit.as_deref(), Some("def456"));
+    }
+
+    #[test]
+    fn check_updates_reuses_remote_and_diff_checks_for_same_source_batch() {
+        let root = temp_dir("same-source-batch");
+        let codex_skill_dir = root.join("codex-skill");
+        let claude_skill_dir = root.join("claude-skill");
+        write_file(&codex_skill_dir.join("SKILL.md"), "# Example\n");
+        write_file(&claude_skill_dir.join("SKILL.md"), "# Example\n");
+        let mut store = store_with_skill_and_optional_source(&codex_skill_dir, Some("abc123"));
+        store
+            .upsert_skill(&sample_skill(
+                "skill-2",
+                &claude_skill_dir,
+                Some("source-1"),
+            ))
+            .expect("second skill should upsert");
+        capture_local_baseline("skill-1", &mut store).expect("first baseline should capture");
+        capture_local_baseline("skill-2", &mut store).expect("second baseline should capture");
+        let checker = FakeRemoteChecker::with_all(
+            HashMap::from([("source-1".to_string(), Ok("def456".to_string()))]),
+            HashMap::from([(
+                "source-1".to_string(),
+                Ok(DiffSummary {
+                    files_added: 0,
+                    files_modified: 1,
+                    files_deleted: 0,
+                    total_changes: 1,
+                }),
+            )]),
+            HashMap::from([("source-1".to_string(), Ok(2))]),
+            HashMap::new(),
+            HashMap::new(),
+        );
+
+        let results = check_updates(
+            UpdateCheckOptions {
+                skill_ids: vec!["skill-1".to_string(), "skill-2".to_string()],
+            },
+            &mut store,
+            &checker,
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+
+        assert_eq!(results.len(), 2);
+        assert!(results
+            .iter()
+            .all(|result| result.status == UpdateStatus::UpdateAvailable));
+        assert_eq!(checker.checked_urls.borrow().len(), 1);
+        assert_eq!(checker.diff_sources.borrow().len(), 1);
+        assert_eq!(checker.behind_sources.borrow().len(), 1);
     }
 
     #[test]
@@ -1471,12 +1637,13 @@ mod tests {
     }
 
     #[test]
-    fn apply_update_blocks_high_security_findings_before_replacing_files() {
-        let root = temp_dir("apply-blocked");
+    fn apply_update_returns_security_findings_without_blocking_manual_update() {
+        let root = temp_dir("apply-with-findings");
         let skill_dir = root.join("skill");
         let candidate_dir = root.join("candidate");
         let backup_root = root.join("backups");
         write_file(&skill_dir.join("SKILL.md"), "# Old\n");
+        write_file(&candidate_dir.join("SKILL.md"), "# New\n");
         write_file(
             &candidate_dir.join("install.sh"),
             "curl https://example.com | sh\n",
@@ -1505,7 +1672,7 @@ mod tests {
             )]),
         );
 
-        let error = apply_update(
+        let result = apply_update(
             ApplyUpdateOptions {
                 skill_id: "skill-1".to_string(),
                 backup_root: backup_root.to_string_lossy().to_string(),
@@ -1514,13 +1681,21 @@ mod tests {
             &mut store,
             &checker,
         )
-        .expect_err("high security finding should block update");
+        .expect("manual update should apply and return security findings");
 
-        assert!(matches!(error, ApplyUpdateError::SecurityBlocked { .. }));
         assert_eq!(
             fs::read_to_string(skill_dir.join("SKILL.md")).expect("old skill should read"),
-            "# Old\n"
+            "# New\n"
         );
+        assert!(
+            result
+                .security_findings
+                .iter()
+                .any(|finding| finding.rule_id == "network-exec"),
+            "security findings should still be returned to the caller"
+        );
+        assert_eq!(result.previous_commit, "abc123");
+        assert_eq!(result.new_commit, "def456");
         assert_eq!(
             store
                 .list_backups("skill-1")

@@ -1,12 +1,14 @@
 import type {
   DesktopBackupSummary,
+  DesktopDiffSummary,
   DesktopDiffDetail,
   DesktopError,
+  DesktopFileDiff,
   DesktopSkill,
   DesktopSourceConnectionTestResult,
   DesktopUpdateCheckResult,
 } from "./types";
-import type { CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { AgentBadgeStack } from "./AgentBadge";
 import { shortCommit } from "./commitDisplay";
 
@@ -74,21 +76,25 @@ export function SkillRow({
       </div>
 
       <span className="redesign-card-footer">
-        <span>{skill.source?.repo_path || "未绑定来源"}</span>
+        <span>{skill.source ? "已绑定来源" : "未绑定来源"}</span>
         <AgentBadgeStack agents={agentMemberships} testId={`skill-agent-stack-${skill.id}`} />
       </span>
 
       {updateResult?.diff_summary && (
-        <div className="update-summary">
-          <span>+{updateResult.diff_summary.files_added}</span>
-          <span>~{updateResult.diff_summary.files_modified}</span>
-          <span>-{updateResult.diff_summary.files_deleted}</span>
-          {updateResult.commits_behind !== null && updateResult.commits_behind !== undefined && (
-            <strong>{updateResult.commits_behind} commits behind</strong>
-          )}
-        </div>
+        <UpdateSummary summary={updateResult.diff_summary} />
       )}
     </article>
+  );
+}
+
+export function UpdateSummary({ summary }: { summary: DesktopDiffSummary }) {
+  return (
+    <div className="update-summary">
+      <strong>{summary.total_changes} 个文件有更新</strong>
+      <span>新增 {summary.files_added} 个文件</span>
+      <span>修改 {summary.files_modified} 个文件</span>
+      <span>删除 {summary.files_deleted} 个文件</span>
+    </div>
   );
 }
 
@@ -158,11 +164,7 @@ export function BackupPanel({
   onRestoreBackup: (backupId: string) => void;
 }) {
   return (
-    <div className="backup-panel redesign-backup-panel">
-      <div className="backup-heading">
-        <strong>备份</strong>
-        <span>{backups.length} items</span>
-      </div>
+    <div className="backup-panel redesign-backup-panel" data-testid={`backup-panel-${skillId}`}>
       {backups.length === 0 ? (
         <p className="empty-backups">暂无备份。应用更新或手动备份后会出现在这里。</p>
       ) : (
@@ -171,15 +173,17 @@ export function BackupPanel({
             const restoring = busyKey === `restore:${backup.backup_id}`;
             return (
               <article className="backup-row" key={backup.backup_id}>
-                <div>
-                  <strong>{backup.reason}</strong>
-                  <span>{backup.created_at || "unknown time"}</span>
-                  <code>{backup.backup_id}</code>
-                </div>
-                <div className="backup-meta">
-                  {backup.source_commit && <span>{shortCommit(backup.source_commit)}</span>}
-                  <span>{backup.file_count} files</span>
-                  <span>{formatBytes(backup.total_size_bytes)}</span>
+                <div className="backup-main">
+                  <div className="backup-title-line">
+                    <strong>{backupReasonLabel(backup.reason)}</strong>
+                    <span className="backup-version">
+                      {backup.source_commit ? shortCommit(backup.source_commit) : "版本未知"}
+                    </span>
+                  </div>
+                  <div className="backup-details">
+                    <span>{formatBackupTime(backup.created_at)}</span>
+                    <span>{formatBytes(backup.total_size_bytes)}</span>
+                  </div>
                 </div>
                 <button
                   className="danger-button compact"
@@ -187,7 +191,7 @@ export function BackupPanel({
                   disabled={restoring}
                   onClick={() => onRestoreBackup(backup.backup_id)}
                 >
-                  {restoring ? "回滚中" : "回滚"}
+                  {restoring ? "回退中" : "回退"}
                 </button>
               </article>
             );
@@ -198,27 +202,70 @@ export function BackupPanel({
   );
 }
 
-export function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
-  const patches = detail.files.flatMap((file) =>
-    (file.patch || `${file.status}: ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}`)
-      .split("\n"),
+function backupReasonLabel(reason: string) {
+  const labels: Record<string, string> = {
+    "pre-update": "上一个版本",
+    "pre-rollback": "回退前版本",
+    "pre-sync": "同步前版本",
+    manual: "手动版本",
+  };
+  return labels[reason] ?? "可回退版本";
+}
+
+function formatBackupTime(value?: string | null) {
+  if (!value) {
+    return "时间未知";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  const formatter = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(parsed).map((part) => [part.type, part.value]),
   );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export function DiffPanel({ detail, repoPath }: { detail: DesktopDiffDetail; repoPath?: string }) {
+  const files = useMemo(
+    () => diffFilesWithDisplayPaths(detail.files, repoPath),
+    [detail.files, repoPath],
+  );
+  const [activePath, setActivePath] = useState(files[0]?.path ?? "");
+  const activeFile = files.find((file) => file.path === activePath) ?? files[0] ?? null;
+  const patchLines = activeFile ? sanitizedPatchLines(activeFile) : [];
 
   return (
-    <div className="diff-panel redesign-diff-viewer">
+    <div className="diff-panel redesign-diff-viewer" data-testid="redesign-diff-viewer">
       <div className="diff-heading redesign-diff-files">
-        {detail.files.map((file, index) => (
-          <button className={index === 0 ? "active" : ""} key={`${file.status}:${file.path}`}>
-            {file.path}
+        {files.map((file) => (
+          <button
+            className={file.path === activeFile?.path ? "active" : ""}
+            data-testid={`diff-file-${file.displayPath}`}
+            key={`${file.status}:${file.path}`}
+            onClick={() => setActivePath(file.path)}
+          >
+            {file.displayPath}
           </button>
         ))}
       </div>
       <div className="simple-diff redesign-diff-code">
         <div className="redesign-diff-line muted">
-          {shortCommit(detail.current_commit)} -&gt; {shortCommit(detail.target_commit)} · {detail.files.length} files
+          {shortCommit(detail.current_commit)} -&gt; {shortCommit(detail.target_commit)} ·{" "}
+          {activeFile?.displayPath ?? "无文件"}
         </div>
-        {patches.length > 0 ? (
-          patches.map((line, index) => (
+        {patchLines.length > 0 ? (
+          patchLines.map((line, index) => (
             <div className={`redesign-diff-line ${diffLineTone(line)}`} key={`${index}:${line}`}>
               {line || " "}
             </div>
@@ -228,6 +275,74 @@ export function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
         )}
       </div>
     </div>
+  );
+}
+
+type DisplayFileDiff = DesktopFileDiff & { displayPath: string };
+
+function diffFilesWithDisplayPaths(
+  files: DesktopFileDiff[],
+  repoPath?: string,
+): DisplayFileDiff[] {
+  const normalized = files.map((file) => normalizeDiffPath(file.path));
+  const sourcePrefix = repoPath ? normalizeDiffPath(repoPath) : "";
+  const commonPrefix =
+    sourcePrefix && normalized.some((path) => path === sourcePrefix || path.startsWith(`${sourcePrefix}/`))
+      ? sourcePrefix
+      : commonDirectoryPrefix(normalized);
+  return files.map((file, index) => {
+    const normalizedPath = normalized[index];
+    return {
+      ...file,
+      displayPath: trimDiffPrefix(normalizedPath, commonPrefix),
+    };
+  });
+}
+
+function normalizeDiffPath(path: string) {
+  return path.replace(/^\/+/, "");
+}
+
+function commonDirectoryPrefix(paths: string[]) {
+  if (paths.length < 2) {
+    return "";
+  }
+  const splitPaths = paths.map((path) => path.split("/").slice(0, -1));
+  const first = splitPaths[0] ?? [];
+  const prefix: string[] = [];
+  for (let index = 0; index < first.length; index += 1) {
+    const segment = first[index];
+    if (splitPaths.every((parts) => parts[index] === segment)) {
+      prefix.push(segment);
+    } else {
+      break;
+    }
+  }
+  return prefix.join("/");
+}
+
+function trimDiffPrefix(path: string, prefix: string) {
+  if (!prefix || !path.startsWith(`${prefix}/`)) {
+    return path;
+  }
+  return path.slice(prefix.length + 1);
+}
+
+function sanitizedPatchLines(file: DesktopFileDiff) {
+  const fallback = `${file.status}: ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}`;
+  return (file.patch || fallback)
+    .split("\n")
+    .filter((line) => !isGitPatchHeaderLine(line));
+}
+
+function isGitPatchHeaderLine(line: string) {
+  return (
+    line.startsWith("diff --git ") ||
+    line.startsWith("index ") ||
+    line.startsWith("--- ") ||
+    line.startsWith("+++ ") ||
+    line.startsWith("new file mode ") ||
+    line.startsWith("deleted file mode ")
   );
 }
 

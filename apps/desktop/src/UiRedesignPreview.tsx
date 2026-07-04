@@ -536,7 +536,7 @@ function RedesignDetail({
         </div>
         {activeOperation === "check" && <CheckPanel skill={skill} />}
         {activeOperation === "diff" && <DiffViewer />}
-        {activeOperation === "backups" && <BackupPanel onRollback={() => onToast("已回滚到 pre-update-2026-06-30")} />}
+        {activeOperation === "backups" && <BackupPanel onRollback={() => onToast("已回滚到备份版本，回滚前状态已自动备份")} />}
       </section>
     </section>
   );
@@ -546,18 +546,66 @@ function CheckPanel({ skill }: { skill: PreviewSkill }) {
   return (
     <div className="redesign-check-panel" data-testid="redesign-check-panel">
       <div>
-        <span>Local</span>
+        <span>本地版本</span>
         <strong>{skill.localCommit}</strong>
       </div>
       <div>
-        <span>Remote</span>
+        <span>远端版本</span>
         <strong>{skill.remoteCommit}</strong>
       </div>
-      <div>
-        <span>Diff summary</span>
-        <strong>{skill.diffSummary}</strong>
+      <div className="redesign-check-diff-summary">
+        <span>差异</span>
+        <DiffSummaryChips added={1} modified={2} />
       </div>
-      <p>安全检查通过，建议先查看 diff；本地没有未提交修改。</p>
+      <section className="redesign-diff-summary-showcase" aria-label="差异排版示例">
+        <DiffSummaryExample title="只有修改" modified={2} />
+        <DiffSummaryExample title="新增 + 修改" added={1} modified={2} />
+        <DiffSummaryExample title="新增 + 修改 + 删除" added={2} modified={3} deleted={1} />
+        <DiffSummaryExample title="只有删除" deleted={1} />
+        <DiffSummaryExample title="无变化" empty />
+      </section>
+    </div>
+  );
+}
+
+function DiffSummaryExample({
+  added = 0,
+  deleted = 0,
+  empty = false,
+  modified = 0,
+  title,
+}: {
+  added?: number;
+  deleted?: number;
+  empty?: boolean;
+  modified?: number;
+  title: string;
+}) {
+  return (
+    <article className="redesign-diff-summary-example">
+      <span>{title}</span>
+      <DiffSummaryChips added={added} deleted={deleted} empty={empty} modified={modified} />
+    </article>
+  );
+}
+
+function DiffSummaryChips({
+  added = 0,
+  deleted = 0,
+  empty = false,
+  modified = 0,
+}: {
+  added?: number;
+  deleted?: number;
+  empty?: boolean;
+  modified?: number;
+}) {
+  return (
+    <div className="redesign-diff-summary-chips">
+      {added > 0 && <b className="added">新增 {added} 个文件</b>}
+      {modified > 0 && <b className="modified">修改 {modified} 个文件</b>}
+      {deleted > 0 && <b className="deleted">删除 {deleted} 个文件</b>}
+      {empty && <b className="empty">无需查看 diff</b>}
     </div>
   );
 }

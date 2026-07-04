@@ -8,8 +8,9 @@ use metis_core::config::{
     evaluate_source_policy, parse_team_policy_from_str, TeamPolicy as CoreTeamPolicy,
 };
 use metis_core::discovery::{
-    list_agents as core_list_agents, scan_and_index_skills, AgentStatus, ListAgentsOptions,
-    ScanOptions, ScanResult,
+    list_agents as core_list_agents, scan_and_index_skills,
+    AgentPathOverride as CoreAgentPathOverride, AgentStatus,
+    CustomMonitoredPath as CoreCustomMonitoredPath, ListAgentsOptions, ScanOptions, ScanResult,
 };
 use metis_core::install::{
     install_remote_skill_to_targets as core_install_remote_skill_to_targets,
@@ -36,8 +37,9 @@ use metis_core::source::{
     SourceType,
 };
 use metis_core::sync::{
-    get_skill_targets_for_source as core_get_skill_targets_for_source,
-    SkillTarget as CoreSkillTarget, SkillTargetSource, SkillTargetStatus as CoreSkillTargetStatus,
+    classify_target_path, get_skill_targets_for_source as core_get_skill_targets_for_source,
+    IndexedTargetState, SkillTarget as CoreSkillTarget, SkillTargetSource,
+    SkillTargetStatus as CoreSkillTargetStatus, TargetPathEvaluation,
 };
 use metis_core::update::{
     apply_update as core_apply_update, check_updates as core_check_updates,
@@ -154,10 +156,20 @@ pub struct DesktopSkill {
     pub metadata_path: Option<String>,
     pub metadata_status: String,
     pub metadata_error: Option<String>,
+    pub file_count: Option<u64>,
+    pub total_size_bytes: Option<u64>,
     pub source_id: Option<String>,
     pub source: Option<DesktopSource>,
     pub local_modified: Option<bool>,
     pub last_scanned_at: String,
+    pub local_updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSkillSize {
+    pub skill_id: String,
+    pub file_count: u64,
+    pub total_size_bytes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -177,11 +189,30 @@ pub struct DesktopSource {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopSettings {
+    #[serde(default)]
     pub custom_scan_paths: Vec<String>,
+    #[serde(default)]
+    pub agent_path_overrides: Vec<DesktopAgentPathOverride>,
+    #[serde(default)]
+    pub custom_monitored_paths: Vec<DesktopCustomMonitoredPath>,
     #[serde(default)]
     pub team_policy_path: Option<String>,
     #[serde(default)]
     pub enterprise_network: DesktopEnterpriseNetworkSettings,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopAgentPathOverride {
+    pub agent_id: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopCustomMonitoredPath {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -555,7 +586,9 @@ pub fn list_agents_for_state(state: &DesktopAppState) -> Result<Vec<DesktopAgent
     let settings = get_desktop_settings_for_state(state)?;
     Ok(core_list_agents(ListAgentsOptions {
         enabled_agent_ids: None,
-        custom_paths: settings.custom_scan_paths,
+        custom_paths: settings.custom_scan_paths.clone(),
+        agent_path_overrides: core_agent_path_overrides(&settings),
+        custom_monitored_paths: core_custom_monitored_paths(&settings),
     })
     .into_iter()
     .map(desktop_agent_status)
@@ -568,23 +601,46 @@ pub fn scan_skills_for_state(
 ) -> Result<DesktopScanResponse, String> {
     let store = state.open_store()?;
     let settings = get_desktop_settings_for_state(state)?;
-    request.custom_paths.extend(settings.custom_scan_paths);
+    request
+        .custom_paths
+        .extend(settings.custom_scan_paths.clone());
     request.custom_paths = normalize_paths(request.custom_paths);
     let result = scan_and_index_skills(
         ScanOptions {
             agent_ids: request.agent_ids,
             custom_paths: request.custom_paths,
+            agent_path_overrides: core_agent_path_overrides(&settings),
+            custom_monitored_paths: core_custom_monitored_paths(&settings),
         },
         &store,
     )
     .map_err(|error| error.to_string())?;
 
-    desktop_scan_response(result, &store)
+    desktop_scan_response(result, &store, &settings)
 }
 
 pub fn list_indexed_skills_for_state(state: &DesktopAppState) -> Result<Vec<DesktopSkill>, String> {
     let store = state.open_store()?;
-    list_indexed_skills_from_store(&store)
+    let settings = get_desktop_settings_for_state(state)?;
+    list_indexed_skills_from_store(&store, &settings)
+}
+
+pub fn get_skill_size_for_state(
+    state: &DesktopAppState,
+    skill_id: &str,
+) -> Result<DesktopSkillSize, String> {
+    let store = state.open_store()?;
+    let skill = store
+        .get_skill(skill_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("skill not found: {skill_id}"))?;
+    let size = skill_directory_size(Path::new(&skill.install_path));
+
+    Ok(DesktopSkillSize {
+        skill_id: skill.id,
+        file_count: size.file_count,
+        total_size_bytes: size.total_size_bytes,
+    })
 }
 
 pub fn get_desktop_settings_for_state(state: &DesktopAppState) -> Result<DesktopSettings, String> {
@@ -604,6 +660,8 @@ pub fn save_desktop_settings_for_state(
     state.ensure_dirs()?;
     let normalized = DesktopSettings {
         custom_scan_paths: normalize_paths(settings.custom_scan_paths),
+        agent_path_overrides: normalize_agent_path_overrides(settings.agent_path_overrides),
+        custom_monitored_paths: normalize_custom_monitored_paths(settings.custom_monitored_paths),
         team_policy_path: normalize_optional_text(settings.team_policy_path),
         enterprise_network: normalize_enterprise_network_settings(settings.enterprise_network),
     };
@@ -776,18 +834,30 @@ pub fn get_skill_targets_for_source_for_state(
     request: DesktopSkillTargetsRequest,
 ) -> Result<Vec<DesktopSkillTarget>, String> {
     let mut store = state.open_store()?;
-    core_get_skill_targets_for_source(
-        SkillTargetSource {
-            url: request.url,
-            repo_path: request.repo_path,
-            ref_: request.ref_,
-            commit: request.commit,
-            install_name: request.install_name,
-        },
-        &mut store,
-    )
-    .map(|targets| targets.into_iter().map(desktop_skill_target).collect())
-    .map_err(|error| friendly_desktop_error(&error).wire_string())
+    let settings = get_desktop_settings_for_state(state)?;
+    let source = SkillTargetSource {
+        url: request.url,
+        repo_path: request.repo_path,
+        ref_: request.ref_,
+        commit: request.commit,
+        install_name: request.install_name,
+    };
+    let mut targets: Vec<DesktopSkillTarget> =
+        core_get_skill_targets_for_source(source.clone(), &mut store)
+            .map(|targets| targets.into_iter().map(desktop_skill_target).collect())
+            .map_err(|error| friendly_desktop_error(&error).wire_string())?;
+    let sources = store.list_sources().map_err(|error| error.to_string())?;
+
+    for custom_path in &settings.custom_monitored_paths {
+        targets.push(custom_skill_target(
+            custom_path,
+            &source,
+            &mut store,
+            &sources,
+        )?);
+    }
+
+    Ok(targets)
 }
 
 pub fn install_remote_skill_to_targets_for_state_with_checker<C: RemoteCommitChecker>(
@@ -884,6 +954,25 @@ pub fn list_skill_backups_for_state(
         .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
+pub fn list_skill_audit_events_for_state(
+    state: &DesktopAppState,
+    skill_id: String,
+    limit: u32,
+) -> Result<Vec<DesktopAuditEvent>, String> {
+    let store = state.open_store()?;
+    core_query_audit_log(
+        AuditQuery {
+            skill_id: Some(skill_id),
+            action: None,
+            limit,
+            offset: 0,
+        },
+        &store,
+    )
+    .map(|events| events.into_iter().map(desktop_audit_event).collect())
+    .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
+}
+
 pub fn restore_skill_backup_for_state(
     state: &DesktopAppState,
     request: DesktopRestoreBackupRequest,
@@ -905,8 +994,9 @@ pub fn export_environment_report_for_state(
     state: &DesktopAppState,
 ) -> Result<DesktopEnvironmentReport, String> {
     let store = state.open_store()?;
+    let settings = get_desktop_settings_for_state(state)?;
     let agents = list_agents_for_state(state)?;
-    let skills = list_indexed_skills_from_store(&store)?;
+    let skills = list_indexed_skills_from_store(&store, &settings)?;
     let mut report_skills = Vec::new();
     let mut bound_sources = 0;
     let mut trusted_sources = 0;
@@ -1067,6 +1157,14 @@ fn list_indexed_skills(
 }
 
 #[tauri::command]
+fn get_skill_size(
+    state: tauri::State<'_, DesktopAppState>,
+    skill_id: String,
+) -> Result<DesktopSkillSize, String> {
+    get_skill_size_for_state(&state, &skill_id)
+}
+
+#[tauri::command]
 fn get_desktop_settings(
     state: tauri::State<'_, DesktopAppState>,
 ) -> Result<DesktopSettings, String> {
@@ -1112,12 +1210,17 @@ fn unbind_skill_source(
 }
 
 #[tauri::command]
-fn preview_remote_skill_source(
+async fn preview_remote_skill_source(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopPreviewRemoteSkillSourceRequest,
 ) -> Result<DesktopRemoteSkillPreview, String> {
-    let checker = system_git_checker_for_state(&state)?;
-    preview_remote_skill_source_for_state_with_checker(&state, request, &checker)
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let checker = system_git_checker_for_state(&state)?;
+        preview_remote_skill_source_for_state_with_checker(&state, request, &checker)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1130,11 +1233,16 @@ fn test_source_connection(
 }
 
 #[tauri::command]
-fn get_skill_targets_for_source(
+async fn get_skill_targets_for_source(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopSkillTargetsRequest,
 ) -> Result<Vec<DesktopSkillTarget>, String> {
-    get_skill_targets_for_source_for_state(&state, request)
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        get_skill_targets_for_source_for_state(&state, request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1147,12 +1255,17 @@ fn install_remote_skill_to_targets(
 }
 
 #[tauri::command]
-fn check_skill_updates(
+async fn check_skill_updates(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopUpdateCheckRequest,
 ) -> Result<Vec<DesktopUpdateCheckResult>, String> {
-    let checker = system_git_checker_for_state(&state)?;
-    check_skill_updates_for_state_with_checker(&state, request, &checker)
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let checker = system_git_checker_for_state(&state)?;
+        check_skill_updates_for_state_with_checker(&state, request, &checker)
+    })
+    .await
+    .map_err(|error| format!("检查更新后台任务失败: {error}"))?
 }
 
 #[tauri::command]
@@ -1179,6 +1292,15 @@ fn list_skill_backups(
     skill_id: String,
 ) -> Result<Vec<DesktopBackupSummary>, String> {
     list_skill_backups_for_state(&state, skill_id)
+}
+
+#[tauri::command]
+fn list_skill_audit_events(
+    state: tauri::State<'_, DesktopAppState>,
+    skill_id: String,
+    limit: u32,
+) -> Result<Vec<DesktopAuditEvent>, String> {
+    list_skill_audit_events_for_state(&state, skill_id, limit)
 }
 
 #[tauri::command]
@@ -1271,9 +1393,10 @@ fn open_url_with_system_handler(url: &str) -> Result<(), String> {
 fn desktop_scan_response(
     result: ScanResult,
     store: &SkillIndexStore,
+    settings: &DesktopSettings,
 ) -> Result<DesktopScanResponse, String> {
     Ok(DesktopScanResponse {
-        skills: list_indexed_skills_from_store(store)?,
+        skills: list_indexed_skills_from_store(store, settings)?,
         warnings: result
             .warnings
             .into_iter()
@@ -1310,6 +1433,111 @@ fn normalize_paths(paths: Vec<String>) -> Vec<String> {
     normalized
 }
 
+fn normalize_agent_path_overrides(
+    overrides: Vec<DesktopAgentPathOverride>,
+) -> Vec<DesktopAgentPathOverride> {
+    let mut normalized = Vec::new();
+    for override_path in overrides {
+        let agent_id = override_path.agent_id.trim();
+        let path = override_path.path.trim();
+        if agent_id.is_empty()
+            || path.is_empty()
+            || normalized
+                .iter()
+                .any(|item: &DesktopAgentPathOverride| item.agent_id == agent_id)
+        {
+            continue;
+        }
+        normalized.push(DesktopAgentPathOverride {
+            agent_id: agent_id.to_string(),
+            path: path.to_string(),
+        });
+    }
+    normalized
+}
+
+fn normalize_custom_monitored_paths(
+    paths: Vec<DesktopCustomMonitoredPath>,
+) -> Vec<DesktopCustomMonitoredPath> {
+    let mut normalized = Vec::new();
+    for (index, path) in paths.into_iter().enumerate() {
+        let name = path.name.trim();
+        let monitor_path = path.path.trim();
+        if name.is_empty()
+            || monitor_path.is_empty()
+            || normalized
+                .iter()
+                .any(|item: &DesktopCustomMonitoredPath| item.path == monitor_path)
+        {
+            continue;
+        }
+        let id = normalize_optional_text(Some(path.id))
+            .unwrap_or_else(|| format!("monitor-{}", index + 1));
+        normalized.push(DesktopCustomMonitoredPath {
+            id,
+            name: name.to_string(),
+            path: monitor_path.to_string(),
+        });
+    }
+    normalized
+}
+
+fn core_agent_path_overrides(settings: &DesktopSettings) -> Vec<CoreAgentPathOverride> {
+    settings
+        .agent_path_overrides
+        .iter()
+        .map(|override_path| CoreAgentPathOverride {
+            agent_id: override_path.agent_id.clone(),
+            path: override_path.path.clone(),
+        })
+        .collect()
+}
+
+fn core_custom_monitored_paths(settings: &DesktopSettings) -> Vec<CoreCustomMonitoredPath> {
+    settings
+        .custom_monitored_paths
+        .iter()
+        .map(|path| CoreCustomMonitoredPath {
+            id: path.id.clone(),
+            name: path.name.clone(),
+            path: path.path.clone(),
+        })
+        .collect()
+}
+
+fn desktop_agent_name(agent_id: &str, settings: &DesktopSettings) -> String {
+    settings
+        .custom_monitored_paths
+        .iter()
+        .find(|path| custom_agent_id(&path.id) == agent_id)
+        .map(|path| path.name.clone())
+        .unwrap_or_else(|| agent_name(agent_id).to_string())
+}
+
+fn custom_agent_id(id: &str) -> String {
+    let slug = id
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if slug.is_empty() {
+        "custom-monitor".to_string()
+    } else {
+        format!("custom-{}", slug)
+    }
+}
+
 fn normalize_enterprise_network_settings(
     settings: DesktopEnterpriseNetworkSettings,
 ) -> DesktopEnterpriseNetworkSettings {
@@ -1341,16 +1569,23 @@ fn git_environment_for_settings(settings: &DesktopSettings) -> Vec<(String, Stri
     environment
 }
 
-fn list_indexed_skills_from_store(store: &SkillIndexStore) -> Result<Vec<DesktopSkill>, String> {
+fn list_indexed_skills_from_store(
+    store: &SkillIndexStore,
+    settings: &DesktopSettings,
+) -> Result<Vec<DesktopSkill>, String> {
     store
         .list_skills()
         .map_err(|error| error.to_string())?
         .into_iter()
-        .map(|skill| desktop_skill(skill, store))
+        .map(|skill| desktop_skill(skill, store, settings))
         .collect()
 }
 
-fn desktop_skill(record: SkillRecord, store: &SkillIndexStore) -> Result<DesktopSkill, String> {
+fn desktop_skill(
+    record: SkillRecord,
+    store: &SkillIndexStore,
+    settings: &DesktopSettings,
+) -> Result<DesktopSkill, String> {
     let source = match record.source_id.as_deref() {
         Some(source_id) => store
             .get_source(source_id)
@@ -1362,18 +1597,57 @@ fn desktop_skill(record: SkillRecord, store: &SkillIndexStore) -> Result<Desktop
     Ok(DesktopSkill {
         id: record.id,
         agent_id: record.agent_id.clone(),
-        agent_name: agent_name(&record.agent_id).to_string(),
+        agent_name: desktop_agent_name(&record.agent_id, settings),
         name: record.name,
         description: record.description,
         install_path: record.install_path,
         metadata_path: record.metadata_path,
         metadata_status: record.metadata_status,
         metadata_error: record.metadata_error,
+        file_count: None,
+        total_size_bytes: None,
         source_id: record.source_id,
         source,
         local_modified: record.local_modified,
         last_scanned_at: record.last_scanned_at,
+        local_updated_at: record.local_updated_at,
     })
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct SkillDirectorySize {
+    file_count: u64,
+    total_size_bytes: u64,
+}
+
+fn skill_directory_size(path: &Path) -> SkillDirectorySize {
+    fn visit(path: &Path, size: &mut SkillDirectorySize) {
+        let Ok(metadata) = fs::symlink_metadata(path) else {
+            return;
+        };
+        if metadata.is_file() {
+            size.file_count += 1;
+            size.total_size_bytes += metadata.len();
+            return;
+        }
+        if !metadata.is_dir() {
+            return;
+        }
+        let Ok(entries) = fs::read_dir(path) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if name.to_string_lossy() == ".git" {
+                continue;
+            }
+            visit(&entry.path(), size);
+        }
+    }
+
+    let mut size = SkillDirectorySize::default();
+    visit(path, &mut size);
+    size
 }
 
 fn desktop_source_from_core(source: Source) -> DesktopSource {
@@ -1446,6 +1720,80 @@ fn desktop_skill_target(target: CoreSkillTarget) -> DesktopSkillTarget {
         root_available: target.root_available,
         root_status: target.root_status,
     }
+}
+
+fn custom_skill_target(
+    custom_path: &DesktopCustomMonitoredPath,
+    source: &SkillTargetSource,
+    store: &mut SkillIndexStore,
+    sources: &[SourceRecord],
+) -> Result<DesktopSkillTarget, String> {
+    let agent_id = custom_agent_id(&custom_path.id);
+    let root_path = custom_path.path.clone();
+    let install_path = Path::new(&root_path)
+        .join(&source.install_name)
+        .to_string_lossy()
+        .to_string();
+    let stored_skill = store
+        .get_skill_by_agent_and_path(&agent_id, &install_path)
+        .map_err(|error| error.to_string())?;
+    let stored_source = stored_skill
+        .as_ref()
+        .and_then(|skill| skill.source_id.as_deref())
+        .and_then(|source_id| sources.iter().find(|record| record.id == source_id));
+    let source_matches = stored_source
+        .map(|record| desktop_source_record_matches(record, source))
+        .unwrap_or(false);
+    let root_status = desktop_custom_root_status(Path::new(&root_path));
+    let root_available = root_status == "available";
+    let install_path_ref = Path::new(&install_path);
+    let indexed = stored_skill.as_ref().map(|skill| IndexedTargetState {
+        source_id: skill.source_id.clone(),
+        current_commit: stored_source.and_then(|record| record.current_commit.clone()),
+        local_modified: skill.local_modified.unwrap_or(false),
+    });
+    let classification = classify_target_path(TargetPathEvaluation {
+        root_available,
+        path_exists: install_path_ref.exists(),
+        has_skill_md: install_path_ref.join("SKILL.md").is_file(),
+        indexed,
+        expected_commit: source.commit.clone(),
+        source_matches,
+    });
+
+    Ok(DesktopSkillTarget {
+        agent_id,
+        agent_name: custom_path.name.clone(),
+        root_path,
+        install_path,
+        status: desktop_skill_target_status(classification.status),
+        local_modified: classification.local_modified,
+        skill_id: stored_skill.as_ref().map(|skill| skill.id.clone()),
+        source_id: stored_skill.and_then(|skill| skill.source_id),
+        root_available,
+        root_status: root_status.to_string(),
+    })
+}
+
+fn desktop_custom_root_status(path: &Path) -> &'static str {
+    if !path.exists() {
+        return "missing";
+    }
+    if fs::read_dir(path).is_err() {
+        return "not_readable";
+    }
+    if path
+        .metadata()
+        .map(|metadata| metadata.permissions().readonly())
+        .unwrap_or(true)
+    {
+        return "not_writable";
+    }
+    "available"
+}
+
+fn desktop_source_record_matches(record: &SourceRecord, source: &SkillTargetSource) -> bool {
+    record.url == source.url && record.repo_path == source.repo_path && record.ref_ == source.ref_
 }
 
 fn desktop_skill_target_status(status: CoreSkillTargetStatus) -> String {
@@ -1800,10 +2148,10 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
 
     if lower.contains("security blocked") || lower.contains("security findings") {
         return desktop_error(
-            "security_blocked",
-            "安全检查阻断",
-            "更新内容触发 High 风险安全检查，Metis 没有覆盖本地文件。",
-            "请人工检查 diff 和安全发现，确认可信后再考虑手动处理。",
+            "security_notice",
+            "更新内容需要留意",
+            "更新内容包含脚本或配置字段，Metis 已保留提示信息。",
+            "来源可信时通常可以继续使用；如不确定，可先查看 diff 或回滚到更新前备份。",
             message,
         );
     }
@@ -1933,6 +2281,7 @@ pub fn run() {
             list_agents,
             scan_skills,
             list_indexed_skills,
+            get_skill_size,
             get_desktop_settings,
             save_desktop_settings,
             get_team_policy_summary,
@@ -1947,6 +2296,7 @@ pub fn run() {
             get_skill_diff,
             apply_skill_update,
             list_skill_backups,
+            list_skill_audit_events,
             restore_skill_backup,
             export_environment_report,
             check_team_manifest_compliance,
@@ -2195,6 +2545,20 @@ mod tests {
     fn get_skill_targets_for_source_for_state_returns_desktop_dtos() {
         let workspace = temp_dir("sync-targets");
         let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let custom_root = workspace.join("team-memory-skills");
+        fs::create_dir_all(&custom_root).expect("custom root should exist");
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_monitored_paths: vec![DesktopCustomMonitoredPath {
+                    id: "team-memory".to_string(),
+                    name: "团队记忆".to_string(),
+                    path: custom_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
 
         let targets = get_skill_targets_for_source_for_state(
             &state,
@@ -2208,11 +2572,22 @@ mod tests {
         )
         .expect("targets should load");
 
-        assert_eq!(targets.len(), 5);
+        assert_eq!(targets.len(), 6);
         assert_eq!(targets[0].agent_id, "codex");
         assert_eq!(targets[0].status, "AgentRootUnavailable");
         assert!(!targets[0].install_path.contains("{name}"));
         assert!(targets.iter().all(|target| target.agent_id != "generic"));
+        let custom_target = targets
+            .iter()
+            .find(|target| target.agent_id == "custom-team-memory")
+            .expect("custom monitored path should be an install target");
+        assert_eq!(custom_target.agent_name, "团队记忆");
+        assert_eq!(custom_target.root_path, custom_root.to_string_lossy());
+        assert_eq!(
+            custom_target.install_path,
+            custom_root.join("example").to_string_lossy()
+        );
+        assert_eq!(custom_target.status, "NotInstalled");
         fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
 
@@ -2337,9 +2712,98 @@ description: {description}
         );
         assert_eq!(skill.install_path, skill_dir.to_string_lossy());
         assert_eq!(skill.metadata_status, "found");
+        assert_eq!(skill.file_count, None);
+        assert_eq!(skill.total_size_bytes, None);
         assert_eq!(skill.local_modified, None);
+        assert!(skill.local_updated_at.is_some());
         assert!(state.sqlite_path().starts_with(&data_root));
         assert!(state.backup_root().starts_with(&data_root));
+    }
+
+    #[test]
+    fn list_indexed_skills_returns_cached_local_updated_at_without_recomputing_filesystem() {
+        let workspace = temp_dir("cached-local-updated-at");
+        let skill_root = workspace.join("skills");
+        let data_root = workspace.join("data");
+        let cache_root = workspace.join("cache");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        let skill_dir = write_skill(
+            &skill_root,
+            "planner",
+            "planner",
+            "Plans focused implementation work",
+        );
+        let state = DesktopAppState::new(data_root, cache_root);
+
+        scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should work");
+        let first = list_indexed_skills_for_state(&state).expect("indexed skills should load");
+        let cached_updated_at = first[0]
+            .local_updated_at
+            .clone()
+            .expect("scan should cache local updated at");
+        let skill_file =
+            fs::File::open(skill_dir.join("SKILL.md")).expect("skill file should open");
+        let future_time = SystemTime::now() + std::time::Duration::from_secs(60);
+        let times = fs::FileTimes::new()
+            .set_modified(future_time)
+            .set_accessed(future_time);
+        skill_file
+            .set_times(times)
+            .expect("skill file time should update");
+
+        let second = list_indexed_skills_for_state(&state).expect("indexed skills should reload");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(
+            second[0].local_updated_at.as_deref(),
+            Some(cached_updated_at.as_str())
+        );
+    }
+
+    #[test]
+    fn get_skill_size_for_state_returns_directory_size_for_one_skill() {
+        let workspace = temp_dir("skill-size");
+        let skill_root = workspace.join("skills");
+        let data_root = workspace.join("data");
+        let cache_root = workspace.join("cache");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        let skill_dir = write_skill(
+            &skill_root,
+            "planner",
+            "planner",
+            "Plans focused implementation work",
+        );
+        fs::create_dir_all(skill_dir.join("references")).expect("references should be created");
+        fs::write(skill_dir.join("references").join("guide.md"), "hello")
+            .expect("reference should be written");
+        let state = DesktopAppState::new(data_root, cache_root);
+
+        scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should work");
+
+        let indexed = list_indexed_skills_for_state(&state).expect("indexed skills should load");
+        let skill_id = indexed[0].id.clone();
+
+        let size =
+            get_skill_size_for_state(&state, &skill_id).expect("skill size should be computed");
+
+        assert_eq!(size.skill_id, skill_id);
+        assert_eq!(size.file_count, 2);
+        assert!(size.total_size_bytes > 5);
     }
 
     #[test]
@@ -2359,30 +2823,34 @@ description: {description}
             .collect::<Vec<_>>();
         assert_eq!(
             agent_ids,
-            vec![
-                "codex",
-                "claude-code",
-                "openclaw",
-                "hermes",
-                "opencode",
-                "generic"
-            ]
+            vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
         );
         assert!(agents.iter().all(|agent| !agent.paths.is_empty()));
     }
 
     #[test]
-    fn list_agents_for_state_includes_saved_custom_scan_paths() {
+    fn list_agents_for_state_uses_saved_path_overrides_and_named_custom_monitors() {
         let workspace = temp_dir("agents-custom-state");
+        let codex_root = workspace.join("codex-skills");
         let custom_root = workspace.join("custom-skills");
+        fs::create_dir_all(&codex_root).expect("codex root should be created");
         fs::create_dir_all(&custom_root).expect("custom root should be created");
         let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
         save_desktop_settings_for_state(
             &state,
             DesktopSettings {
-                custom_scan_paths: vec![custom_root.to_string_lossy().to_string()],
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: codex_root.to_string_lossy().to_string(),
+                }],
+                custom_monitored_paths: vec![DesktopCustomMonitoredPath {
+                    id: "team-memory".to_string(),
+                    name: "团队记忆".to_string(),
+                    path: custom_root.to_string_lossy().to_string(),
+                }],
                 team_policy_path: None,
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+                ..Default::default()
             },
         )
         .expect("settings should save");
@@ -2391,14 +2859,18 @@ description: {description}
 
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
-        let generic = agents
+        let codex = agents
             .iter()
-            .find(|agent| agent.agent_id == "generic")
-            .expect("generic agent should exist");
-        assert!(generic
-            .paths
+            .find(|agent| agent.agent_id == "codex")
+            .expect("codex agent should exist");
+        assert_eq!(codex.paths[0].path, codex_root.to_string_lossy());
+
+        let custom = agents
             .iter()
-            .any(|path| path.path == custom_root.to_string_lossy() && path.exists));
+            .find(|agent| agent.agent_id == "custom-team-memory")
+            .expect("named custom monitor should exist");
+        assert_eq!(custom.agent_name, "团队记忆");
+        assert_eq!(custom.paths[0].path, custom_root.to_string_lossy());
     }
 
     #[test]
@@ -2417,6 +2889,15 @@ description: {description}
                     "/tmp/metis/custom".to_string(),
                     "/tmp/metis/other".to_string(),
                 ],
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: " codex ".to_string(),
+                    path: "  /tmp/metis/codex  ".to_string(),
+                }],
+                custom_monitored_paths: vec![DesktopCustomMonitoredPath {
+                    id: "".to_string(),
+                    name: "  Team Memory  ".to_string(),
+                    path: "  /tmp/metis/team-memory  ".to_string(),
+                }],
                 team_policy_path: Some("  /tmp/metis/team-policy.json  ".to_string()),
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
             },
@@ -2430,6 +2911,21 @@ description: {description}
         assert_eq!(
             saved.custom_scan_paths,
             vec!["/tmp/metis/custom", "/tmp/metis/other"]
+        );
+        assert_eq!(
+            saved.agent_path_overrides,
+            vec![DesktopAgentPathOverride {
+                agent_id: "codex".to_string(),
+                path: "/tmp/metis/codex".to_string(),
+            }]
+        );
+        assert_eq!(
+            saved.custom_monitored_paths,
+            vec![DesktopCustomMonitoredPath {
+                id: "monitor-1".to_string(),
+                name: "Team Memory".to_string(),
+                path: "/tmp/metis/team-memory".to_string(),
+            }]
         );
         assert_eq!(loaded, saved);
         assert_eq!(
@@ -2455,6 +2951,7 @@ description: {description}
                         "  /Users/me/certs/corp-ca.pem  ".to_string(),
                     ),
                 },
+                ..Default::default()
             },
         )
         .expect("settings should save");
@@ -2531,6 +3028,7 @@ description: {description}
                 custom_scan_paths: Vec::new(),
                 team_policy_path: Some(policy_path.to_string_lossy().to_string()),
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+                ..Default::default()
             },
         )
         .expect("settings should save");
@@ -2582,6 +3080,7 @@ description: {description}
                 custom_scan_paths: Vec::new(),
                 team_policy_path: Some(policy_path.to_string_lossy().to_string()),
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+                ..Default::default()
             },
         )
         .expect("settings should save");
@@ -2671,6 +3170,7 @@ description: {description}
                 custom_scan_paths: Vec::new(),
                 team_policy_path: Some(policy_path.to_string_lossy().to_string()),
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+                ..Default::default()
             },
         )
         .expect("settings should save");
@@ -2745,6 +3245,7 @@ description: {description}
                     local_fingerprint: None,
                     local_modified: Some(false),
                     last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+                    local_updated_at: Some("2026-06-20T10:00:00Z".to_string()),
                 })
                 .expect("skill should insert");
         }
@@ -2789,6 +3290,7 @@ description: {description}
                 custom_scan_paths: vec![skill_root.to_string_lossy().to_string()],
                 team_policy_path: None,
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+                ..Default::default()
             },
         )
         .expect("settings should save");
@@ -3071,9 +3573,9 @@ description: {description}
             ),
             (
                 "security blocked",
-                "security_blocked",
-                "安全检查阻断",
-                "更新内容触发 High 风险安全检查，Metis 没有覆盖本地文件。",
+                "security_notice",
+                "更新内容需要留意",
+                "更新内容包含脚本或配置字段，Metis 已保留提示信息。",
             ),
             (
                 "apply failed and rollback succeeded: permission denied",
@@ -3169,6 +3671,7 @@ description: {description}
                 local_fingerprint: None,
                 local_modified: Some(false),
                 last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+                local_updated_at: Some("2026-06-20T10:00:00Z".to_string()),
             })
             .expect("skill should insert");
 
@@ -3239,6 +3742,7 @@ description: {description}
                 local_fingerprint: None,
                 local_modified: Some(false),
                 last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+                local_updated_at: Some("2026-06-20T10:00:00Z".to_string()),
             })
             .expect("skill should insert");
         let manifest_json = serde_json::json!({
@@ -3345,6 +3849,7 @@ description: {description}
                 local_fingerprint: None,
                 local_modified: Some(false),
                 last_scanned_at: "2026-06-20T10:00:00Z".to_string(),
+                local_updated_at: Some("2026-06-20T10:00:00Z".to_string()),
             })
             .expect("skill should insert");
         store
@@ -3640,6 +4145,91 @@ description: {description}
         );
 
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn list_skill_audit_events_for_state_returns_recent_skill_history() {
+        let workspace = temp_dir("skill-audit-history");
+        let skill_root = workspace.join("skills");
+        fs::create_dir_all(&skill_root).expect("skill root should be created");
+        write_skill(&skill_root, "history", "history", "History skill");
+        write_skill(&skill_root, "other", "other", "Other skill");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![skill_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("scan should insert skill");
+        let skill_id = scanned
+            .skills
+            .iter()
+            .find(|skill| skill.name == "history")
+            .expect("history skill should exist")
+            .id
+            .clone();
+        let other_skill_id = scanned
+            .skills
+            .iter()
+            .find(|skill| skill.name == "other")
+            .expect("other skill should exist")
+            .id
+            .clone();
+        {
+            let store = state.open_store().expect("store should open");
+            store
+                .insert_audit_event(&metis_storage::db::AuditEventRecord {
+                    id: "audit-old".to_string(),
+                    skill_id: skill_id.clone(),
+                    action: "update_checked".to_string(),
+                    detail: Some("update checked".to_string()),
+                    commit_before: Some("aaa111".to_string()),
+                    commit_after: Some("bbb222".to_string()),
+                    status: "success".to_string(),
+                    risk_summary: None,
+                    created_at: Some("2026-07-01T10:00:00Z".to_string()),
+                })
+                .expect("first audit event should insert");
+            store
+                .insert_audit_event(&metis_storage::db::AuditEventRecord {
+                    id: "audit-new".to_string(),
+                    skill_id: skill_id.clone(),
+                    action: "update_applied".to_string(),
+                    detail: Some("update applied".to_string()),
+                    commit_before: Some("aaa111".to_string()),
+                    commit_after: Some("bbb222".to_string()),
+                    status: "success".to_string(),
+                    risk_summary: Some("[]".to_string()),
+                    created_at: Some("2026-07-01T10:05:00Z".to_string()),
+                })
+                .expect("second audit event should insert");
+            store
+                .insert_audit_event(&metis_storage::db::AuditEventRecord {
+                    id: "audit-other".to_string(),
+                    skill_id: other_skill_id,
+                    action: "update_applied".to_string(),
+                    detail: Some("other skill updated".to_string()),
+                    commit_before: None,
+                    commit_after: None,
+                    status: "success".to_string(),
+                    risk_summary: None,
+                    created_at: Some("2026-07-01T10:10:00Z".to_string()),
+                })
+                .expect("other audit event should insert");
+        }
+
+        let events = list_skill_audit_events_for_state(&state, skill_id.clone(), 2)
+            .expect("skill audit events should load");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].id, "audit-new");
+        assert_eq!(events[0].action, "UpdateApplied");
+        assert_eq!(events[1].id, "audit-old");
+        assert!(events.iter().all(|event| event.skill_id == skill_id));
     }
 
     #[test]

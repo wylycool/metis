@@ -12,12 +12,11 @@ import {
   type StatusBadgeTone,
 } from "./SkillRow";
 import type {
+  DesktopAuditEvent,
   DesktopBackupSummary,
   DesktopDiffDetail,
   DesktopError,
-  DesktopInstallRemoteSkillResult,
   DesktopSkill,
-  DesktopSkillTarget,
   DesktopSourceConnectionTestResult,
   DesktopUpdateCheckResult,
 } from "./types";
@@ -28,17 +27,14 @@ export function SkillDetailPage({
   backupOpen,
   backups,
   bindDraft,
-  detailInstallResult,
-  detailTargetError,
-  detailTargets,
   diffDetail,
   diffError,
   isBinding,
   sourceConnectionError,
   sourceConnectionResult,
   agentMemberships,
-  selectedDetailTargetIds,
   skill,
+  skillAuditEvents,
   updateResult,
   updateResults,
   onBack,
@@ -47,25 +43,19 @@ export function SkillDetailPage({
   onCheck,
   onDraftChange,
   onTestSourceConnection,
-  onInstallDetailTargets,
   onApplyUpdate,
   onApplyNeededAgentUpdates,
   onOpenBind,
   onRestoreBackup,
   onToggleBackups,
-  onToggleDetailTarget,
   onToggleDiff,
   onUnbind,
-  onRefreshDetailTargets,
 }: {
   actionBusy: string | null;
   backupError?: DesktopError;
   backupOpen: boolean;
   backups: DesktopBackupSummary[];
   bindDraft: BindDraft;
-  detailInstallResult?: DesktopInstallRemoteSkillResult;
-  detailTargetError?: DesktopError;
-  detailTargets: DesktopSkillTarget[];
   diffDetail?: DesktopDiffDetail;
   diffError?: DesktopError;
   isBinding: boolean;
@@ -76,8 +66,8 @@ export function SkillDetailPage({
     "agent_id" | "agent_name" | "id" | "install_path" | "local_modified"
     | "source_id"
   >[];
-  selectedDetailTargetIds: string[];
   skill: DesktopSkill;
+  skillAuditEvents: DesktopAuditEvent[];
   updateResult?: DesktopUpdateCheckResult;
   updateResults: Record<string, DesktopUpdateCheckResult>;
   onBack: () => void;
@@ -86,16 +76,13 @@ export function SkillDetailPage({
   onCheck: () => void;
   onDraftChange: (draft: BindDraft) => void;
   onTestSourceConnection: () => void;
-  onInstallDetailTargets: () => void;
   onApplyUpdate: (skillId: string, mode?: "overwrite-local") => void;
   onApplyNeededAgentUpdates: (skillIds: string[]) => void;
   onOpenBind: () => void;
   onRestoreBackup: (backupId: string) => void;
   onToggleBackups: () => void;
-  onToggleDetailTarget: (target: DesktopSkillTarget) => void;
   onToggleDiff: () => void;
   onUnbind: () => void;
-  onRefreshDetailTargets: () => void;
 }) {
   const source = skill.source;
   const checkBusy = actionBusy === "check-updates";
@@ -105,18 +92,13 @@ export function SkillDetailPage({
   const diffBusy = actionBusy === `diff:${skill.id}`;
   const backupBusy = actionBusy === `backups:${skill.id}`;
   const installedAgentRows = useMemo(
-    () => detailInstalledAgentRows(skill, agentMemberships, detailTargets, updateResults),
-    [agentMemberships, detailTargets, skill, updateResults],
+    () => detailInstalledAgentRows(skill, agentMemberships, updateResults),
+    [agentMemberships, skill, updateResults],
   );
   const detailSummary = detailAggregateSummary(installedAgentRows);
   const outdatedAgentRows = installedAgentRows.filter((row) => row.statusKind === "update");
   const applyNeededBusy = actionBusy === "apply-needed-agent-updates";
-  void detailInstallResult;
-  void detailTargetError;
-  void selectedDetailTargetIds;
-  void onInstallDetailTargets;
-  void onRefreshDetailTargets;
-  void onToggleDetailTarget;
+  const canViewDiff = canViewUpdateDiff(updateResult);
 
   return (
     <section
@@ -139,7 +121,9 @@ export function SkillDetailPage({
           <span className="redesign-detail-kicker">Skill detail</span>
           <h1>{skill.name}</h1>
           <p>{skill.description || "暂无描述"}</p>
-          <p className="redesign-detail-summary-message">{detailSummary.message}</p>
+          {detailSummary.message && (
+            <p className="redesign-detail-summary-message">{detailSummary.message}</p>
+          )}
         </div>
         <div
           className="intro-source-corner redesign-source-summary"
@@ -157,6 +141,9 @@ export function SkillDetailPage({
           </button>
         </div>
         <div className="detail-status-strip">
+          <span className="detail-skill-size" data-testid={`skill-size-${skill.id}`}>
+            {skill.total_size_bytes == null ? "计算中" : formatBytes(skill.total_size_bytes)}
+          </span>
           <StatusBadge tone={detailSummary.tone}>{detailSummary.label}</StatusBadge>
         </div>
       </header>
@@ -173,45 +160,24 @@ export function SkillDetailPage({
           className="skill-detail-card local-operations-card redesign-update-workbench"
           data-testid={`skill-operations-card-${skill.id}`}
         >
-          {updateResult?.diff_summary && (
-            <div className="update-summary detail-update-summary">
-              <span>+{updateResult.diff_summary.files_added}</span>
-              <span>~{updateResult.diff_summary.files_modified}</span>
-              <span>-{updateResult.diff_summary.files_deleted}</span>
-              {updateResult.commits_behind !== null &&
-                updateResult.commits_behind !== undefined && (
-                  <strong>{updateResult.commits_behind} commits behind</strong>
-                )}
-            </div>
-          )}
-
           <div className="detail-action-row local-action-row redesign-operation-tabs">
             <button
-              className={`operation-button compact ${!diffDetail && !backupOpen ? "active" : ""}`}
+              className="operation-button compact"
               data-testid={`check-updates-${skill.id}`}
               disabled={installedAgentRows.length === 0 || checkBusy}
               onClick={onCheck}
             >
-            {checkBusy ? "检查中" : "检查更新"}
+              {checkBusy ? "检查中" : "检查更新"}
             </button>
             <button
               className={`operation-button compact ${diffDetail ? "active" : ""}`}
               data-testid={`toggle-diff-${skill.id}`}
-              disabled={!source || diffBusy}
+              disabled={!source || diffBusy || (!diffDetail && !canViewDiff)}
               onClick={onToggleDiff}
+              title={!source || canViewDiff || diffDetail ? undefined : "先检查更新后查看 diff"}
             >
               {diffBusy ? "加载 diff" : diffDetail ? "隐藏 diff" : "查看 diff"}
             </button>
-            {outdatedAgentRows.length > 0 && (
-              <button
-                className="operation-button compact"
-                data-testid={`apply-needed-agent-updates-${skill.id}`}
-                disabled={applyNeededBusy}
-                onClick={() => onApplyNeededAgentUpdates(outdatedAgentRows.map((row) => row.skillId))}
-              >
-                {applyNeededBusy ? "更新中" : "更新需要更新的 Agent"}
-              </button>
-            )}
             <button
               className={`operation-button compact ${backupOpen ? "active" : ""}`}
               data-testid={`toggle-backups-${skill.id}`}
@@ -220,13 +186,25 @@ export function SkillDetailPage({
             >
               {backupBusy ? "读取备份" : backupOpen ? "隐藏备份" : "备份/回滚"}
             </button>
+            {outdatedAgentRows.length > 0 && (
+              <button
+                className="operation-button compact pending"
+                data-testid={`apply-needed-agent-updates-${skill.id}`}
+                disabled={applyNeededBusy}
+                onClick={() =>
+                  onApplyNeededAgentUpdates(outdatedAgentRows.map((row) => row.skillId))
+                }
+              >
+                {applyNeededBusy ? "更新中" : "更新需要更新的 Agent"}
+              </button>
+            )}
           </div>
 
           {diffError && <InlineError error={diffError} />}
           {!diffDetail && !backupOpen && (
             <FormalCheckPanel skill={skill} source={source} updateResult={updateResult} />
           )}
-          {diffDetail && <DiffPanel detail={diffDetail} />}
+          {diffDetail && <DiffPanel detail={diffDetail} repoPath={source?.repo_path} />}
 
           {backupError && <InlineError error={backupError} />}
           {backupOpen && (
@@ -238,6 +216,8 @@ export function SkillDetailPage({
             />
           )}
         </section>
+
+        <SkillHistoryPanel events={skillAuditEvents} skillId={skill.id} />
       </div>
 
       {isBinding && (
@@ -275,6 +255,44 @@ export function SkillDetailPage({
         </div>
       )}
 
+    </section>
+  );
+}
+
+function SkillHistoryPanel({
+  events,
+  skillId,
+}: {
+  events: DesktopAuditEvent[];
+  skillId: string;
+}) {
+  return (
+    <section
+      className="skill-detail-card skill-history-card"
+      data-testid={`skill-history-${skillId}`}
+    >
+      <div className="skill-history-heading">
+        <h2>历史记录</h2>
+        <span>{events.length} 条</span>
+      </div>
+      {events.length === 0 ? (
+        <p className="skill-history-empty">暂无历史记录</p>
+      ) : (
+        <div className="skill-history-list">
+          {events.map((event) => (
+            <article className={`skill-history-row ${event.status}`} key={event.id}>
+              <div>
+                <strong>{auditActionLabel(event.action)}</strong>
+                <span>{event.created_at ? compactDateTime(event.created_at) : "时间未知"}</span>
+              </div>
+              <p>{auditCommitSummary(event)}</p>
+              {securityRiskCount(event.risk_summary) > 0 && (
+                <small>包含需要留意的脚本或配置字段</small>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -358,34 +376,146 @@ function FormalCheckPanel({
   source: DesktopSkill["source"];
   updateResult?: DesktopUpdateCheckResult;
 }) {
-  const currentCommit = updateResult?.source?.current_commit ?? source?.current_commit ?? "local";
-  const targetCommit =
-    updateResult?.source?.remote_commit ?? source?.remote_commit ?? source?.ref_ ?? "unknown";
+  const currentCommit = updateResult?.source?.current_commit ?? source?.current_commit;
+  const localVersion = currentCommit ? shortCommit(currentCommit) : "未绑定来源";
+  const targetCommit = updateResult?.source?.remote_commit
+    ? shortCommit(updateResult.source.remote_commit)
+    : "等待检查";
   const summary = updateResult?.diff_summary
-    ? `+${updateResult.diff_summary.files_added} ~${updateResult.diff_summary.files_modified} -${updateResult.diff_summary.files_deleted}`
+    ? diffSummaryParts(updateResult.diff_summary)
     : updateResult?.status === "UpToDate"
-      ? "no changes"
-      : "等待检查";
-  const safeMessage = skill.local_modified
-    ? "检测到本地修改，建议先查看 diff 或备份后再更新。"
-    : "安全检查通过，建议先查看 diff；本地没有未提交修改。";
+      ? [{ className: "empty", label: "没有文件变化" }]
+      : [{ className: "empty", label: "等待检查" }];
 
   return (
     <div className="redesign-check-panel" data-testid={`check-panel-${skill.id}`}>
       <div>
-        <span>Local</span>
-        <strong>{shortCommit(currentCommit)}</strong>
+        <span>本地版本</span>
+        <strong>{localVersion}</strong>
       </div>
       <div>
-        <span>Remote</span>
-        <strong>{shortCommit(targetCommit)}</strong>
+        <span>远端版本</span>
+        <strong>{targetCommit}</strong>
       </div>
-      <div>
-        <span>Diff summary</span>
-        <strong>{summary}</strong>
+      <div className="redesign-check-diff-summary">
+        <span>差异</span>
+        <div className="redesign-diff-summary-chips">
+          {summary.map((part) => (
+            <b className={part.className} key={part.label}>
+              {part.label}
+            </b>
+          ))}
+        </div>
       </div>
-      <p>{safeMessage}</p>
     </div>
+  );
+}
+
+function diffSummaryParts(summary: DesktopUpdateCheckResult["diff_summary"]) {
+  if (!summary) {
+    return [{ className: "empty", label: "等待检查" }];
+  }
+  const parts = [
+    summary.files_added > 0
+      ? { className: "added", label: `新增 ${summary.files_added} 个文件` }
+      : null,
+    summary.files_modified > 0
+      ? { className: "modified", label: `修改 ${summary.files_modified} 个文件` }
+      : null,
+    summary.files_deleted > 0
+      ? { className: "deleted", label: `删除 ${summary.files_deleted} 个文件` }
+      : null,
+  ].filter((part): part is { className: string; label: string } => part !== null);
+  if (parts.length > 0) {
+    return parts;
+  }
+  return [{ className: "empty", label: "没有文件变化" }];
+}
+
+function auditActionLabel(action: string) {
+  switch (action) {
+    case "UpdateApplied":
+      return "已应用更新";
+    case "UpdateChecked":
+      return "检查过更新";
+    case "RollbackApplied":
+      return "已回滚";
+    case "RollbackFailed":
+      return "回滚失败";
+    case "UpdateFailed":
+      return "更新失败";
+    case "UpdateBlocked":
+      return "更新已提示";
+    case "SourceBound":
+      return "已绑定来源";
+    case "SourceUnbound":
+      return "已解绑来源";
+    case "BackupDeleted":
+      return "已删除备份";
+    default:
+      return "记录";
+  }
+}
+
+function auditCommitSummary(event: DesktopAuditEvent) {
+  const before = event.commit_before ? shortCommit(event.commit_before) : null;
+  const after = event.commit_after ? shortCommit(event.commit_after) : null;
+  if (before && after) {
+    return `${before} -> ${after}`;
+  }
+  if (after) {
+    return `版本 ${after}`;
+  }
+  if (before) {
+    return `原版本 ${before}`;
+  }
+  return event.detail || event.status;
+}
+
+function compactDateTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString(undefined, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const formatted = unitIndex === 0 ? Math.round(size).toString() : size.toFixed(1);
+  return `${formatted} ${units[unitIndex]}`;
+}
+
+function securityRiskCount(riskSummary?: string | null) {
+  if (!riskSummary) {
+    return 0;
+  }
+  try {
+    const parsed = JSON.parse(riskSummary);
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function canViewUpdateDiff(updateResult?: DesktopUpdateCheckResult) {
+  return (
+    updateResult?.status === "UpdateAvailable" &&
+    (updateResult.diff_summary?.total_changes ?? 0) > 0
   );
 }
 
@@ -407,11 +537,11 @@ function detailInstalledAgentRows(
     DesktopSkill,
     "agent_id" | "agent_name" | "id" | "install_path" | "local_modified" | "source_id"
   >[],
-  detailTargets: DesktopSkillTarget[],
   updateResults: Record<string, DesktopUpdateCheckResult>,
 ) {
   const rows: DetailAgentInstallRow[] = [];
   const seen = new Set<string>();
+  const groupHasSource = Boolean(skill.source_id || skill.source);
 
   function addRow(
     agent: AgentIdentity,
@@ -445,7 +575,7 @@ function detailInstalledAgentRows(
       membership.install_path,
       membership.id,
       membership.local_modified === true,
-      Boolean(membership.source_id),
+      Boolean(membership.source_id) || groupHasSource,
     );
   }
 
@@ -454,27 +584,10 @@ function detailInstalledAgentRows(
     skill.install_path,
     skill.id,
     skill.local_modified === true,
-    Boolean(skill.source_id),
+    groupHasSource,
   );
 
-  for (const target of detailTargets) {
-    if (!isInstalledDetailTarget(target)) {
-      continue;
-    }
-    addRow(
-      { agent_id: target.agent_id, agent_name: target.agent_name },
-      target.install_path,
-      target.skill_id ?? skill.id,
-      target.local_modified,
-      Boolean(target.source_id),
-    );
-  }
-
   return rows;
-}
-
-function isInstalledDetailTarget(target: DesktopSkillTarget) {
-  return target.status !== "NotInstalled" && Boolean(target.skill_id);
 }
 
 type DetailAgentStatusKind =
@@ -524,34 +637,34 @@ function detailAggregateSummary(rows: DetailAgentInstallRow[]): {
   if (rows.some((row) => row.statusKind === "local-modified")) {
     return {
       label: "有 Agent 存在本地修改",
-      message: "展开安装位置查看哪些 Agent 被改过；如果是误修改，可在对应行点击覆盖更新。",
+      message: "",
       tone: "warning",
     };
   }
   if (rows.some((row) => row.statusKind === "update")) {
     return {
       label: "有 Agent 需要更新",
-      message: "展开安装位置查看哪些 Agent 需要更新，并可一键更新需要处理的项。",
+      message: "",
       tone: "warning",
     };
   }
   if (rows.length > 0 && rows.every((row) => row.statusKind === "latest")) {
     return {
       label: "所有 Agent 均无需更新",
-      message: "已安装此 skill 的 Agent 都与来源版本一致。",
+      message: "",
       tone: "good",
     };
   }
   if (rows.some((row) => row.statusKind === "failed" || row.statusKind === "no-source")) {
     return {
       label: "部分 Agent 暂无法判断",
-      message: "展开安装位置查看原因，例如来源未绑定、Git 访问失败或路径不可访问。",
+      message: "",
       tone: "muted",
     };
   }
   return {
     label: "尚未检查 Agent 状态",
-    message: "点击检查更新后，Metis 会分别检查每个已安装 Agent 的版本和来源状态。",
+    message: "",
     tone: "muted",
   };
 }

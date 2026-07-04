@@ -1,23 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applySkillUpdate,
   bindSkillSource,
-  checkTeamManifestCompliance,
   checkSkillUpdates,
-  exportAuditLogReportToFile,
-  exportEnvironmentReport,
-  exportEnvironmentReportToFile,
-  exportTeamComplianceReportToFile,
   getSkillDiff,
+  getSkillSize,
   getDesktopSettings,
   getSkillTargetsForSource,
-  getTeamPolicyAuditReport,
-  getTeamPolicySummary,
   installRemoteSkillToTargets,
+  listSkillAuditEvents,
   listSkillBackups,
   listAgents,
   listIndexedSkills,
-  loadTeamManifestFromFile,
   openExternalUrl,
   previewRemoteSkillSource,
   restoreSkillBackup,
@@ -37,28 +31,25 @@ import { UiRedesignPreview } from "./UiRedesignPreview";
 import type {
   DesktopAgentStatus,
   DesktopApplyUpdateResult,
+  DesktopAuditEvent,
   DesktopBackupSummary,
   DesktopDiffDetail,
   DesktopError,
-  DesktopEnvironmentReport,
   DesktopInstallRemoteSkillResult,
   DesktopRemoteSkillPreview,
   DesktopScanWarning,
   DesktopSettings,
   DesktopSkill,
+  DesktopSkillSize,
   DesktopSource,
   DesktopSourceConnectionTestResult,
   DesktopSkillTarget,
-  DesktopTeamManifestComplianceReport,
-  DesktopTeamManifestComplianceItem,
-  DesktopTeamPolicyAuditReport,
-  DesktopTeamPolicyAuditItem,
-  DesktopTeamPolicySummary,
+  DesktopCustomMonitoredPath,
   DesktopUpdateCheckResult,
   LoadState,
 } from "./types";
 
-type WorkspaceKey = "skills" | "governance" | "settings";
+type WorkspaceKey = "skills" | "settings";
 type SkillsViewKind = "list" | "detail" | "add";
 
 function App() {
@@ -76,25 +67,24 @@ function MetisApp() {
   const [updateResults, setUpdateResults] = useState<Record<string, DesktopUpdateCheckResult>>({});
   const [diffDetails, setDiffDetails] = useState<Record<string, DesktopDiffDetail>>({});
   const [diffError, setDiffError] = useState<Record<string, DesktopError>>({});
+  const [skillSizes, setSkillSizes] = useState<Record<string, DesktopSkillSize>>({});
+  const [skillAuditEvents, setSkillAuditEvents] = useState<Record<string, DesktopAuditEvent[]>>({});
   const [backupPanels, setBackupPanels] = useState<Record<string, boolean>>({});
   const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
   const [backupError, setBackupError] = useState<Record<string, DesktopError>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [settings, setSettings] = useState<DesktopSettings>({
+  const [sourceRequiredSkillId, setSourceRequiredSkillId] = useState<string | null>(null);
+  const [, setSettings] = useState<DesktopSettings>({
     custom_scan_paths: [],
+    agent_path_overrides: [],
+    custom_monitored_paths: [],
     team_policy_path: null,
     enterprise_network: emptyEnterpriseNetworkSettings(),
   });
-  const [settingsDraft, setSettingsDraft] = useState("");
-  const [teamPolicyPathDraft, setTeamPolicyPathDraft] = useState("");
-  const [enterpriseProxyUrlDraft, setEnterpriseProxyUrlDraft] = useState("");
-  const [enterpriseNoProxyDraft, setEnterpriseNoProxyDraft] = useState("");
-  const [enterpriseCaBundlePathDraft, setEnterpriseCaBundlePathDraft] = useState("");
-  const [teamPolicySummary, setTeamPolicySummary] = useState<DesktopTeamPolicySummary | null>(
-    null,
-  );
-  const [teamPolicyAuditReport, setTeamPolicyAuditReport] =
-    useState<DesktopTeamPolicyAuditReport | null>(null);
+  const [agentPathOverrideDrafts, setAgentPathOverrideDrafts] = useState<Record<string, string>>({});
+  const [customMonitorDrafts, setCustomMonitorDrafts] = useState<DesktopCustomMonitoredPath[]>([]);
+  const [newCustomMonitorName, setNewCustomMonitorName] = useState("");
+  const [newCustomMonitorPath, setNewCustomMonitorPath] = useState("");
   const [bindingSkillId, setBindingSkillId] = useState<string | null>(null);
   const [bindDraft, setBindDraft] = useState<BindDraft>(emptyBindDraft());
   const [sourceConnectionResults, setSourceConnectionResults] = useState<
@@ -120,36 +110,18 @@ function MetisApp() {
   const [selectedRemoteTargetIds, setSelectedRemoteTargetIds] = useState<string[]>([]);
   const [remoteInstallResult, setRemoteInstallResult] =
     useState<DesktopInstallRemoteSkillResult | null>(null);
-  const [detailTargets, setDetailTargets] = useState<Record<string, DesktopSkillTarget[]>>({});
-  const [detailTargetErrors, setDetailTargetErrors] = useState<Record<string, DesktopError>>({});
-  const [selectedDetailTargetIds, setSelectedDetailTargetIds] = useState<Record<string, string[]>>(
-    {},
-  );
-  const [detailInstallResults, setDetailInstallResults] = useState<
-    Record<string, DesktopInstallRemoteSkillResult>
-  >({});
-  const totalExistingPaths = agents.reduce(
-    (count, agent) => count + agent.paths.filter((path) => path.exists).length,
-    0,
-  );
-  const modifiedCount = skills.filter((skill) => skill.local_modified).length;
-  const boundCount = skills.filter((skill) => skill.source).length;
+  const builtinPathHealth = builtinPathHealthForAgents(agents);
+  const customPathHealth = pathHealthForAgents(agents, "custom");
   const trustedSourceCount = skills.filter((skill) => skill.source?.trusted).length;
   const autoUpdateCount = skills.filter((skill) => skill.source?.auto_update).length;
   const trustedAutoUpdateSkills = skills.filter(
     (skill) => skill.source?.trusted && skill.source.auto_update && skill.local_modified !== true,
   );
-  const [environmentReport, setEnvironmentReport] = useState<DesktopEnvironmentReport | null>(
-    null,
-  );
-  const [teamManifestDraft, setTeamManifestDraft] = useState("");
-  const [teamManifestFilePath, setTeamManifestFilePath] = useState("");
-  const [teamComplianceExportPath, setTeamComplianceExportPath] = useState("");
-  const [environmentReportExportPath, setEnvironmentReportExportPath] = useState("");
-  const [auditLogExportPath, setAuditLogExportPath] = useState("");
-  const [teamComplianceReport, setTeamComplianceReport] =
-    useState<DesktopTeamManifestComplianceReport | null>(null);
+  const sourceRequiredSkill = sourceRequiredSkillId
+    ? skills.find((skill) => skill.id === sourceRequiredSkillId) ?? null
+    : null;
   const didBootstrap = useRef(false);
+  const skillSizesRef = useRef<Record<string, DesktopSkillSize>>({});
 
   useEffect(() => {
     if (didBootstrap.current) {
@@ -161,13 +133,14 @@ function MetisApp() {
 
   useEffect(() => {
     if (!actionMessage) {
+      setSourceRequiredSkillId(null);
       return;
     }
     const toastTimer = window.setTimeout(() => {
       setActionMessage(null);
-    }, 3000);
+    }, sourceRequiredSkillId ? 6000 : 3000);
     return () => window.clearTimeout(toastTimer);
-  }, [actionMessage]);
+  }, [actionMessage, sourceRequiredSkillId]);
 
   async function bootstrap() {
     setState("loading");
@@ -181,11 +154,9 @@ function MetisApp() {
       const settingsResult = await getDesktopSettings();
       setAgents(agentResult);
       setSettings(settingsResult);
-      setSettingsDraft(settingsResult.custom_scan_paths.join("\n"));
-      setTeamPolicyPathDraft(settingsResult.team_policy_path ?? "");
-      syncEnterpriseNetworkDrafts(settingsResult);
+      syncPathSettingsDrafts(settingsResult);
 
-      if (indexedResult.length > 0) {
+      if (indexedResult.length > 0 && !hasMissingLocalUpdatedAt(indexedResult)) {
         setSkills(indexedResult);
         setWarnings([]);
         setState("loaded");
@@ -203,23 +174,42 @@ function MetisApp() {
     }
   }
 
+  function hasMissingLocalUpdatedAt(indexedSkills: DesktopSkill[]) {
+    return indexedSkills.some((skill) => skill.local_updated_at === null);
+  }
+
   function settingsRequestFromDrafts(): DesktopSettings {
+    const nextCustomMonitors = [...customMonitorDrafts];
+    if (newCustomMonitorName.trim() && newCustomMonitorPath.trim()) {
+      nextCustomMonitors.push({
+        id: customMonitorId(newCustomMonitorName, nextCustomMonitors.length),
+        name: newCustomMonitorName,
+        path: newCustomMonitorPath,
+      });
+    }
     return {
-      custom_scan_paths: settingsDraft.split("\n"),
-      team_policy_path: teamPolicyPathDraft.trim() || null,
-      enterprise_network: {
-        proxy_url: enterpriseProxyUrlDraft.trim() || null,
-        no_proxy: enterpriseNoProxyDraft.trim() || null,
-        certificate_authority_bundle_path: enterpriseCaBundlePathDraft.trim() || null,
-      },
+      custom_scan_paths: [],
+      agent_path_overrides: Object.entries(agentPathOverrideDrafts).map(([agent_id, path]) => ({
+        agent_id,
+        path,
+      })),
+      custom_monitored_paths: nextCustomMonitors,
+      team_policy_path: null,
+      enterprise_network: emptyEnterpriseNetworkSettings(),
     };
   }
 
-  function syncEnterpriseNetworkDrafts(nextSettings: DesktopSettings) {
-    const network = nextSettings.enterprise_network ?? emptyEnterpriseNetworkSettings();
-    setEnterpriseProxyUrlDraft(network.proxy_url ?? "");
-    setEnterpriseNoProxyDraft(network.no_proxy ?? "");
-    setEnterpriseCaBundlePathDraft(network.certificate_authority_bundle_path ?? "");
+  function syncPathSettingsDrafts(nextSettings: DesktopSettings) {
+    const overrides = Object.fromEntries(
+      (nextSettings.agent_path_overrides ?? []).map((overridePath) => [
+        overridePath.agent_id,
+        overridePath.path,
+      ]),
+    );
+    setAgentPathOverrideDrafts(overrides);
+    setCustomMonitorDrafts(nextSettings.custom_monitored_paths ?? []);
+    setNewCustomMonitorName("");
+    setNewCustomMonitorPath("");
   }
 
   async function handleScan() {
@@ -233,9 +223,11 @@ function MetisApp() {
       setAgents(agentResult);
       setSkills(scanResult.skills);
       setWarnings(scanResult.warnings);
-      setUpdateResults({});
+      setUpdateResults((current) => retainUpdateResultsForSkills(current, scanResult.skills));
       setDiffDetails({});
       setDiffError({});
+      skillSizesRef.current = {};
+      setSkillSizes({});
       setBackups({});
       setBackupPanels({});
       setBackupError({});
@@ -247,23 +239,25 @@ function MetisApp() {
   }
 
   async function handleSaveSettings(scanAfterSave: boolean) {
-    setActionBusy("settings");
     setActionError(null);
     setActionMessage(null);
+    const nextSettings = settingsRequestFromDrafts();
+    const validationError = validateSettingsDraft(nextSettings);
+    if (validationError) {
+      setActionError(validationError);
+      return;
+    }
+
+    setActionBusy("settings");
 
     try {
-      const saved = await saveDesktopSettings({
-        ...settingsRequestFromDrafts(),
-      });
+      const saved = await saveDesktopSettings(nextSettings);
       setSettings(saved);
-      setSettingsDraft(saved.custom_scan_paths.join("\n"));
-      setTeamPolicyPathDraft(saved.team_policy_path ?? "");
-      syncEnterpriseNetworkDrafts(saved);
-      setTeamPolicySummary(null);
-      setTeamPolicyAuditReport(null);
+      syncPathSettingsDrafts(saved);
       setActionMessage("设置已保存");
       if (scanAfterSave) {
         await handleScan();
+        setActionMessage("设置已保存");
       } else {
         setAgents(await listAgents());
       }
@@ -274,11 +268,75 @@ function MetisApp() {
     }
   }
 
-  function removeCustomPath(path: string) {
-    const nextPaths = settings.custom_scan_paths.filter((item) => item !== path);
-    const nextDraft = nextPaths.join("\n");
-    setSettings({ ...settings, custom_scan_paths: nextPaths });
-    setSettingsDraft(nextDraft);
+  function validateSettingsDraft(nextSettings: DesktopSettings): DesktopError | null {
+    const builtinAgentNames = new Set(
+      settingsAgentRows
+        .filter((row) => !row.agent_id.startsWith("custom-") && row.agent_id !== "generic")
+        .map((row) => normalizeSettingsIdentity(row.agent_name)),
+    );
+    const builtinPaths = new Set(
+      settingsAgentRows
+        .filter((row) => !row.agent_id.startsWith("custom-") && row.agent_id !== "generic")
+        .map((row) => normalizeSettingsPath(agentPathOverrideDrafts[row.agent_id] ?? row.path))
+        .filter(Boolean),
+    );
+    const seenCustomNames = new Set<string>();
+    const seenCustomPaths = new Set<string>();
+
+    for (const customPath of nextSettings.custom_monitored_paths ?? []) {
+      const name = normalizeSettingsIdentity(customPath.name);
+      const path = normalizeSettingsPath(customPath.path);
+      if (!name || !path) {
+        continue;
+      }
+      if (builtinAgentNames.has(name)) {
+        return settingsValidationError(
+          "自定义路径名称不能和内置 Agent 重复",
+          "换一个不会和 Codex、Claude Code、OpenClaw 等内置 Agent 混淆的名称。",
+        );
+      }
+      if (seenCustomNames.has(name)) {
+        return settingsValidationError(
+          "自定义路径名称不能重复",
+          "每个自定义路径需要使用不同的名称，方便在列表和详情页区分。",
+        );
+      }
+      if (builtinPaths.has(path) || seenCustomPaths.has(path)) {
+        return settingsValidationError(
+          "自定义路径不能和已有路径重复",
+          "请填写一个没有被内置 Agent 或其他自定义路径使用过的目录。",
+        );
+      }
+      seenCustomNames.add(name);
+      seenCustomPaths.add(path);
+    }
+
+    return null;
+  }
+
+  function handleAgentPathDraftChange(agentId: string, defaultPath: string, nextPath: string) {
+    setAgentPathOverrideDrafts((current) => {
+      const next = { ...current };
+      if (nextPath.trim() === defaultPath.trim()) {
+        delete next[agentId];
+      } else {
+        next[agentId] = nextPath;
+      }
+      return next;
+    });
+  }
+
+  function removeCustomMonitor(id: string) {
+    setCustomMonitorDrafts((current) => current.filter((path) => path.id !== id));
+  }
+
+  function customMonitorId(name: string, index: number) {
+    const slug = name
+      .trim()
+      .toLocaleLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return slug ? `${slug}-${index + 1}` : `monitor-${index + 1}`;
   }
 
   function openBindForm(skill: DesktopSkill) {
@@ -333,57 +391,6 @@ function MetisApp() {
         ...current,
         [skillId]: desktopError(caught),
       }));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function handlePreviewTeamPolicy() {
-    setActionBusy("team-policy");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      if (teamPolicyPathDraft.trim() !== (settings.team_policy_path ?? "")) {
-        const saved = await saveDesktopSettings({
-          ...settingsRequestFromDrafts(),
-        });
-        setSettings(saved);
-        setSettingsDraft(saved.custom_scan_paths.join("\n"));
-        setTeamPolicyPathDraft(saved.team_policy_path ?? "");
-        syncEnterpriseNetworkDrafts(saved);
-      }
-      const summary = await getTeamPolicySummary();
-      setTeamPolicySummary(summary);
-      setTeamPolicyAuditReport(null);
-      setActionMessage(summary ? "团队策略已载入" : "未配置团队策略文件");
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function handleRunTeamPolicyAudit() {
-    setActionBusy("team-policy-audit");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      if (teamPolicyPathDraft.trim() !== (settings.team_policy_path ?? "")) {
-        const saved = await saveDesktopSettings({
-          ...settingsRequestFromDrafts(),
-        });
-        setSettings(saved);
-        setSettingsDraft(saved.custom_scan_paths.join("\n"));
-        setTeamPolicyPathDraft(saved.team_policy_path ?? "");
-        syncEnterpriseNetworkDrafts(saved);
-      }
-      const report = await getTeamPolicyAuditReport();
-      setTeamPolicyAuditReport(report);
-      setActionMessage("策略审计已生成");
-    } catch (caught) {
-      setActionError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -503,7 +510,6 @@ function MetisApp() {
         return next;
       });
       setDiffError({});
-      await refreshIndexedSkills();
       const updateCount = results.filter((result) => result.status === "UpdateAvailable").length;
       setActionMessage(`检查完成：${updateCount} 个 skill 待更新`);
     } catch (caught) {
@@ -526,8 +532,16 @@ function MetisApp() {
       for (const detailSkill of detailSkills) {
         readySkills.push(await ensureReusableSourceBound(detailSkill));
       }
+      const checkableSkills = readySkills.filter((readySkill) =>
+        Boolean(readySkill.source_id || readySkill.source),
+      );
+      if (checkableSkills.length === 0) {
+        setSourceRequiredSkillId(detailSkills[0].id);
+        setActionMessage("需要先绑定来源");
+        return;
+      }
       const results = await checkSkillUpdates({
-        skill_ids: readySkills.map((readySkill) => readySkill.id),
+        skill_ids: checkableSkills.map((readySkill) => readySkill.id),
       });
       setUpdateResults((current) => {
         const next = { ...current };
@@ -537,11 +551,11 @@ function MetisApp() {
         return next;
       });
       setDiffError({});
-      await refreshIndexedSkills();
       const updateCount = results.filter(
         (result) => result.status === "UpdateAvailable" && !result.local_modified,
       ).length;
       setActionMessage(`检查完成：${updateCount} 个 Agent 需要更新`);
+      await Promise.all(checkableSkills.map((readySkill) => loadSkillAuditEvents(readySkill.id)));
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -574,106 +588,6 @@ function MetisApp() {
       setRemotePreview(preview);
       setRemoteTargets(targets);
       setSelectedRemoteTargetIds([]);
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function loadDetailTargets(skill: DesktopSkill) {
-    const source = skill.source ?? reusableSourceForSkill(skill);
-    if (!source) {
-      return;
-    }
-
-    setActionBusy(`detail-targets:${skill.id}`);
-    setActionError(null);
-    setDetailTargetErrors((current) => {
-      const next = { ...current };
-      delete next[skill.id];
-      return next;
-    });
-
-    try {
-      const preview = await previewRemoteSkillSource({
-        url: source.url,
-        repo_path: source.repo_path,
-        ref_: source.ref_ || "main",
-      });
-      const targets = await getSkillTargetsForSource({
-        url: source.url,
-        repo_path: preview.repo_path === "." ? "" : preview.repo_path,
-        ref_: source.ref_ || "main",
-        commit: preview.commit,
-        install_name: preview.install_name,
-      });
-      setDetailTargets((current) => ({ ...current, [skill.id]: targets }));
-      setSelectedDetailTargetIds((current) => ({ ...current, [skill.id]: [] }));
-    } catch (caught) {
-      setDetailTargetErrors((current) => ({ ...current, [skill.id]: desktopError(caught) }));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  function toggleDetailTarget(skillId: string, target: DesktopSkillTarget) {
-    const id = remoteTargetId(target);
-    setSelectedDetailTargetIds((current) => {
-      const selected = current[skillId] ?? [];
-      return {
-        ...current,
-        [skillId]: selected.includes(id)
-          ? selected.filter((item) => item !== id)
-          : [...selected, id],
-      };
-    });
-  }
-
-  async function handleInstallDetailTargets(skill: DesktopSkill) {
-    const source = skill.source ?? reusableSourceForSkill(skill);
-    if (!source || !detailTargets[skill.id]) {
-      return;
-    }
-    const selectedIds = selectedDetailTargetIds[skill.id] ?? [];
-    const selectedTargets = detailTargets[skill.id].filter((target) =>
-      selectedIds.includes(remoteTargetId(target)),
-    );
-    if (selectedTargets.length === 0) {
-      return;
-    }
-
-    setActionBusy(`detail-install:${skill.id}`);
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      const preview = await previewRemoteSkillSource({
-        url: source.url,
-        repo_path: source.repo_path,
-        ref_: source.ref_ || "main",
-      });
-      const result = await installRemoteSkillToTargets({
-        url: source.url,
-        repo_path: preview.repo_path === "." ? "" : preview.repo_path,
-        ref_: source.ref_ || "main",
-        commit: preview.commit,
-        install_name: preview.install_name,
-        targets: selectedTargets.map((target) => ({
-          agent_id: target.agent_id,
-          agent_name: target.agent_name,
-          install_path: target.install_path,
-        })),
-      });
-      setDetailInstallResults((current) => ({ ...current, [skill.id]: result }));
-      setActionMessage("跨 Agent 同步已完成");
-      await refreshIndexedSkills();
-      setDetailTargets((current) => {
-        const next = { ...current };
-        delete next[skill.id];
-        return next;
-      });
-      await loadDetailTargets(skill);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -726,113 +640,6 @@ function MetisApp() {
     }
   }
 
-  async function handleExportEnvironmentReport() {
-    setActionBusy("environment-report");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      const report = await exportEnvironmentReport();
-      setEnvironmentReport(report);
-      setActionMessage("环境报告已生成");
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function handleExportEnvironmentReportToFile() {
-    setActionBusy("environment-report-file");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      const result = await exportEnvironmentReportToFile(environmentReportExportPath.trim());
-      setActionMessage(`环境报告已写出：${result.output_path}`);
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function handleLoadTeamManifestFromFile() {
-    setActionBusy("team-manifest-file");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      const manifest = await loadTeamManifestFromFile(teamManifestFilePath.trim());
-      setTeamManifestDraft(manifest);
-      setTeamComplianceReport(null);
-      setActionMessage("团队清单文件已载入");
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function handleCheckTeamCompliance() {
-    setActionBusy("team-compliance");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      const report = await checkTeamManifestCompliance({
-        manifest_json: teamManifestDraft.trim(),
-      });
-      setTeamComplianceReport(report);
-      setActionMessage("团队合规报告已生成");
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function handleExportTeamComplianceReport() {
-    if (!teamComplianceReport) {
-      return;
-    }
-
-    setActionBusy("team-compliance-export");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      const result = await exportTeamComplianceReportToFile({
-        output_path: teamComplianceExportPath.trim(),
-        report: teamComplianceReport,
-      });
-      setActionMessage(`团队合规报告已写出：${result.output_path}`);
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
-  async function handleExportAuditLogReport() {
-    setActionBusy("audit-log-export");
-    setActionError(null);
-    setActionMessage(null);
-
-    try {
-      const result = await exportAuditLogReportToFile({
-        output_path: auditLogExportPath.trim(),
-        limit: 200,
-        offset: 0,
-      });
-      setActionMessage(`审计日志已写出：${result.output_path}`);
-    } catch (caught) {
-      setActionError(desktopError(caught));
-    } finally {
-      setActionBusy(null);
-    }
-  }
-
   async function handleRunAutoUpdate() {
     setActionBusy("auto-update");
     setActionError(null);
@@ -847,7 +654,7 @@ function MetisApp() {
       ).length;
 
       if (candidateIds.length === 0) {
-        setActionMessage(`受控自动更新完成：已更新 0 个，跳过 ${skippedByPolicy} 个`);
+        setActionMessage(`自动更新完成：已更新 0 个，跳过 ${skippedByPolicy} 个`);
         return;
       }
 
@@ -862,6 +669,7 @@ function MetisApp() {
 
       let applied = 0;
       let failed = 0;
+      const appliedSkillIds: string[] = [];
       for (const result of results) {
         if (result.status !== "UpdateAvailable" || result.local_modified) {
           continue;
@@ -869,6 +677,7 @@ function MetisApp() {
         try {
           const appliedResult = await applySkillUpdate(result.skill_id);
           applied += 1;
+          appliedSkillIds.push(result.skill_id);
           markSkillUpToDate(appliedResult);
           clearSkillDetailArtifacts(result.skill_id);
         } catch {
@@ -877,12 +686,13 @@ function MetisApp() {
       }
 
       await refreshIndexedSkills();
+      await Promise.all(appliedSkillIds.map((skillId) => loadSkillSize(skillId, { force: true })));
       const skipped =
         skippedByPolicy +
         results.filter((result) => result.status !== "UpdateAvailable" || result.local_modified)
           .length;
       const failureText = failed > 0 ? `，失败 ${failed} 个` : "";
-      setActionMessage(`受控自动更新完成：已更新 ${applied} 个，跳过 ${skipped} 个${failureText}`);
+      setActionMessage(`自动更新完成：已更新 ${applied} 个，跳过 ${skipped} 个${failureText}`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -919,13 +729,20 @@ function MetisApp() {
     }
   }
 
-  async function handleToggleDetailDiff(skill: DesktopSkill) {
+  async function handleToggleDetailDiff(
+    skill: DesktopSkill,
+    updateResult?: DesktopUpdateCheckResult,
+  ) {
     if (diffDetails[skill.id]) {
       setDiffDetails((current) => {
         const next = { ...current };
         delete next[skill.id];
         return next;
       });
+      return;
+    }
+    if (!canLoadDiffDetail(updateResult)) {
+      setActionMessage("请先检查更新，有文件变化后再查看 diff");
       return;
     }
 
@@ -967,6 +784,29 @@ function MetisApp() {
       setActionBusy(null);
     }
   }
+
+  const loadSkillAuditEvents = useCallback(async (skillId: string) => {
+    try {
+      const events = await listSkillAuditEvents(skillId, 6);
+      setSkillAuditEvents((current) => ({ ...current, [skillId]: events }));
+    } catch {
+      setSkillAuditEvents((current) => ({ ...current, [skillId]: [] }));
+    }
+  }, []);
+
+  const loadSkillSize = useCallback(async (skillId: string, options?: { force?: boolean }) => {
+    if (!options?.force && skillSizesRef.current[skillId]) {
+      return;
+    }
+    try {
+      const size = await getSkillSize(skillId);
+      const next = { ...skillSizesRef.current, [skillId]: size };
+      skillSizesRef.current = next;
+      setSkillSizes(next);
+    } catch {
+      // Size is supplemental UI data; failures should not block opening the detail page.
+    }
+  }, []);
 
   async function handleToggleBackups(skillId: string) {
     if (backupPanels[skillId]) {
@@ -1059,7 +899,9 @@ function MetisApp() {
       clearSkillDetailArtifacts(skillId);
       setBackupPanels((current) => ({ ...current, [skillId]: true }));
       await refreshIndexedSkills();
+      await loadSkillSize(skillId, { force: true });
       await loadBackups(skillId);
+      await loadSkillAuditEvents(skillId);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1077,12 +919,17 @@ function MetisApp() {
 
     let applied = 0;
     let failed = 0;
+    let securityFindingCount = 0;
+    const appliedSkillIds: string[] = [];
     for (const skillId of skillIds) {
       try {
         const result = await applySkillUpdate(skillId);
         applied += 1;
+        appliedSkillIds.push(skillId);
+        securityFindingCount += result.security_findings.length;
         markSkillUpToDate(result);
         clearSkillDetailArtifacts(skillId);
+        await loadSkillAuditEvents(skillId);
       } catch {
         failed += 1;
       }
@@ -1090,8 +937,13 @@ function MetisApp() {
 
     try {
       await refreshIndexedSkills();
+      await Promise.all(appliedSkillIds.map((skillId) => loadSkillSize(skillId, { force: true })));
       const failureText = failed > 0 ? `，失败 ${failed} 个` : "";
-      setActionMessage(`已更新 ${applied} 个需要更新的 Agent${failureText}`);
+      setActionMessage(
+        `已更新 ${applied} 个需要更新的 Agent${failureText}${securityFindingsNote(
+          securityFindingCount,
+        )}`,
+      );
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1105,14 +957,14 @@ function MetisApp() {
     setActionMessage(null);
 
     try {
-      const result = await restoreSkillBackup({ skill_id: skillId, backup_id: backupId });
-      setActionMessage(
-        `已回滚到 ${result.restored_from_backup_id}，回滚前状态已备份为 ${result.previous_state_backup_id}`,
-      );
+      await restoreSkillBackup({ skill_id: skillId, backup_id: backupId });
+      setActionMessage("已回滚到备份版本，回滚前状态已自动备份");
       clearSkillRuntimeState(skillId);
       setBackupPanels((current) => ({ ...current, [skillId]: true }));
       await refreshIndexedSkills();
+      await loadSkillSize(skillId, { force: true });
       await loadBackups(skillId);
+      await loadSkillAuditEvents(skillId);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1219,15 +1071,6 @@ function MetisApp() {
               Skills
             </button>
             <button
-              aria-pressed={activeWorkspace === "governance"}
-              className={activeWorkspace === "governance" ? "active" : ""}
-              data-testid="workspace-tab-governance-sidebar"
-              onClick={() => setActiveWorkspace("governance")}
-            >
-              <RefreshIcon />
-              Updates
-            </button>
-            <button
               aria-pressed={activeWorkspace === "settings"}
               className={activeWorkspace === "settings" ? "active" : ""}
               data-testid="workspace-tab-settings-sidebar"
@@ -1274,13 +1117,6 @@ function MetisApp() {
               onClick={() => setActiveWorkspace("skills")}
             />
             <WorkspaceTab
-              active={activeWorkspace === "governance"}
-              count={boundCount}
-              label="Governance"
-              testId="workspace-tab-governance-legacy"
-              onClick={() => setActiveWorkspace("governance")}
-            />
-            <WorkspaceTab
               active={activeWorkspace === "settings"}
               label="Settings"
               testId="workspace-tab-settings-legacy"
@@ -1289,395 +1125,177 @@ function MetisApp() {
           </nav>
 
       {activeWorkspace !== "skills" && (
-        <section className="summary-strip" aria-label="扫描摘要">
-          <SummaryMetric label="已发现 skills" value={skills.length.toString()} />
-          <SummaryMetric label="已绑定来源" value={boundCount.toString()} />
-          <SummaryMetric label="存在的路径" value={totalExistingPaths.toString()} />
-          <SummaryMetric label="本地修改" value={modifiedCount.toString()} />
+        <section className="summary-strip" aria-label="路径摘要">
+          <SummaryMetric label="内置有效路径" value={builtinPathHealth.valid.toString()} />
+          <SummaryMetric label="内置无效路径" value={builtinPathHealth.missing.toString()} />
+          <SummaryMetric label="自定义有效路径" value={customPathHealth.valid.toString()} />
+          <SummaryMetric label="自定义无效路径" value={customPathHealth.missing.toString()} />
         </section>
       )}
 
       {actionError && <InlineError error={actionError} />}
-      {actionMessage && (
-        <div className="redesign-toast" data-testid="redesign-toast">
-          {actionMessage}
-        </div>
-      )}
-
-      {activeWorkspace === "governance" && (
-        <section className="workspace-pane" data-testid="workspace-governance">
-          <section className="beta-panel" aria-label="Beta 稳定化">
-            <div>
-              <h2>Beta 稳定化</h2>
-              <p>
-                Trusted source {trustedSourceCount} 个，Auto update {autoUpdateCount} 个，候选{" "}
-                {trustedAutoUpdateSkills.length} 个。
-              </p>
-            </div>
-            <div className="beta-actions">
-              <button
-                className="ghost-button compact"
-                data-testid="export-environment-report"
-                disabled={actionBusy === "environment-report"}
-                onClick={handleExportEnvironmentReport}
-              >
-                {actionBusy === "environment-report" ? "生成中" : "导出环境报告"}
-              </button>
-              <button
-                className="compact"
-                data-testid="run-auto-update"
-                disabled={actionBusy === "auto-update" || skills.length === 0}
-                onClick={handleRunAutoUpdate}
-              >
-                {actionBusy === "auto-update" ? "更新中" : "受控自动更新"}
-              </button>
-            </div>
-            <div className="file-action-row">
-              <input
-                data-testid="environment-report-export-path"
-                value={environmentReportExportPath}
-                placeholder="/tmp/metis-environment-report.json"
-                onChange={(event) => setEnvironmentReportExportPath(event.target.value)}
-              />
-              <button
-                className="ghost-button compact"
-                data-testid="export-environment-report-to-file"
-                disabled={
-                  actionBusy === "environment-report-file" ||
-                  environmentReportExportPath.trim().length === 0
-                }
-                onClick={handleExportEnvironmentReportToFile}
-              >
-                {actionBusy === "environment-report-file" ? "写出中" : "写出环境报告"}
-              </button>
-            </div>
-            {environmentReport ? (
-              <ReportPreview title="环境报告预览" subtitle="不包含 token 或 credential_ref 值。">
-                {JSON.stringify(environmentReport, null, 2)}
-              </ReportPreview>
-            ) : (
-              <ReportEmptyState
-                testId="environment-report-empty"
-                title="暂无环境报告"
-                description="先生成环境报告，再决定是否写出到文件。"
-              />
-            )}
-          </section>
-
-          <section className="team-compliance-panel" aria-label="团队清单合规">
-            <div className="team-compliance-header">
-              <div>
-                <h2>团队清单合规</h2>
-                <p>版本锁定、来源绑定和本地修改状态。</p>
-              </div>
-              <button
-                className="compact"
-                data-testid="check-team-compliance"
-                disabled={actionBusy === "team-compliance" || teamManifestDraft.trim().length === 0}
-                onClick={handleCheckTeamCompliance}
-              >
-                {actionBusy === "team-compliance" ? "校验中" : "校验清单"}
-              </button>
-            </div>
-            <div className="file-action-row">
-              <input
-                data-testid="team-manifest-file-path"
-                value={teamManifestFilePath}
-                placeholder="/tmp/team-manifest.json"
-                onChange={(event) => setTeamManifestFilePath(event.target.value)}
-              />
-              <button
-                className="ghost-button compact"
-                data-testid="load-team-manifest-from-file"
-                disabled={
-                  actionBusy === "team-manifest-file" || teamManifestFilePath.trim().length === 0
-                }
-                onClick={handleLoadTeamManifestFromFile}
-              >
-                {actionBusy === "team-manifest-file" ? "载入中" : "从文件载入"}
-              </button>
-            </div>
-            <textarea
-              className="team-manifest-input"
-              data-testid="team-manifest-input"
-              value={teamManifestDraft}
-              placeholder='{"version":"1","skills":[]}'
-              onChange={(event) => setTeamManifestDraft(event.target.value)}
-            />
-            {teamComplianceReport ? (
-              <div className="team-compliance-result">
-                <div className="team-compliance-summary">
-                  <SummaryMetric
-                    label="清单 skills"
-                    value={teamComplianceReport.summary.total.toString()}
-                  />
-                  <SummaryMetric
-                    label="符合版本"
-                    value={teamComplianceReport.summary.installed.toString()}
-                  />
-                  <SummaryMetric
-                    label="缺失"
-                    value={teamComplianceReport.summary.missing.toString()}
-                  />
-                  <SummaryMetric
-                    label="版本不一致"
-                    value={teamComplianceReport.summary.version_mismatch.toString()}
-                  />
-                  <SummaryMetric
-                    label="本地修改"
-                    value={teamComplianceReport.summary.local_modified.toString()}
-                  />
-                  <SummaryMetric
-                    label="来源不一致"
-                    value={teamComplianceReport.summary.source_mismatch.toString()}
-                  />
-                </div>
-                <div className="team-compliance-list">
-                  {teamComplianceReport.items.map((item) => (
-                    <TeamComplianceRow key={`${item.agent_id}:${item.name}`} item={item} />
-                  ))}
-                </div>
-                <ReportPreview title="团队合规报告预览" subtitle="用于提交给团队或归档审计。">
-                  {JSON.stringify(teamComplianceReport, null, 2)}
-                </ReportPreview>
-                <div className="file-action-row">
-                  <input
-                    data-testid="team-compliance-export-path"
-                    value={teamComplianceExportPath}
-                    placeholder="/tmp/metis-team-compliance-report.json"
-                    onChange={(event) => setTeamComplianceExportPath(event.target.value)}
-                  />
-                  <button
-                    className="ghost-button compact"
-                    data-testid="export-team-compliance-report"
-                    disabled={
-                      actionBusy === "team-compliance-export" ||
-                      teamComplianceExportPath.trim().length === 0
-                    }
-                    onClick={handleExportTeamComplianceReport}
-                  >
-                    {actionBusy === "team-compliance-export" ? "写出中" : "写出合规报告"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <ReportEmptyState
-                testId="team-compliance-empty"
-                title="暂无团队合规报告"
-                description="粘贴或载入团队清单后再校验合规状态。"
-              />
-            )}
-          </section>
-
-          <section className="governance-audit-panel" aria-label="本地审计导出">
-            <div>
-              <h2>本地审计导出</h2>
-              <p>导出最近 200 条本机审计事件，用于团队只读审计和问题追溯。</p>
-            </div>
-            <div className="file-action-row">
-              <input
-                data-testid="audit-log-export-path"
-                value={auditLogExportPath}
-                placeholder="/tmp/metis-audit-log-report.json"
-                onChange={(event) => setAuditLogExportPath(event.target.value)}
-              />
-              <button
-                className="ghost-button compact"
-                data-testid="export-audit-log-report"
-                disabled={actionBusy === "audit-log-export" || auditLogExportPath.trim().length === 0}
-                onClick={handleExportAuditLogReport}
-              >
-                {actionBusy === "audit-log-export" ? "写出中" : "写出审计日志"}
-              </button>
-            </div>
-          </section>
-        </section>
-      )}
+      {actionMessage &&
+        (sourceRequiredSkill ? (
+          <div
+            className="redesign-toast source-required-toast"
+            data-testid="source-required-toast"
+            role="status"
+          >
+            <span className="source-required-toast-icon" aria-hidden="true">
+              <SourceLinkIcon />
+            </span>
+            <span className="source-required-toast-copy">
+              <strong>需要先绑定来源</strong>
+              <small>当前 Skill 还没有 Git 来源，绑定后才能检查远端更新。</small>
+            </span>
+            <button
+              className="source-required-toast-action"
+              data-testid="source-required-toast-action"
+              onClick={() => {
+                openBindForm(sourceRequiredSkill);
+                setActionMessage(null);
+              }}
+            >
+              去绑定来源
+            </button>
+          </div>
+        ) : (
+          <div className="redesign-toast" data-testid="redesign-toast">
+            {actionMessage}
+          </div>
+        ))}
 
       {activeWorkspace === "settings" && (
         <section className="settings-panel workspace-pane redesign-settings-page" aria-label="配置" data-testid="workspace-settings">
-          <div className="settings-agent-path-table redesign-agent-path-table" data-testid="settings-agent-path-table">
-            {settingsAgentRows.map((row) => (
-              <label
-                className="settings-agent-path-row redesign-agent-path-row"
-                data-testid={`settings-agent-path-${row.agent_id}`}
-                key={row.agent_id}
-              >
-                <span className={row.exists ? "ready" : "missing"}>{row.agent_name}</span>
-                <input readOnly value={row.path} />
-                <small>{row.exists ? "可读写" : "路径不存在"}</small>
-              </label>
-            ))}
-          </div>
-          <div className="settings-summary">
-            <span>{settings.custom_scan_paths.length || "默认"} 个扫描路径</span>
-            <span>{settings.team_policy_path ? "已配置团队策略" : "未配置团队策略"}</span>
-            <span>{settings.enterprise_network?.proxy_url ? "已配置企业代理" : "未配置企业代理"}</span>
-            <span>
-              {settings.enterprise_network?.certificate_authority_bundle_path
-                ? "已配置企业 CA bundle"
-                : "未配置企业 CA bundle"}
-            </span>
-            <span>凭据使用本机 Git / SSH 配置</span>
-          </div>
-          <div className="settings-editor">
-            <div className="settings-section" data-testid="settings-section-scan-paths">
-              <div>
-                <h3>扫描路径</h3>
-                <p>每行一个额外 Generic Agent Skills 根目录。</p>
-              </div>
-              <div className="custom-path-chips">
-                {settings.custom_scan_paths.length === 0 ? (
-                  <span>默认路径</span>
-                ) : (
-                  settings.custom_scan_paths.map((path) => <code key={path}>{path}</code>)
-                )}
-              </div>
-              <textarea
-                value={settingsDraft}
-                placeholder="/Users/me/.agent-skills-extra"
-                onChange={(event) => setSettingsDraft(event.target.value)}
-              />
-              {settings.custom_scan_paths.length > 0 && (
-                <div className="path-remove-list">
-                  {settings.custom_scan_paths.map((path) => (
-                    <button
-                      className="ghost-button compact"
-                      key={path}
-                      onClick={() => removeCustomPath(path)}
+          <section className="settings-section path-management-section" data-testid="settings-section-path-management">
+            <div>
+              <h3>内置 Agent 路径管理</h3>
+              <p>列出 Metis 当前用于扫描各 Agent skill 的目录，路径不对时可以直接修改。</p>
+            </div>
+            <div className="settings-agent-path-table redesign-agent-path-table" data-testid="settings-agent-path-table">
+              {settingsAgentRows
+                .filter((row) => !row.agent_id.startsWith("custom-") && row.agent_id !== "generic")
+                .map((row) => {
+                  const currentPath = agentPathOverrideDrafts[row.agent_id] ?? row.path;
+                  return (
+                    <label
+                      className={`settings-agent-path-row redesign-agent-path-row ${row.exists ? "exists" : "missing"}`}
+                      data-testid={`settings-agent-path-${row.agent_id}`}
+                      key={row.agent_id}
                     >
-                      移除 {shortPath(path)}
+                      <span className={row.exists ? "ready" : "missing"}>{row.agent_name}</span>
+                      <input
+                        data-testid={`agent-path-${row.agent_id}`}
+                        value={currentPath}
+                        onChange={(event) =>
+                          handleAgentPathDraftChange(row.agent_id, row.path, event.target.value)
+                        }
+                      />
+                      <small className={row.exists ? "path-status-ready" : "path-status-missing"}>
+                        {row.exists ? "可读写" : "路径不存在"}
+                      </small>
+                    </label>
+                  );
+                })}
+            </div>
+          </section>
+
+          <section className="settings-section custom-monitor-section" data-testid="settings-section-custom-monitors">
+            <div>
+              <h3>自定义路径管理</h3>
+              <p>把个人或团队的 skill 目录作为独立来源展示，名称会和 Codex、OpenClaw 一样出现在列表里。</p>
+            </div>
+            <div className="custom-monitor-list">
+              {customMonitorDrafts.length === 0 ? (
+                <span className="settings-muted">暂无自定义监控路径</span>
+              ) : (
+                customMonitorDrafts.map((path) => (
+                  <div
+                    className="settings-agent-path-row redesign-agent-path-row custom-monitor-row"
+                    data-testid={`custom-monitor-row-${path.id}`}
+                    key={path.id}
+                  >
+                    <input
+                      aria-label={`${path.name} 名称`}
+                      value={path.name}
+                      onChange={(event) =>
+                        setCustomMonitorDrafts((current) =>
+                          current.map((item) =>
+                            item.id === path.id ? { ...item, name: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      aria-label={`${path.name} 路径`}
+                      value={path.path}
+                      onChange={(event) =>
+                        setCustomMonitorDrafts((current) =>
+                          current.map((item) =>
+                            item.id === path.id ? { ...item, path: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      className="ghost-button compact custom-monitor-remove"
+                      onClick={() => removeCustomMonitor(path.id)}
+                      type="button"
+                    >
+                      移除
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ))
               )}
-              <div className="form-actions">
-                <button
-                  className="ghost-button compact"
-                  disabled={actionBusy === "settings"}
-                  onClick={() => handleSaveSettings(false)}
-                >
-                  {actionBusy === "settings" ? "保存中" : "保存"}
-                </button>
-                <button
-                  className="compact"
-                  disabled={actionBusy === "settings" || state === "loading"}
-                  onClick={() => handleSaveSettings(true)}
-                >
-                  保存并扫描
-                </button>
-              </div>
             </div>
-            <div className="settings-section" data-testid="settings-section-team-policy">
-              <div>
-                <h3>团队策略</h3>
-                <p>本地 JSON 策略可预配置 trusted source，并限制未信任来源自动更新。</p>
-              </div>
+            <div
+              className="settings-agent-path-row redesign-agent-path-row custom-monitor-row new-monitor-row"
+              data-testid="custom-monitor-new-row"
+            >
               <input
-                data-testid="team-policy-path"
-                value={teamPolicyPathDraft}
-                placeholder="/Users/me/team-policy.json"
-                onChange={(event) => setTeamPolicyPathDraft(event.target.value)}
+                data-testid="custom-monitor-name-new"
+                value={newCustomMonitorName}
+                placeholder="自定义路径名称"
+                onChange={(event) => setNewCustomMonitorName(event.target.value)}
               />
-              <div className="form-actions">
-                <button
-                  className="ghost-button compact"
-                  data-testid="preview-team-policy"
-                  disabled={actionBusy === "team-policy" || teamPolicyPathDraft.trim().length === 0}
-                  onClick={handlePreviewTeamPolicy}
-                >
-                  {actionBusy === "team-policy" ? "读取中" : "预览策略"}
-                </button>
-                <button
-                  className="ghost-button compact"
-                  data-testid="run-team-policy-audit"
-                  disabled={
-                    actionBusy === "team-policy-audit" || teamPolicyPathDraft.trim().length === 0
-                  }
-                  onClick={handleRunTeamPolicyAudit}
-                >
-                  {actionBusy === "team-policy-audit" ? "审计中" : "审计现有来源"}
-                </button>
-              </div>
-              {teamPolicySummary && (
-                <div className="policy-summary">
-                  <span>策略版本 {teamPolicySummary.version}</span>
-                  <span>可信来源 {teamPolicySummary.trusted_sources} 个</span>
-                  <span>
-                    {teamPolicySummary.allow_auto_update ? "允许自动更新" : "禁止自动更新"}
-                  </span>
-                  <span>
-                    {teamPolicySummary.require_trusted_source
-                      ? "自动更新要求 trusted source"
-                      : "自动更新不要求 trusted source"}
-                  </span>
-                </div>
-              )}
-              {teamPolicyAuditReport && (
-                <div className="policy-audit-result">
-                  <div className="policy-summary">
-                    <span>已绑定来源 {teamPolicyAuditReport.total_bound_sources} 个</span>
-                    <span>合规 {teamPolicyAuditReport.compliant} 个</span>
-                    <span>建议标记 trusted {teamPolicyAuditReport.should_mark_trusted} 个</span>
-                    <span>需关闭 auto update {teamPolicyAuditReport.auto_update_disallowed} 个</span>
-                  </div>
-                  <div className="policy-audit-list">
-                    {teamPolicyAuditReport.items.map((item) => (
-                      <PolicyAuditRow key={`${item.skill_id}:${item.source_id}`} item={item} />
-                    ))}
-                  </div>
-                </div>
-              )}
+              <input
+                data-testid="custom-monitor-path-new"
+                value={newCustomMonitorPath}
+                placeholder="/Users/me/team-skills"
+                onChange={(event) => setNewCustomMonitorPath(event.target.value)}
+              />
+              <small className="path-status-ready">待添加</small>
             </div>
-            <div className="settings-section" data-testid="settings-section-enterprise-network">
-              <div>
-                <h3>企业网络</h3>
-                <p>代理和企业 CA bundle 仅用于 Metis 发起的 Git 子进程。</p>
-              </div>
-              <div className="network-field-grid">
-                <input
-                  data-testid="enterprise-proxy-url"
-                  value={enterpriseProxyUrlDraft}
-                  placeholder="http://proxy.corp.example:8080"
-                  onChange={(event) => setEnterpriseProxyUrlDraft(event.target.value)}
-                />
-                <input
-                  data-testid="enterprise-no-proxy"
-                  value={enterpriseNoProxyDraft}
-                  placeholder="localhost,127.0.0.1,.corp.example"
-                  onChange={(event) => setEnterpriseNoProxyDraft(event.target.value)}
-                />
-                <input
-                  data-testid="enterprise-ca-bundle-path"
-                  value={enterpriseCaBundlePathDraft}
-                  placeholder="/Users/me/certs/corp-ca.pem"
-                  onChange={(event) => setEnterpriseCaBundlePathDraft(event.target.value)}
-                />
-              </div>
-              <div className="policy-summary">
-                <span>
-                  {settings.enterprise_network?.proxy_url ? "企业代理已配置" : "企业代理未配置"}
-                </span>
-                <span>
-                  {settings.enterprise_network?.no_proxy ? "NO_PROXY 已配置" : "NO_PROXY 未配置"}
-                </span>
-                <span>
-                  {settings.enterprise_network?.certificate_authority_bundle_path
-                    ? "企业 CA bundle 已配置"
-                    : "企业 CA bundle 未配置"}
-                </span>
-              </div>
+          </section>
+
+          <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
+            <div>
+              <h3>自动更新</h3>
+              <p>只会更新已标记 trusted、已开启 auto update、且本地没有修改的 skill。</p>
             </div>
-            <div className="settings-section credential-section">
-              <div>
-                <h3>凭据引用</h3>
-                <p>在来源绑定中填写引用名，Metis 只保存名称；真实认证由本机 Git、SSH agent 或 Git credential helper 处理。</p>
-              </div>
-              <div className="credential-note">
-                <code>github-main</code>
-                <code>work-gitlab</code>
-              </div>
+            <div className="policy-summary">
+              <span>Trusted source {trustedSourceCount} 个</span>
+              <span>Auto update {autoUpdateCount} 个</span>
+              <span>本次候选 {trustedAutoUpdateSkills.length} 个</span>
             </div>
+            <button
+              className="compact"
+              data-testid="run-auto-update"
+              disabled={actionBusy === "auto-update" || skills.length === 0}
+              onClick={handleRunAutoUpdate}
+            >
+              {actionBusy === "auto-update" ? "更新中" : "开启自动更新"}
+            </button>
+          </section>
+
+          <div className="form-actions settings-save-actions">
+            <button
+              className="ghost-button compact"
+              disabled={actionBusy === "settings"}
+              onClick={() => handleSaveSettings(true)}
+            >
+              {actionBusy === "settings" ? "保存中" : "保存"}
+            </button>
           </div>
         </section>
       )}
@@ -1690,9 +1308,6 @@ function MetisApp() {
           backups={backups}
           bindDraft={bindDraft}
           bindingSkillId={bindingSkillId}
-          detailInstallResults={detailInstallResults}
-          detailTargetErrors={detailTargetErrors}
-          detailTargets={detailTargets}
           diffDetails={diffDetails}
           diffError={diffError}
           error={error}
@@ -1700,9 +1315,10 @@ function MetisApp() {
           remotePreview={remotePreview}
           remoteSyncDraft={remoteSyncDraft}
           remoteTargets={remoteTargets}
-          selectedDetailTargetIds={selectedDetailTargetIds}
           selectedRemoteTargetIds={selectedRemoteTargetIds}
+          skillAuditEvents={skillAuditEvents}
           skillSearchQuery={skillSearchQuery}
+          skillSizes={skillSizes}
           sourceConnectionErrors={sourceConnectionErrors}
           sourceConnectionResults={sourceConnectionResults}
           skills={skills}
@@ -1717,9 +1333,9 @@ function MetisApp() {
           onCheckUpdates={handleCheckUpdates}
           onCheckDetailUpdates={handleCheckDetailUpdates}
           onDraftChange={handleBindDraftChange}
-          onInstallDetailTargets={handleInstallDetailTargets}
           onInstallRemoteTargets={handleInstallRemoteTargets}
-          onLoadDetailTargets={loadDetailTargets}
+          onLoadSkillAuditEvents={loadSkillAuditEvents}
+          onLoadSkillSize={loadSkillSize}
           onOpenBind={openBindForm}
           onOpenSettings={() => setActiveWorkspace("settings")}
           onPreviewRemoteSync={handlePreviewRemoteSync}
@@ -1727,7 +1343,6 @@ function MetisApp() {
           onScan={handleScan}
           onSetRemoteSyncDraft={setRemoteSyncDraft}
           onRouteKindChange={setSkillsViewKind}
-          onToggleDetailTarget={toggleDetailTarget}
           onToggleDetailDiff={handleToggleDetailDiff}
           onToggleDiff={handleToggleDiff}
           onToggleRemoteTarget={toggleRemoteTarget}
@@ -1797,116 +1412,6 @@ function WorkspaceTab({
   );
 }
 
-function TeamComplianceRow({ item }: { item: DesktopTeamManifestComplianceItem }) {
-  return (
-    <article className="team-compliance-row">
-      <div>
-        <div className="skill-title compact-title">
-          <h3>{item.name}</h3>
-          <span>{item.agent_id}</span>
-        </div>
-        <div className="team-compliance-meta">
-          <span>expected {item.expected_commit ? shortCommit(item.expected_commit) : "unlocked"}</span>
-          <span>local {item.local_commit ? shortCommit(item.local_commit) : "none"}</span>
-          <span>{item.local_modified ? "local modified" : "local clean"}</span>
-        </div>
-        <div className="team-compliance-source">
-          <code>{item.expected_source_url ?? "no expected source"}</code>
-          <code>{item.local_source_url ?? "no local source"}</code>
-        </div>
-      </div>
-      <span className={`status-badge ${teamComplianceTone(item.status)}`}>{item.status}</span>
-    </article>
-  );
-}
-
-function PolicyAuditRow({ item }: { item: DesktopTeamPolicyAuditItem }) {
-  return (
-    <article className="policy-audit-row">
-      <div>
-        <div className="skill-title compact-title">
-          <h3>{item.skill_name}</h3>
-          <span>{item.source_ref}</span>
-        </div>
-        <div className="team-compliance-meta">
-          <span>{item.current_trusted ? "trusted" : "untrusted"}</span>
-          <span>{item.current_auto_update ? "auto update on" : "auto update off"}</span>
-          <span>{item.policy_trusted ? "policy trusted" : "policy untrusted"}</span>
-        </div>
-        <div className="team-compliance-source">
-          <code>{item.source_url}</code>
-          <code>{item.source_repo_path}</code>
-        </div>
-        <p className="policy-recommendation">{item.recommendation}</p>
-      </div>
-      <span className={`status-badge ${policyAuditTone(item.status)}`}>{item.status}</span>
-    </article>
-  );
-}
-
-function ReportPreview({
-  children,
-  subtitle,
-  title,
-}: {
-  children: string;
-  subtitle: string;
-  title: string;
-}) {
-  return (
-    <div className="report-preview-shell">
-      <div className="report-preview-header">
-        <strong>{title}</strong>
-        <span>{subtitle}</span>
-      </div>
-      <pre className="environment-report-preview">{children}</pre>
-    </div>
-  );
-}
-
-function ReportEmptyState({
-  description,
-  testId,
-  title,
-}: {
-  description: string;
-  testId: string;
-  title: string;
-}) {
-  return (
-    <div className="report-empty-state" data-testid={testId}>
-      <strong>{title}</strong>
-      <span>{description}</span>
-    </div>
-  );
-}
-
-function teamComplianceTone(status: string): "good" | "danger" | "warning" | "muted" {
-  if (status === "installed") {
-    return "good";
-  }
-  if (status === "missing" || status === "source_mismatch") {
-    return "danger";
-  }
-  if (status === "version_mismatch" || status === "local_modified") {
-    return "warning";
-  }
-  return "muted";
-}
-
-function policyAuditTone(status: string): "good" | "danger" | "warning" | "muted" {
-  if (status === "compliant") {
-    return "good";
-  }
-  if (status === "auto_update_disallowed") {
-    return "danger";
-  }
-  if (status === "should_mark_trusted") {
-    return "warning";
-  }
-  return "muted";
-}
-
 function emptyBindDraft(): BindDraft {
   return {
     url: "",
@@ -1926,25 +1431,90 @@ function emptyEnterpriseNetworkSettings() {
   };
 }
 
+function normalizeSettingsIdentity(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
+function normalizeSettingsPath(value: string) {
+  const trimmed = value.trim();
+  if (trimmed === "/") {
+    return trimmed;
+  }
+  return trimmed.replace(/\/+$/g, "");
+}
+
+function settingsValidationError(message: string, suggestion: string): DesktopError {
+  return {
+    category: "settings",
+    title: "设置未保存",
+    message,
+    suggestion,
+    debug_detail: null,
+  };
+}
+
 function applyUpdateMessage(result: DesktopApplyUpdateResult) {
   if (result.previous_commit === result.new_commit) {
-    return `已用来源版本覆盖本地修改：${shortCommit(result.new_commit)}，已创建备份 ${result.backup_id}`;
+    return `已用来源版本覆盖本地修改：${shortCommit(result.new_commit)}，已创建备份 ${
+      result.backup_id
+    }${securityFindingsNote(result.security_findings.length)}`;
   }
   return `更新完成：${shortCommit(result.previous_commit)} -> ${shortCommit(
     result.new_commit,
-  )}，已创建备份 ${result.backup_id}`;
+  )}，已创建备份 ${result.backup_id}${securityFindingsNote(result.security_findings.length)}`;
 }
 
 function overwriteLocalUpdateMessage(result: DesktopApplyUpdateResult) {
-  return `已用来源版本覆盖本地修改：${shortCommit(result.new_commit)}，已创建备份 ${result.backup_id}`;
+  return `已用来源版本覆盖本地修改：${shortCommit(result.new_commit)}，已创建备份 ${
+    result.backup_id
+  }${securityFindingsNote(result.security_findings.length)}`;
 }
 
-function shortPath(path: string) {
-  const parts = path.split("/").filter(Boolean);
-  if (parts.length <= 2) {
-    return path;
+function securityFindingsNote(count: number) {
+  if (count === 0) {
+    return "";
   }
-  return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+  return "。更新内容包含需要留意的脚本或配置字段，来源可信时通常可以继续使用";
+}
+
+function canLoadDiffDetail(updateResult?: DesktopUpdateCheckResult) {
+  return (
+    updateResult?.status === "UpdateAvailable" &&
+    (updateResult.diff_summary?.total_changes ?? 0) > 0
+  );
+}
+
+function pathHealthForAgents(
+  agents: DesktopAgentStatus[],
+  kind: "custom",
+): { valid: number; missing: number } {
+  return agents
+    .filter((agent) => kind === "custom" && agent.agent_id.startsWith("custom-"))
+    .flatMap((agent) => agent.paths)
+    .reduce(
+      (summary, path) => ({
+        valid: summary.valid + (path.exists ? 1 : 0),
+        missing: summary.missing + (path.exists ? 0 : 1),
+      }),
+      { valid: 0, missing: 0 },
+    );
+}
+
+function builtinPathHealthForAgents(
+  agents: DesktopAgentStatus[],
+): { valid: number; missing: number } {
+  return agents
+    .filter((agent) => !agent.agent_id.startsWith("custom-"))
+    .reduce(
+      (summary, agent) => {
+        const hasValidPath = agent.paths.some((path) => path.exists);
+        return {
+          valid: summary.valid + (hasValidPath ? 1 : 0),
+          missing: summary.missing + (hasValidPath ? 0 : 1),
+        };
+      },
+      { valid: 0, missing: 0 },
+    );
 }
 
 function agentPathRows(agents: DesktopAgentStatus[]) {
@@ -1989,6 +1559,16 @@ function desktopError(caught: unknown): DesktopError {
     return unknownDesktopError(caught.message);
   }
   return unknownDesktopError("桌面后端返回了无法识别的错误");
+}
+
+function retainUpdateResultsForSkills(
+  current: Record<string, DesktopUpdateCheckResult>,
+  scannedSkills: DesktopSkill[],
+): Record<string, DesktopUpdateCheckResult> {
+  const scannedSkillIds = new Set(scannedSkills.map((skill) => skill.id));
+  return Object.fromEntries(
+    Object.entries(current).filter(([skillId]) => scannedSkillIds.has(skillId)),
+  );
 }
 
 function parseDesktopError(raw: string): DesktopError | null {
@@ -2040,7 +1620,6 @@ type WorkspaceTopbarProps = {
 
 const workspaceTopbarCopy: Record<WorkspaceKey, { eyebrow: string; title: string }> = {
   skills: { eyebrow: "Skill Dashboard", title: "Skills" },
-  governance: { eyebrow: "Updates", title: "更新与治理" },
   settings: { eyebrow: "Settings", title: "Agent 路径设置" },
 };
 
@@ -2124,17 +1703,6 @@ function GridIcon() {
   );
 }
 
-function RefreshIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M20 7v5h-5" />
-      <path d="M4 17v-5h5" />
-      <path d="M18 9a6.5 6.5 0 0 0-11-2" />
-      <path d="M6 15a6.5 6.5 0 0 0 11 2" />
-    </svg>
-  );
-}
-
 function GearIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -2149,6 +1717,16 @@ function SearchIcon() {
     <svg aria-hidden="true" viewBox="0 0 24 24">
       <circle cx="10.5" cy="10.5" r="5.8" />
       <path d="m15 15 4.4 4.4" />
+    </svg>
+  );
+}
+
+function SourceLinkIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M9.2 14.8 14.8 9.2" />
+      <path d="M10.5 6.8 12 5.3a4.2 4.2 0 0 1 5.9 5.9l-1.5 1.5" />
+      <path d="M13.5 17.2 12 18.7a4.2 4.2 0 0 1-5.9-5.9l1.5-1.5" />
     </svg>
   );
 }

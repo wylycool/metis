@@ -215,6 +215,38 @@ describe("Phase 6 light workspace contrast", () => {
     expect(declaredPx(latestBlockFor(".status-filter-button"), "min-height")).toBeLessThanOrEqual(42);
   });
 
+  test("keeps Add Skill surfaces in the light command sheet system", () => {
+    expect(latestBlockFor(".add-skill-header")).toContain("background: var(--command-surface);");
+    expect(latestBlockFor(".add-skill-header")).toContain("color: var(--ink);");
+    expect(latestBlockFor(".add-skill-page .remote-sync-panel")).toContain(
+      "background: var(--command-surface);",
+    );
+    expect(latestBlockFor(".add-skill-page .target-matrix")).toContain(
+      "background: var(--command-surface);",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row")).toContain(
+      "background: rgba(248, 250, 252, 0.72);",
+    );
+    expect(latestBlockFor(".add-skill-page .target-matrix-refresh")).not.toContain(
+      "background: var(--ink)",
+    );
+    expect(latestBlockFor(".add-skill-page .target-matrix-refresh:hover:not(:disabled)")).toContain(
+      "background: var(--command-selected);",
+    );
+    expect(latestBlockFor(".remote-preview-version-label")).toContain("color: var(--muted);");
+    expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-start");
+    expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-end");
+    expect(latestBlockFor(".add-skill-page .remote-target-row .remote-target-checkbox")).toContain(
+      "accent-color: var(--command-accent);",
+    );
+    expect(latestBlockFor(".add-skill-page .target-install-button")).not.toContain(
+      "background: var(--ink)",
+    );
+    expect(latestBlockFor(".add-skill-page .target-install-button:hover:not(:disabled)")).toContain(
+      "background: #ddf7ee;",
+    );
+  });
+
   test("keeps agent category labels icon-first until the window is wide", () => {
     expect(stylesheet).toMatch(
       /@media\s*\(min-width:\s*1180px\)\s*\{[\s\S]*\.agent-filter-label[\s\S]*display:\s*inline;/,
@@ -299,6 +331,19 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".scan-button")).toContain("background: var(--command-purple-soft);");
     expect(latestBlockFor(".scan-button")).not.toContain("var(--command-accent-soft)");
     expect(latestBlockFor(".add-skill-button")).toContain("background: var(--command-surface);");
+    expect(latestBlockFor(".skill-sort-control")).toContain("background: var(--command-surface);");
+    expect(latestBlockFor(".skill-sort-control")).toContain("border-radius: 8px;");
+    expect(latestBlockFor(".skill-sort-control")).toContain("font-weight: 500;");
+    expect(latestBlockFor(".skill-sort-control span")).toContain("font-weight: 500;");
+    expect(latestBlockFor(".skill-sort-control select")).toContain("appearance: none;");
+    expect(latestBlockFor(".skill-sort-control select")).toContain("font-weight: 500;");
+    expect(latestBlockFor(".skill-sort-control select:focus")).toContain("outline: none;");
+    expect(latestBlockFor(".skill-sort-control:hover")).toContain(
+      "background: var(--command-selected);",
+    );
+    expect(latestBlockFor(".skill-sort-control:hover")).not.toContain(
+      "background: var(--ink-hover);",
+    );
     expect(latestBlockFor(".status-filter-button.active")).toContain(
       "background: var(--command-selected);",
     );
@@ -437,7 +482,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-detail-agent-path-row .agent-badge")).toContain("margin-left: 0;");
     expect(latestBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
     expect(latestBlockFor(".redesign-detail-agent-row-action")).toContain("white-space: nowrap;");
-    expect(latestBlockFor(".redesign-backup-panel .backup-row")).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;");
+    expect(latestBlockFor(".redesign-backup-panel .backup-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
     expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("background: #f8fafc;");
     expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("color: #2f4b77;");
     expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
@@ -446,6 +491,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-toast")).toContain("background: rgba(255, 255, 255, 0.96);");
     expect(latestBlockFor(".redesign-toast")).toContain("color: #263247;");
     expect(latestBlockFor(".redesign-toast")).toContain("box-shadow: 0 12px 28px rgba(30, 48, 78, 0.14);");
+    expect(latestBlockFor(".source-required-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
+    expect(latestBlockFor(".source-required-toast")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
+    expect(latestBlockFor(".source-required-toast-icon")).toContain("background: #f5b84b;");
+    expect(latestBlockFor(".source-required-toast-action")).toContain("background: #fff7ed;");
+    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("background: #ffedd5;");
+    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #8a4b0f;");
   });
 
   test("brands overlapping agent letter badges by agent identity", () => {
@@ -621,6 +672,16 @@ describe("Phase 6 light workspace contrast", () => {
       "font-weight: 680;",
     );
     expect(latestBlockFor(".redesign-show-more")).toContain("font-weight: 680;");
+    expect(latestBlockFor(".redesign-show-more:hover:not(:disabled)")).toContain(
+      "background: #e6f0ff;",
+    );
+    expect(latestBlockFor(".redesign-show-more:hover:not(:disabled)")).toContain(
+      "color: #2749cf;",
+    );
+    expect(latestBlockFor(".redesign-show-more:focus-visible")).toContain(
+      "background: #e6f0ff;",
+    );
+    expect(latestBlockFor(".redesign-show-more:active")).toContain("background: #dce9ff;");
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card > small\s*\{[\s\S]*display:\s*none;/,
     );
@@ -643,7 +704,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.source-drawer\.redesign-source-drawer\s*\{[\s\S]*width:\s*min\(440px,\s*100vw\);/,
     );
     expect(stylesheet).toMatch(
-      /\.settings-agent-path-table\.redesign-agent-path-table\s*\{[\s\S]*border-radius:\s*20px;/,
+      /\.settings-agent-path-table\.redesign-agent-path-table\s*\{[\s\S]*border-radius:\s*14px;/,
     );
   });
 
