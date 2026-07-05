@@ -7397,7 +7397,10 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   align-items: center;
   gap: 13px;
   max-width: min(560px, calc(100vw - 48px));
+  border-color: rgba(214, 139, 38, 0.28);
   padding: 14px;
+  background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);
+  box-shadow: 0 18px 36px rgba(138, 75, 15, 0.14);
   font-weight: 520;
 }
 
@@ -7407,9 +7410,9 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  color: #2749cf;
-  background: #edf3ff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  color: #ffffff;
+  background: #f5b84b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 10px 20px rgba(245, 184, 75, 0.28);
 }
 
 .source-required-toast-icon svg {
@@ -7429,13 +7432,13 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .source-required-toast-copy strong {
-  color: #263247;
+  color: #2f2415;
   font-size: 13.5px;
   font-weight: 760;
 }
 
 .source-required-toast-copy small {
-  color: #64748b;
+  color: #7a5b2e;
   font-size: 12.5px;
   font-weight: 520;
   line-height: 1.45;
@@ -7443,25 +7446,25 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .source-required-toast-action {
   min-height: 34px;
-  border: 1px solid rgba(49, 84, 223, 0.16);
+  border: 1px solid rgba(214, 139, 38, 0.3);
   border-radius: 9px;
   padding: 0 12px;
-  color: #2749cf;
-  background: #f8fafc;
-  box-shadow: 0 8px 18px rgba(30, 48, 78, 0.08);
+  color: #8a4b0f;
+  background: #fff7ed;
+  box-shadow: 0 8px 18px rgba(138, 75, 15, 0.08);
   font-size: 12px;
   font-weight: 680;
   white-space: nowrap;
 }
 
 .source-required-toast-action:hover {
-  color: #2749cf;
-  background: #eef4ff;
-  box-shadow: 0 10px 22px rgba(30, 48, 78, 0.12);
+  color: #8a4b0f;
+  background: #ffedd5;
+  box-shadow: 0 10px 22px rgba(138, 75, 15, 0.12);
 }
 
 .source-required-toast-action:focus-visible {
-  outline: 3px solid rgba(49, 84, 223, 0.2);
+  outline: 3px solid rgba(245, 184, 75, 0.32);
   outline-offset: 2px;
 }
 

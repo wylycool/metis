@@ -120,6 +120,8 @@ function MetisApp() {
   const sourceRequiredSkill = sourceRequiredSkillId
     ? skills.find((skill) => skill.id === sourceRequiredSkillId) ?? null
     : null;
+  const autoUpdateUnavailable = isAutoUpdateUnavailableMessage(actionMessage);
+  const guidanceToastVisible = Boolean(sourceRequiredSkill || autoUpdateUnavailable);
   const didBootstrap = useRef(false);
   const skillSizesRef = useRef<Record<string, DesktopSkillSize>>({});
 
@@ -138,9 +140,9 @@ function MetisApp() {
     }
     const toastTimer = window.setTimeout(() => {
       setActionMessage(null);
-    }, sourceRequiredSkillId ? 6000 : 3000);
+    }, guidanceToastVisible ? 6000 : 3000);
     return () => window.clearTimeout(toastTimer);
-  }, [actionMessage, sourceRequiredSkillId]);
+  }, [actionMessage, guidanceToastVisible]);
 
   async function bootstrap() {
     setState("loading");
@@ -1135,7 +1137,7 @@ function MetisApp() {
 
       {actionError && <InlineError error={actionError} />}
       {actionMessage &&
-        (sourceRequiredSkill ? (
+        (guidanceToastVisible ? (
           <div
             className="redesign-toast source-required-toast"
             data-testid="source-required-toast"
@@ -1145,19 +1147,25 @@ function MetisApp() {
               <SourceLinkIcon />
             </span>
             <span className="source-required-toast-copy">
-              <strong>需要先绑定来源</strong>
-              <small>当前 Skill 还没有 Git 来源，绑定后才能检查远端更新。</small>
+              <strong>{sourceRequiredSkill ? "需要先绑定来源" : "没有可自动更新的 Skill"}</strong>
+              <small>
+                {sourceRequiredSkill
+                  ? "当前 Skill 还没有 Git 来源，绑定后才能检查远端更新。"
+                  : actionMessage}
+              </small>
             </span>
-            <button
-              className="source-required-toast-action"
-              data-testid="source-required-toast-action"
-              onClick={() => {
-                openBindForm(sourceRequiredSkill);
-                setActionMessage(null);
-              }}
-            >
-              去绑定来源
-            </button>
+            {sourceRequiredSkill && (
+              <button
+                className="source-required-toast-action"
+                data-testid="source-required-toast-action"
+                onClick={() => {
+                  openBindForm(sourceRequiredSkill);
+                  setActionMessage(null);
+                }}
+              >
+                去绑定来源
+              </button>
+            )}
           </div>
         ) : (
           <div className="redesign-toast" data-testid="redesign-toast">
@@ -1402,6 +1410,10 @@ function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
   }
 
   return "当前没有可用的自动更新 Skill，请确认来源已信任、已开启 auto update，且本地没有修改。";
+}
+
+function isAutoUpdateUnavailableMessage(message: string | null) {
+  return message?.startsWith("当前没有可用的自动更新 Skill") ?? false;
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {
