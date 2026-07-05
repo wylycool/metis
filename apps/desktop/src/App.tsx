@@ -654,7 +654,7 @@ function MetisApp() {
       ).length;
 
       if (candidateIds.length === 0) {
-        setActionMessage(`自动更新完成：已更新 0 个，跳过 ${skippedByPolicy} 个`);
+        setActionMessage(autoUpdateUnavailableMessage(skills));
         return;
       }
 
@@ -1375,6 +1375,33 @@ function isUiRedesignPreviewRoute() {
   const hash = window.location.hash.replace(/^#/, "");
   const search = window.location.search;
   return hash === "/ui-redesign-preview" || search.includes("preview=ui-redesign");
+}
+
+function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
+  const boundSourceCount = skills.filter((skill) => skill.source).length;
+  const trustedSourceCount = skills.filter((skill) => skill.source?.trusted).length;
+  const autoUpdateSourceCount = skills.filter((skill) => skill.source?.auto_update).length;
+  const blockedByLocalChanges = skills.some(
+    (skill) => skill.source?.trusted && skill.source.auto_update && skill.local_modified === true,
+  );
+
+  if (boundSourceCount === 0) {
+    return "当前没有可用的自动更新 Skill，请先为 Skill 绑定 Git 来源，再勾选「信任此来源」并开启 auto update。";
+  }
+
+  if (trustedSourceCount === 0) {
+    return "当前没有可用的自动更新 Skill，请先在来源里勾选「信任此来源」并开启 auto update。";
+  }
+
+  if (autoUpdateSourceCount === 0) {
+    return "当前没有可用的自动更新 Skill，请先在来源里开启 auto update。";
+  }
+
+  if (blockedByLocalChanges) {
+    return "当前没有可用的自动更新 Skill，候选 Skill 都有本地修改，请先检查或手动处理本地修改。";
+  }
+
+  return "当前没有可用的自动更新 Skill，请确认来源已信任、已开启 auto update，且本地没有修改。";
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {

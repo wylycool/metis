@@ -491,12 +491,14 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-toast")).toContain("background: rgba(255, 255, 255, 0.96);");
     expect(latestBlockFor(".redesign-toast")).toContain("color: #263247;");
     expect(latestBlockFor(".redesign-toast")).toContain("box-shadow: 0 12px 28px rgba(30, 48, 78, 0.14);");
-    expect(latestBlockFor(".source-required-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
     expect(latestBlockFor(".source-required-toast")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
-    expect(latestBlockFor(".source-required-toast-icon")).toContain("background: #f5b84b;");
-    expect(latestBlockFor(".source-required-toast-action")).toContain("background: #fff7ed;");
-    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("background: #ffedd5;");
-    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #8a4b0f;");
+    expect(latestBlockFor(".source-required-toast")).not.toContain("background: linear-gradient");
+    expect(latestBlockFor(".source-required-toast")).not.toContain("box-shadow:");
+    expect(latestBlockFor(".source-required-toast-icon")).toContain("background: #edf3ff;");
+    expect(latestBlockFor(".source-required-toast-action")).toContain("background: #f8fafc;");
+    expect(latestBlockFor(".source-required-toast-action")).not.toContain("background: var(--ink)");
+    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("background: #eef4ff;");
+    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #2749cf;");
   });
 
   test("brands overlapping agent letter badges by agent identity", () => {

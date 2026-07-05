@@ -307,6 +307,40 @@ describe("Metis desktop GUI main flow", () => {
     expect(scenario.appliedSkillIds()).toEqual(["trusted-skill"]);
   });
 
+  test("guides the user when auto update has no trusted source candidates", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario({
+      trustedSources: false,
+      autoUpdateSources: false,
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
+    expect(await screen.findByText("自动更新")).toBeTruthy();
+    expect(screen.getByText("Trusted source 0 个")).toBeTruthy();
+    expect(screen.getByText("Auto update 0 个")).toBeTruthy();
+    expect(screen.getByText("本次候选 0 个")).toBeTruthy();
+
+    await user.click(screen.getByTestId("run-auto-update"));
+
+    expect(
+      await screen.findByText(
+        "当前没有可用的自动更新 Skill，请先在来源里勾选「信任此来源」并开启 auto update。",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/自动更新完成：已更新 0 个，跳过 0 个/)).toBeNull();
+    expect(
+      invokeMock.mock.calls.filter(([command]) => command === "check_skill_updates"),
+    ).toHaveLength(0);
+    expect(
+      invokeMock.mock.calls.filter(([command]) => command === "apply_skill_update"),
+    ).toHaveLength(0);
+  });
+
   test("Settings manages built-in agent paths and named custom monitored paths", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario();
@@ -2104,7 +2138,14 @@ function createMainFlowScenario(
   };
 }
 
-function createBetaReadinessScenario() {
+function createBetaReadinessScenario(
+  options: {
+    trustedSources?: boolean;
+    autoUpdateSources?: boolean;
+  } = {},
+) {
+  const trustedEnabled = options.trustedSources ?? true;
+  const autoUpdateEnabled = options.autoUpdateSources ?? true;
   const trustedSource: DesktopSource = {
     id: "source-trusted-skill",
     source_type: "git",
@@ -2114,8 +2155,8 @@ function createBetaReadinessScenario() {
     current_commit: "aaa111",
     remote_commit: "bbb222",
     last_checked_at: "2026-06-20T10:00:00Z",
-    trusted: true,
-    auto_update: true,
+    trusted: trustedEnabled,
+    auto_update: autoUpdateEnabled,
     credential_ref: "secret-token",
   };
   const untrustedSource: DesktopSource = {
@@ -2128,7 +2169,7 @@ function createBetaReadinessScenario() {
     remote_commit: "ddd444",
     last_checked_at: "2026-06-20T10:00:00Z",
     trusted: false,
-    auto_update: true,
+    auto_update: autoUpdateEnabled,
     credential_ref: "secret-token",
   };
   let skills: DesktopSkill[] = [
