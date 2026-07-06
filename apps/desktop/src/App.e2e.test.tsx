@@ -93,6 +93,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceUrlHelp.getByText("如果你已经在本机配置好 SSH key，也可以使用这个地址。")).toBeTruthy();
     expect(sourceUrlHelp.getByText("https://github.com/xx/xx.git")).toBeTruthy();
     expect(sourceUrlHelp.getByText("git@github.com:xx/xx.git")).toBeTruthy();
+    await user.click(sourceDrawer.getByText("Skill 在仓库内的路径"));
+    expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("false");
     expect((screen.getByTestId("bind-url-e2e-skill") as HTMLInputElement).placeholder).toBe(
       "https://github.com/xx/xx.git",
     );
@@ -101,6 +103,19 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceDrawer.getByText("主分支名")).toBeTruthy();
     expect(sourceDrawer.queryByText("分支 / Tag / Commit")).toBeNull();
     expect(sourceDrawer.queryByText("凭据引用（可选）")).toBeNull();
+    const repoPathHelpButton = sourceDrawer.getByLabelText("仓库内路径填写说明");
+    await user.click(repoPathHelpButton);
+    expect(repoPathHelpButton.getAttribute("aria-expanded")).toBe("true");
+    expect(sourceDrawer.getByText("如果 SKILL.md 就在仓库根目录，这里可以不填。")).toBeTruthy();
+    expect(sourceDrawer.getByText("skills/example")).toBeTruthy();
+    const refHelpButton = sourceDrawer.getByLabelText("主分支名填写说明");
+    await user.click(refHelpButton);
+    expect(repoPathHelpButton.getAttribute("aria-expanded")).toBe("false");
+    expect(refHelpButton.getAttribute("aria-expanded")).toBe("true");
+    expect(sourceDrawer.getByText("多数仓库使用 main，较早的仓库可能使用 master。")).toBeTruthy();
+    expect((screen.getByTestId("bind-ref-e2e-skill") as HTMLInputElement).placeholder).toBe(
+      "一般为 main 或者 master",
+    );
     await user.click(sourceDrawer.getByText("Skill 在仓库内的路径"));
     expect(document.activeElement).not.toBe(screen.getByTestId("bind-repo-path-e2e-skill"));
     await user.click(sourceDrawer.getByText("主分支名"));
@@ -440,6 +455,14 @@ describe("Metis desktop GUI main flow", () => {
         repo_path: ".",
         ref_: "main",
       },
+    });
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
+      request: expect.objectContaining({
+        url: "https://github.com/xx/xx.git",
+        repo_path: ".",
+        ref_: "main",
+      }),
     });
   });
 

@@ -7643,7 +7643,11 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .source-test-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 36px;
+  min-width: 104px;
   border: 1px solid #1d4ed8;
   border-radius: 10px;
   padding: 0 16px;
@@ -7651,6 +7655,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   background: #2563eb;
   font-size: 13px;
   font-weight: 850;
+  white-space: nowrap;
   box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
 }
 

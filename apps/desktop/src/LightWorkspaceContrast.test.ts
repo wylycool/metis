@@ -294,6 +294,9 @@ describe("Phase 6 light workspace contrast", () => {
       "grid-template-columns: 22px minmax(0, 1fr);",
     );
     expect(latestBlockFor(".source-verification-panel .source-connection-check")).toContain("justify-items: start;");
+    expect(latestBlockFor(".source-test-button")).toContain("display: inline-flex;");
+    expect(latestBlockFor(".source-test-button")).toContain("white-space: nowrap;");
+    expect(latestBlockFor(".source-test-button")).toContain("min-width: 104px;");
     expect(latestBlockFor(".source-test-button")).toContain("background: #2563eb;");
     expect(latestBlockFor(".source-test-button:disabled")).toContain("background: #dbeafe;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");

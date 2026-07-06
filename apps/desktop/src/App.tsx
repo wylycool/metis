@@ -440,7 +440,7 @@ function MetisApp() {
       await bindSkillSource({
         skill_id: skillId,
         url: bindDraft.url.trim(),
-        repo_path: bindDraft.repo_path.trim(),
+        repo_path: bindDraft.repo_path.trim() || ".",
         ref_: bindDraft.ref_.trim() || "main",
         credential_ref: bindDraft.credential_ref.trim() || null,
         trusted: bindDraft.trusted,
