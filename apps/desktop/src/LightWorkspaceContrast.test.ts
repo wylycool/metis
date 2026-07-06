@@ -287,6 +287,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-help-button[aria-expanded=\"true\"]")).toContain(
       "background: var(--source-help-hover-bg);",
     );
+    expect(latestBlockFor(".source-help-button:hover:not(:disabled)")).toContain(
+      "background: var(--source-help-hover-bg);",
+    );
+    expect(latestBlockFor(".source-help-button:hover:not(:disabled)")).not.toContain(
+      "var(--primary-hover)",
+    );
     expect(latestBlockFor(".source-help-popover")).toContain("gap: 12px;");
     expect(latestBlockFor(".source-help-popover")).toContain("border-radius: 16px;");
     expect(latestBlockFor(".source-help-card")).toContain("display: grid;");

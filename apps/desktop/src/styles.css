@@ -7565,7 +7565,14 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   box-shadow: 0 6px 14px var(--source-help-button-shadow);
 }
 
-.source-help-button:hover,
+.source-help-button:hover:not(:disabled) {
+  transform: none;
+  border-color: var(--source-help-hover-border);
+  color: var(--source-help-hover-color);
+  background: var(--source-help-hover-bg);
+  box-shadow: 0 0 0 3px var(--source-help-focus-ring);
+}
+
 .source-help-button:focus-visible,
 .source-help-button[aria-expanded="true"] {
   border-color: var(--source-help-hover-border);
