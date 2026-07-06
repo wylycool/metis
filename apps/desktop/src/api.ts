@@ -10,6 +10,7 @@ import type {
   DesktopFileExportResult,
   DesktopInstallRemoteSkillRequest,
   DesktopInstallRemoteSkillResult,
+  DesktopGitEnvironmentTestResult,
   DesktopPreviewRemoteSkillSourceRequest,
   DesktopRemoteSkillPreview,
   DesktopRestoreBackupRequest,
@@ -84,6 +85,10 @@ export function testSourceConnection(
   request: DesktopPreviewRemoteSkillSourceRequest,
 ): Promise<DesktopSourceConnectionTestResult> {
   return invoke("test_source_connection", { request });
+}
+
+export function testGitEnvironment(): Promise<DesktopGitEnvironmentTestResult> {
+  return invoke("test_git_environment");
 }
 
 export function getSkillTargetsForSource(

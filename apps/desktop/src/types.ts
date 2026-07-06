@@ -104,6 +104,13 @@ export interface DesktopSourceConnectionTestResult {
   repo_path: string;
 }
 
+export interface DesktopGitEnvironmentTestResult {
+  ok: boolean;
+  message: string;
+  url: string;
+  commit: string;
+}
+
 export interface DesktopRemoteSkillPreview {
   name: string;
   description?: string | null;

@@ -7637,9 +7637,10 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .source-verification-panel .source-connection-check {
-  display: grid;
-  justify-items: start;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
 }
 
 .source-test-button {
@@ -7659,11 +7660,18 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
 }
 
-.source-test-button:hover,
+.source-test-button:hover:not(:disabled) {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
+}
+
 .source-test-button:focus-visible {
-  border-color: #1e40af;
-  background: #1d4ed8;
-  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28), 0 12px 24px rgba(37, 99, 235, 0.2);
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
 }
 
 .source-test-button:disabled {
@@ -7679,6 +7687,72 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   font-size: 12px;
   font-weight: 650;
   line-height: 1.45;
+}
+
+.settings-git-health-card {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.settings-git-test-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 128px;
+  border: 1px solid #1d4ed8;
+  border-radius: 10px;
+  padding: 0 16px;
+  color: #ffffff;
+  background: #2563eb;
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
+}
+
+.settings-git-test-button:hover:not(:disabled) {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
+}
+
+.settings-git-test-button:focus-visible {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
+}
+
+.settings-git-test-button:disabled {
+  border-color: #bfdbfe;
+  color: #3b82f6;
+  background: #dbeafe;
+  box-shadow: none;
+}
+
+.settings-git-health-result {
+  display: grid;
+  gap: 3px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.settings-git-health-result strong {
+  color: #166534;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.settings-git-health-result span {
+  overflow-wrap: anywhere;
 }
 
 .source-form .form-actions {

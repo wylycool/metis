@@ -263,6 +263,14 @@ pub struct DesktopSourceConnectionTestResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopGitEnvironmentTestResult {
+    pub ok: bool,
+    pub message: String,
+    pub url: String,
+    pub commit: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopSkillTargetsRequest {
     pub url: String,
     pub repo_path: String,
@@ -829,6 +837,39 @@ pub fn test_source_connection_for_state_with_checker<C: RemoteCommitChecker>(
     .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
+pub fn test_git_environment_for_state_with_checker<C: RemoteCommitChecker>(
+    state: &DesktopAppState,
+    checker: &C,
+) -> Result<DesktopGitEnvironmentTestResult, String> {
+    state.ensure_dirs()?;
+    let url = "https://github.com/wylycool/metis.git".to_string();
+    let source = SourceRecord {
+        id: "git-environment-check".to_string(),
+        source_type: "git".to_string(),
+        url: url.clone(),
+        repo_path: ".".to_string(),
+        ref_: "HEAD".to_string(),
+        current_commit: None,
+        remote_commit: None,
+        last_checked_at: None,
+        trusted: false,
+        auto_update: false,
+        credential_ref: None,
+        created_at: None,
+        updated_at: None,
+    };
+    let commit = checker
+        .remote_commit(&source)
+        .map_err(|error| friendly_desktop_error(&error).wire_string())?;
+
+    Ok(DesktopGitEnvironmentTestResult {
+        ok: true,
+        message: "本机 Git 可以正常访问公开仓库。".to_string(),
+        url,
+        commit,
+    })
+}
+
 pub fn get_skill_targets_for_source_for_state(
     state: &DesktopAppState,
     request: DesktopSkillTargetsRequest,
@@ -1230,6 +1271,19 @@ fn test_source_connection(
 ) -> Result<DesktopSourceConnectionTestResult, String> {
     let checker = system_git_checker_for_state(&state)?;
     test_source_connection_for_state_with_checker(&state, request, &checker)
+}
+
+#[tauri::command]
+async fn test_git_environment(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopGitEnvironmentTestResult, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let checker = system_git_checker_for_state(&state)?;
+        test_git_environment_for_state_with_checker(&state, &checker)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -2290,6 +2344,7 @@ pub fn run() {
             unbind_skill_source,
             preview_remote_skill_source,
             test_source_connection,
+            test_git_environment,
             get_skill_targets_for_source,
             install_remote_skill_to_targets,
             check_skill_updates,
@@ -2515,6 +2570,33 @@ mod tests {
         assert_eq!(result.skill_name, "example");
         assert_eq!(result.commit, "abc123");
         assert_eq!(result.repo_path, "skills/example");
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn test_git_environment_for_state_returns_public_repo_success() {
+        let workspace = temp_dir("test-git-environment");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let checker = FakeUpdateChecker {
+            commits: HashMap::from([("git-environment-check".to_string(), "def456".to_string())]),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: None,
+        };
+
+        let result = test_git_environment_for_state_with_checker(&state, &checker)
+            .expect("git environment test should succeed");
+
+        assert!(result.ok);
+        assert_eq!(result.message, "本机 Git 可以正常访问公开仓库。");
+        assert_eq!(result.commit, "def456");
+        assert_eq!(result.url, "https://github.com/wylycool/metis.git");
         fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
 

@@ -130,7 +130,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceVerification.queryByText("连接验证")).toBeNull();
     expect(sourceDrawer.getByTestId("source-form-actions-e2e-skill")).toBeTruthy();
     expect(
-      sourceVerification.getByText("检测当前 URL、主分支名、仓库内路径和 SKILL.md 是否可访问。不会安装、更新或修改任何文件。"),
+      sourceVerification.getByText("检测当前已填来源是否可访问。不会安装、更新或修改任何文件。"),
     ).toBeTruthy();
     await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
     await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
@@ -489,6 +489,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("团队清单合规")).toBeNull();
     expect(screen.queryByText("企业网络")).toBeNull();
     expect(screen.queryByText("凭据引用")).toBeNull();
+    const gitHealthSection = within(screen.getByTestId("settings-section-git-health"));
+    expect(gitHealthSection.getByText("Git 环境检查")).toBeTruthy();
+    expect(gitHealthSection.getByText("检测本机 Git 是否可运行，并确认能访问公开 Git 仓库。")).toBeTruthy();
+    await user.click(gitHealthSection.getByTestId("test-git-environment"));
+    expect(await screen.findByText("本机 Git 可以正常访问公开仓库。")).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith("test_git_environment");
 
     await user.click(screen.getByTestId("run-auto-update"));
 
@@ -2184,6 +2190,13 @@ function createMainFlowScenario(
             repo_path: request.request.repo_path,
           } satisfies DesktopSourceConnectionTestResult;
         }
+        case "test_git_environment":
+          return {
+            ok: true,
+            message: "本机 Git 可以正常访问公开仓库。",
+            url: "https://github.com/wylycool/metis.git",
+            commit: "abc123",
+          };
         case "preview_remote_skill_source":
           if (options.slowRemotePreview) {
             await delay(80);
@@ -2504,6 +2517,13 @@ function createBetaReadinessScenario(
                   }
                 : null,
             })),
+          };
+        case "test_git_environment":
+          return {
+            ok: true,
+            message: "本机 Git 可以正常访问公开仓库。",
+            url: "https://github.com/wylycool/metis.git",
+            commit: "abc123",
           };
         case "load_team_manifest_from_file":
           return JSON.stringify({

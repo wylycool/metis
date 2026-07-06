@@ -293,12 +293,15 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-setting-row")).toContain(
       "grid-template-columns: 22px minmax(0, 1fr);",
     );
-    expect(latestBlockFor(".source-verification-panel .source-connection-check")).toContain("justify-items: start;");
+    expect(latestBlockFor(".source-verification-panel .source-connection-check")).toContain("display: flex;");
+    expect(latestBlockFor(".source-verification-panel .source-connection-check")).toContain("align-items: center;");
     expect(latestBlockFor(".source-test-button")).toContain("display: inline-flex;");
     expect(latestBlockFor(".source-test-button")).toContain("white-space: nowrap;");
     expect(latestBlockFor(".source-test-button")).toContain("min-width: 104px;");
     expect(latestBlockFor(".source-test-button")).toContain("background: #2563eb;");
+    expect(latestBlockFor(".source-test-button:hover:not(:disabled)")).toContain("background: #eff6ff;");
     expect(latestBlockFor(".source-test-button:disabled")).toContain("background: #dbeafe;");
+    expect(latestBlockFor(".settings-git-test-button:hover:not(:disabled)")).toContain("background: #eff6ff;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");

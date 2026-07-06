@@ -17,6 +17,7 @@ import {
   restoreSkillBackup,
   saveDesktopSettings,
   scanSkills,
+  testGitEnvironment,
   testSourceConnection,
   unbindSkillSource,
 } from "./api";
@@ -35,6 +36,7 @@ import type {
   DesktopBackupSummary,
   DesktopDiffDetail,
   DesktopError,
+  DesktopGitEnvironmentTestResult,
   DesktopInstallRemoteSkillResult,
   DesktopRemoteSkillPreview,
   DesktopScanWarning,
@@ -93,6 +95,9 @@ function MetisApp() {
   const [sourceConnectionErrors, setSourceConnectionErrors] = useState<Record<string, DesktopError>>(
     {},
   );
+  const [gitEnvironmentResult, setGitEnvironmentResult] =
+    useState<DesktopGitEnvironmentTestResult | null>(null);
+  const [gitEnvironmentError, setGitEnvironmentError] = useState<DesktopError | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<DesktopError | null>(null);
   const [state, setState] = useState<LoadState>("idle");
@@ -725,6 +730,22 @@ function MetisApp() {
       setActionMessage(`自动更新完成：已更新 ${applied} 个，跳过 ${skipped} 个${failureText}`);
     } catch (caught) {
       setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleTestGitEnvironment() {
+    setActionBusy("git-environment");
+    setActionError(null);
+    setGitEnvironmentResult(null);
+    setGitEnvironmentError(null);
+
+    try {
+      const result = await testGitEnvironment();
+      setGitEnvironmentResult(result);
+    } catch (caught) {
+      setGitEnvironmentError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
@@ -1385,6 +1406,35 @@ function MetisApp() {
             >
               {actionBusy === "auto-update" ? "更新中" : "开启自动更新"}
             </button>
+          </section>
+
+          <section className="settings-section git-health-section" data-testid="settings-section-git-health">
+            <div>
+              <h3>Git 环境检查</h3>
+              <p>检测本机 Git 是否可运行，并确认能访问公开 Git 仓库。</p>
+            </div>
+            <div className="settings-git-health-card">
+              <button
+                className="settings-git-test-button"
+                data-testid="test-git-environment"
+                disabled={actionBusy === "git-environment"}
+                onClick={handleTestGitEnvironment}
+                type="button"
+              >
+                {actionBusy === "git-environment" ? "检测中" : "检测 Git 环境"}
+              </button>
+              {gitEnvironmentResult && (
+                <div className="settings-git-health-result success" data-testid="git-environment-result">
+                  <strong>{gitEnvironmentResult.message}</strong>
+                  <span>{gitEnvironmentResult.url}</span>
+                </div>
+              )}
+              {gitEnvironmentError && (
+                <div className="settings-git-health-result failure" data-testid="git-environment-error">
+                  <InlineError error={gitEnvironmentError} />
+                </div>
+              )}
+            </div>
           </section>
 
           <div className="form-actions settings-save-actions">
