@@ -84,8 +84,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceDrawer.getByTestId("source-form-body-e2e-skill")).toBeTruthy();
     const sourceUrlHelp = within(sourceDrawer.getByTestId("source-url-help-e2e-skill"));
     expect(sourceUrlHelp.getByText("HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。")).toBeTruthy();
-    expect(sourceUrlHelp.getByText("https://github.com/multica-ai/andrej-karpathy-skills.git")).toBeTruthy();
-    expect(sourceUrlHelp.getByText("git@github.com:multica-ai/andrej-karpathy-skills.git")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("https://github.com/xx/xx.git")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("git@github.com:xx/xx.git")).toBeTruthy();
+    expect((screen.getByTestId("bind-url-e2e-skill") as HTMLInputElement).placeholder).toBe(
+      "https://github.com/xx/xx.git",
+    );
+    expect(sourceDrawer.queryByText(/multica-ai|andrej-karpathy/)).toBeNull();
     const sourceSettings = within(sourceDrawer.getByTestId("source-settings-grid-e2e-skill"));
     expect(sourceDrawer.getByText("主分支名")).toBeTruthy();
     expect(sourceDrawer.queryByText("分支 / Tag / Commit")).toBeNull();
@@ -99,7 +103,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceVerification.getByText("测试连接")).toBeTruthy();
     expect(sourceDrawer.getByTestId("source-form-actions-e2e-skill")).toBeTruthy();
     expect(
-      sourceVerification.getByText("确认仓库、分支和 Skill 路径是否可访问。不会安装、更新或修改任何文件。"),
+      sourceVerification.getByText("检测当前 URL、主分支名、仓库内路径和 SKILL.md 是否可访问。不会安装、更新或修改任何文件。"),
     ).toBeTruthy();
     await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
     await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");

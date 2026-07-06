@@ -403,16 +403,16 @@ export function BindSourceForm({
                 <span className="source-help-popover">
                   <strong>仓库地址怎么填</strong>
                   <span>HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。</span>
-                  <code>https://github.com/multica-ai/andrej-karpathy-skills.git</code>
+                  <code>https://github.com/xx/xx.git</code>
                   <span>如果你已经在本机配置好 SSH key，也可以使用 SSH 地址。</span>
-                  <code>git@github.com:multica-ai/andrej-karpathy-skills.git</code>
+                  <code>git@github.com:xx/xx.git</code>
                 </span>
               </span>
             </div>
             <input
               data-testid={`bind-url-${skillId}`}
               value={draft.url}
-              placeholder="https://github.com/multica-ai/andrej-karpathy-skills.git"
+              placeholder="https://github.com/xx/xx.git"
               onChange={(event) => onChange({ ...draft, url: event.target.value })}
             />
           </label>
@@ -464,7 +464,7 @@ export function BindSourceForm({
           <div className="source-connection-check">
             <div>
               <strong>连接验证</strong>
-              <p>确认仓库、分支和 Skill 路径是否可访问。不会安装、更新或修改任何文件。</p>
+              <p>检测当前 URL、主分支名、仓库内路径和 SKILL.md 是否可访问。不会安装、更新或修改任何文件。</p>
             </div>
             <button
               className="ghost-button compact"
