@@ -331,9 +331,10 @@ describe("Metis desktop GUI main flow", () => {
     expect(autoUpdateNotice.getByText("没有可自动更新的 Skill")).toBeTruthy();
     expect(
       autoUpdateNotice.getByText(
-        "当前没有可用的自动更新 Skill，请先在来源里勾选「信任此来源」并开启 auto update。",
+        "请先在来源里勾选「信任此来源」并开启 auto update。",
       ),
     ).toBeTruthy();
+    expect(autoUpdateNotice.queryByText(/当前没有可用的自动更新 Skill/)).toBeNull();
     expect(screen.queryByTestId("redesign-toast")).toBeNull();
     expect(screen.queryByText(/自动更新完成：已更新 0 个，跳过 0 个/)).toBeNull();
     expect(

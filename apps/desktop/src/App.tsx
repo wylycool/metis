@@ -1397,26 +1397,32 @@ function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
   );
 
   if (boundSourceCount === 0) {
-    return "当前没有可用的自动更新 Skill，请先为 Skill 绑定 Git 来源，再勾选「信任此来源」并开启 auto update。";
+    return "请先为 Skill 绑定 Git 来源，再勾选「信任此来源」并开启 auto update。";
   }
 
   if (trustedSourceCount === 0) {
-    return "当前没有可用的自动更新 Skill，请先在来源里勾选「信任此来源」并开启 auto update。";
+    return "请先在来源里勾选「信任此来源」并开启 auto update。";
   }
 
   if (autoUpdateSourceCount === 0) {
-    return "当前没有可用的自动更新 Skill，请先在来源里开启 auto update。";
+    return "请先在来源里开启 auto update。";
   }
 
   if (blockedByLocalChanges) {
-    return "当前没有可用的自动更新 Skill，候选 Skill 都有本地修改，请先检查或手动处理本地修改。";
+    return "候选 Skill 都有本地修改，请先检查或手动处理本地修改。";
   }
 
-  return "当前没有可用的自动更新 Skill，请确认来源已信任、已开启 auto update，且本地没有修改。";
+  return "请确认来源已信任、已开启 auto update，且本地没有修改。";
 }
 
 function isAutoUpdateUnavailableMessage(message: string | null) {
-  return message?.startsWith("当前没有可用的自动更新 Skill") ?? false;
+  return (
+    message === "请先为 Skill 绑定 Git 来源，再勾选「信任此来源」并开启 auto update。" ||
+    message === "请先在来源里勾选「信任此来源」并开启 auto update。" ||
+    message === "请先在来源里开启 auto update。" ||
+    message === "候选 Skill 都有本地修改，请先检查或手动处理本地修改。" ||
+    message === "请确认来源已信任、已开启 auto update，且本地没有修改。"
+  );
 }
 
 function toastToneForActionMessage(message: string): "success" | "info" | "warning" {
