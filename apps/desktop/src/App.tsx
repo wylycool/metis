@@ -1409,7 +1409,7 @@ function MetisApp() {
           </section>
 
           <section className="settings-section git-health-section" data-testid="settings-section-git-health">
-            <h3>Git 检测</h3>
+            <h3>本机Git 检测</h3>
             <div className="settings-git-health-card">
               <div className="settings-git-health-action">
                 <button

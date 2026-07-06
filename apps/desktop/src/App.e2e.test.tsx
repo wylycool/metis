@@ -490,7 +490,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("企业网络")).toBeNull();
     expect(screen.queryByText("凭据引用")).toBeNull();
     const gitHealthSection = within(screen.getByTestId("settings-section-git-health"));
-    expect(gitHealthSection.getByText("Git 检测")).toBeTruthy();
+    expect(gitHealthSection.getByText("本机Git 检测")).toBeTruthy();
+    expect(gitHealthSection.queryByText("Git 检测")).toBeNull();
     expect(gitHealthSection.queryByText("Git 环境检查")).toBeNull();
     expect(gitHealthSection.queryByText("检测本机 Git 是否可运行。")).toBeNull();
     expect(gitHealthSection.queryByText(/git --version/)).toBeNull();
