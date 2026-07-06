@@ -108,6 +108,7 @@ export interface DesktopGitEnvironmentTestResult {
   ok: boolean;
   message: string;
   version: string;
+  clone_ok: boolean;
 }
 
 export interface DesktopRemoteSkillPreview {

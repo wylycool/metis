@@ -267,6 +267,7 @@ pub struct DesktopGitEnvironmentTestResult {
     pub ok: bool,
     pub message: String,
     pub version: String,
+    pub clone_ok: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -836,14 +837,20 @@ pub fn test_source_connection_for_state_with_checker<C: RemoteCommitChecker>(
     .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitEnvironmentProbeReport {
+    pub version: String,
+    pub clone_ok: bool,
+}
+
 pub trait GitVersionProbe {
-    fn git_version(&self) -> Result<String, String>;
+    fn git_environment(&self) -> Result<GitEnvironmentProbeReport, String>;
 }
 
 struct SystemGitVersionProbe;
 
 impl GitVersionProbe for SystemGitVersionProbe {
-    fn git_version(&self) -> Result<String, String> {
+    fn git_environment(&self) -> Result<GitEnvironmentProbeReport, String> {
         let output = Command::new("git")
             .arg("--version")
             .output()
@@ -867,22 +874,91 @@ impl GitVersionProbe for SystemGitVersionProbe {
             return Err("git unavailable: git --version returned empty output".to_string());
         }
 
-        Ok(stdout)
+        run_local_git_clone_self_check()?;
+
+        Ok(GitEnvironmentProbeReport {
+            version: stdout,
+            clone_ok: true,
+        })
     }
 }
 
 pub fn test_git_environment_with_probe<P: GitVersionProbe>(
     probe: &P,
 ) -> Result<DesktopGitEnvironmentTestResult, String> {
-    let version = probe
-        .git_version()
+    let report = probe
+        .git_environment()
         .map_err(|error| friendly_desktop_error(&error).wire_string())?;
 
     Ok(DesktopGitEnvironmentTestResult {
         ok: true,
-        message: "本机 Git 可以正常运行。".to_string(),
-        version,
+        message: "Git 可用".to_string(),
+        version: report.version,
+        clone_ok: report.clone_ok,
     })
+}
+
+fn run_local_git_clone_self_check() -> Result<(), String> {
+    let check_root = std::env::temp_dir().join(format!(
+        "metis-git-check-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default()
+    ));
+    let origin_path = check_root.join("origin.git");
+    let clone_path = check_root.join("clone");
+
+    let result = (|| {
+        fs::create_dir_all(&check_root)
+            .map_err(|error| format!("git unavailable: cannot create temp check dir: {error}"))?;
+
+        git_command_with_args(["init", "--bare"])
+            .arg(&origin_path)
+            .output()
+            .map_err(|error| format!("git unavailable: git init self-check failed: {error}"))
+            .and_then(|output| git_output_result(output, "git init self-check"))?;
+
+        git_command_with_args(["clone"])
+            .arg(&origin_path)
+            .arg(&clone_path)
+            .output()
+            .map_err(|error| format!("git unavailable: git clone self-check failed: {error}"))
+            .and_then(|output| git_output_result(output, "git clone self-check"))?;
+
+        git_command_with_args(["-C"])
+            .arg(&clone_path)
+            .args(["fetch", "--dry-run", "origin"])
+            .output()
+            .map_err(|error| format!("git unavailable: git fetch self-check failed: {error}"))
+            .and_then(|output| git_output_result(output, "git fetch self-check"))?;
+
+        Ok(())
+    })();
+
+    let _ = fs::remove_dir_all(&check_root);
+    result
+}
+
+fn git_command_with_args<const N: usize>(args: [&str; N]) -> Command {
+    let mut command = Command::new("git");
+    command.args(args);
+    command
+}
+
+fn git_output_result(output: std::process::Output, label: &str) -> Result<(), String> {
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let detail = if stderr.is_empty() {
+        format!("{label} exited with {}", output.status)
+    } else {
+        format!("{label}: {stderr}")
+    };
+    Err(format!("git unavailable: {detail}"))
 }
 
 pub fn get_skill_targets_for_source_for_state(
@@ -2586,11 +2662,11 @@ mod tests {
     }
 
     struct FakeGitVersionProbe {
-        output: Result<String, String>,
+        output: Result<GitEnvironmentProbeReport, String>,
     }
 
     impl GitVersionProbe for FakeGitVersionProbe {
-        fn git_version(&self) -> Result<String, String> {
+        fn git_environment(&self) -> Result<GitEnvironmentProbeReport, String> {
             self.output.clone()
         }
     }
@@ -2598,15 +2674,19 @@ mod tests {
     #[test]
     fn test_git_environment_returns_local_git_version_without_remote_probe() {
         let probe = FakeGitVersionProbe {
-            output: Ok("git version 2.45.0".to_string()),
+            output: Ok(GitEnvironmentProbeReport {
+                version: "git version 2.45.0".to_string(),
+                clone_ok: true,
+            }),
         };
 
         let result =
             test_git_environment_with_probe(&probe).expect("git environment test should succeed");
 
         assert!(result.ok);
-        assert_eq!(result.message, "本机 Git 可以正常运行。");
+        assert_eq!(result.message, "Git 可用");
         assert_eq!(result.version, "git version 2.45.0");
+        assert!(result.clone_ok);
     }
 
     #[test]

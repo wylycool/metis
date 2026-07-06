@@ -490,12 +490,13 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("企业网络")).toBeNull();
     expect(screen.queryByText("凭据引用")).toBeNull();
     const gitHealthSection = within(screen.getByTestId("settings-section-git-health"));
-    expect(gitHealthSection.getByText("Git 环境检查")).toBeTruthy();
-    expect(gitHealthSection.getByText("检测本机 Git 是否可运行。")).toBeTruthy();
-    expect(gitHealthSection.getByText("点击后只会运行本机 git --version，不会访问仓库、安装、更新或修改任何文件。")).toBeTruthy();
+    expect(gitHealthSection.getByText("Git 检测")).toBeTruthy();
+    expect(gitHealthSection.queryByText("Git 环境检查")).toBeNull();
+    expect(gitHealthSection.queryByText("检测本机 Git 是否可运行。")).toBeNull();
+    expect(gitHealthSection.queryByText(/git --version/)).toBeNull();
     await user.click(gitHealthSection.getByTestId("test-git-environment"));
-    expect(await screen.findByText("本机 Git 可以正常运行。")).toBeTruthy();
-    expect(screen.getByText("git version 2.45.0")).toBeTruthy();
+    expect(await screen.findByText("Git 可用")).toBeTruthy();
+    expect(screen.getByText("git version 2.45.0 · clone/fetch 已通过")).toBeTruthy();
     expect(screen.queryByText(/github\.com/)).toBeNull();
     expect(invokeMock).toHaveBeenCalledWith("test_git_environment");
 
@@ -2196,8 +2197,9 @@ function createMainFlowScenario(
         case "test_git_environment":
           return {
             ok: true,
-            message: "本机 Git 可以正常运行。",
+            message: "Git 可用",
             version: "git version 2.45.0",
+            clone_ok: true,
           };
         case "preview_remote_skill_source":
           if (options.slowRemotePreview) {
@@ -2523,8 +2525,9 @@ function createBetaReadinessScenario(
         case "test_git_environment":
           return {
             ok: true,
-            message: "本机 Git 可以正常运行。",
+            message: "Git 可用",
             version: "git version 2.45.0",
+            clone_ok: true,
           };
         case "load_team_manifest_from_file":
           return JSON.stringify({

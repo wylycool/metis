@@ -301,7 +301,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-test-button")).toContain("background: #2563eb;");
     expect(latestBlockFor(".source-test-button:hover:not(:disabled)")).toContain("background: #eff6ff;");
     expect(latestBlockFor(".source-test-button:disabled")).toContain("background: #dbeafe;");
+    expect(latestBlockFor(".settings-git-health-card")).toContain("display: flex;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-height: 36px;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 76px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("padding: 0 14px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("font-size: 13px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("box-shadow: none;");

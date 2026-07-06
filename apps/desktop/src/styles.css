@@ -7690,12 +7690,12 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .settings-git-health-card {
-  display: grid;
-  justify-items: start;
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
@@ -7707,20 +7707,12 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   gap: 12px;
 }
 
-.settings-git-health-action p {
-  margin: 0;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.45;
-}
-
 .settings-git-test-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 36px;
-  min-width: 104px;
+  min-width: 76px;
   border: 1px solid #bfdbfe;
   border-radius: 8px;
   padding: 0 14px;
@@ -7754,7 +7746,10 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .settings-git-health-result {
-  display: grid;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
   color: #475569;
   font-size: 12px;
   font-weight: 650;

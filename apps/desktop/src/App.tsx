@@ -1409,10 +1409,7 @@ function MetisApp() {
           </section>
 
           <section className="settings-section git-health-section" data-testid="settings-section-git-health">
-            <div>
-              <h3>Git 环境检查</h3>
-              <p>检测本机 Git 是否可运行。</p>
-            </div>
+            <h3>Git 检测</h3>
             <div className="settings-git-health-card">
               <div className="settings-git-health-action">
                 <button
@@ -1422,16 +1419,15 @@ function MetisApp() {
                   onClick={handleTestGitEnvironment}
                   type="button"
                 >
-                  {actionBusy === "git-environment" ? "检测中" : "检测 Git 环境"}
+                  {actionBusy === "git-environment" ? "检测中" : "检测"}
                 </button>
-                <p>点击后只会运行本机 git --version，不会访问仓库、安装、更新或修改任何文件。</p>
+                {gitEnvironmentResult && (
+                  <div className="settings-git-health-result success" data-testid="git-environment-result">
+                    <strong>{gitEnvironmentResult.message}</strong>
+                    <span>{gitEnvironmentResult.version} · clone/fetch 已通过</span>
+                  </div>
+                )}
               </div>
-              {gitEnvironmentResult && (
-                <div className="settings-git-health-result success" data-testid="git-environment-result">
-                  <strong>{gitEnvironmentResult.message}</strong>
-                  <span>{gitEnvironmentResult.version}</span>
-                </div>
-              )}
               {gitEnvironmentError && (
                 <div className="settings-git-health-result failure" data-testid="git-environment-error">
                   <InlineError error={gitEnvironmentError} />
