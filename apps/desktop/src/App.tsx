@@ -113,6 +113,8 @@ function MetisApp() {
   const [remotePreview, setRemotePreview] = useState<DesktopRemoteSkillPreview | null>(null);
   const [remoteTargets, setRemoteTargets] = useState<DesktopSkillTarget[]>([]);
   const [selectedRemoteTargetIds, setSelectedRemoteTargetIds] = useState<string[]>([]);
+  const [pendingAutoUpdateRemovalSkillId, setPendingAutoUpdateRemovalSkillId] =
+    useState<string | null>(null);
   const [remoteInstallResult, setRemoteInstallResult] =
     useState<DesktopInstallRemoteSkillResult | null>(null);
   const builtinPathHealth = builtinPathHealthForAgents(agents);
@@ -758,12 +760,6 @@ function MetisApp() {
     if (!skill.source) {
       return;
     }
-    const confirmed = window.confirm(
-      `确定将「${skill.name}」移出自动更新列表吗？移除后不会再自动更新这个 Skill。`,
-    );
-    if (!confirmed) {
-      return;
-    }
 
     setActionBusy(`remove-auto-update:${skill.id}`);
     setActionError(null);
@@ -780,6 +776,7 @@ function MetisApp() {
         auto_update: false,
       });
       await refreshIndexedSkills();
+      setPendingAutoUpdateRemovalSkillId(null);
       setActionMessage("已移出自动更新列表");
     } catch (caught) {
       setActionError(desktopError(caught));
@@ -1392,11 +1389,37 @@ function MetisApp() {
                       className="ghost-button compact auto-update-remove"
                       data-testid={`remove-auto-update-${skill.id}`}
                       disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                      onClick={() => handleRemoveAutoUpdateSkill(skill)}
+                      onClick={() => setPendingAutoUpdateRemovalSkillId(skill.id)}
                       type="button"
                     >
                       {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "移除"}
                     </button>
+                    {pendingAutoUpdateRemovalSkillId === skill.id && (
+                      <div
+                        className="auto-update-remove-confirm"
+                        data-testid={`auto-update-remove-confirm-${skill.id}`}
+                      >
+                        <span>确认移出自动更新列表？</span>
+                        <button
+                          className="ghost-button compact"
+                          data-testid={`cancel-remove-auto-update-${skill.id}`}
+                          disabled={actionBusy === `remove-auto-update:${skill.id}`}
+                          onClick={() => setPendingAutoUpdateRemovalSkillId(null)}
+                          type="button"
+                        >
+                          取消
+                        </button>
+                        <button
+                          className="compact"
+                          data-testid={`confirm-remove-auto-update-${skill.id}`}
+                          disabled={actionBusy === `remove-auto-update:${skill.id}`}
+                          onClick={() => handleRemoveAutoUpdateSkill(skill)}
+                          type="button"
+                        >
+                          {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "确认移除"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

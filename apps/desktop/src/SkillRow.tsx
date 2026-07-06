@@ -571,6 +571,7 @@ export function BindSourceForm({
           <div className="source-connection-check">
             <button
               className="source-test-button"
+              data-busy={testBusy ? "true" : "false"}
               data-testid={`test-source-connection-${skillId}`}
               disabled={testDisabled}
               onClick={onTestConnection}
@@ -602,7 +603,12 @@ export function BindSourceForm({
         <button className="ghost-button compact" onClick={onCancel}>
           取消
         </button>
-        <button className="compact" disabled={disabled} onClick={onSubmit}>
+        <button
+          className="compact source-save-button"
+          data-busy={busy ? "true" : "false"}
+          disabled={disabled}
+          onClick={onSubmit}
+        >
           <span data-testid={`submit-bind-source-${skillId}`}>
             {busy ? "保存中" : "保存来源"}
           </span>

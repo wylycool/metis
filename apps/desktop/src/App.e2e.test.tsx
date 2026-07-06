@@ -86,6 +86,16 @@ describe("Metis desktop GUI main flow", () => {
     const sourceUrlHelpRoot = sourceDrawer.getByTestId("source-url-help-e2e-skill");
     const sourceUrlHelp = within(sourceUrlHelpRoot);
     const sourceHelpButton = sourceDrawer.getByLabelText("仓库地址填写说明");
+    const emptySourceTestButton = sourceDrawer.getByTestId(
+      "test-source-connection-e2e-skill",
+    ) as HTMLButtonElement;
+    expect(emptySourceTestButton.disabled).toBe(true);
+    expect(emptySourceTestButton.dataset.busy).toBe("false");
+    const emptySourceSaveButton = sourceDrawer
+      .getByTestId("submit-bind-source-e2e-skill")
+      .closest("button") as HTMLButtonElement;
+    expect(emptySourceSaveButton.disabled).toBe(true);
+    expect(emptySourceSaveButton.dataset.busy).toBe("false");
     expect(sourceUrlHelpRoot.className).toContain("source-help--url");
     expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("false");
     await user.click(sourceHelpButton);
@@ -627,13 +637,21 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByText(/自动更新完成：已更新 1 个，跳过 1 个/)).toBeTruthy();
     expect(scenario.appliedSkillIds()).toEqual(["trusted-skill"]);
 
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValueOnce(false);
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const bindCallCountBeforeRemove = invokeMock.mock.calls.filter(
+      ([command]) => command === "bind_skill_source",
+    ).length;
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
+    expect(screen.getByTestId("confirm-remove-auto-update-trusted-skill")).toBeTruthy();
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(
       invokeMock.mock.calls.filter(([command]) => command === "bind_skill_source"),
-    ).toHaveLength(0);
-    confirmSpy.mockReturnValueOnce(true);
+    ).toHaveLength(bindCallCountBeforeRemove);
+    await user.click(screen.getByTestId("cancel-remove-auto-update-trusted-skill"));
+    expect(screen.queryByTestId("confirm-remove-auto-update-trusted-skill")).toBeNull();
+
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
+    await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));
     await waitFor(() => expect(screen.queryByTestId("auto-update-source-row-trusted-skill")).toBeNull());
     expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
       request: expect.objectContaining({
