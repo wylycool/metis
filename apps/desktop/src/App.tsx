@@ -112,10 +112,11 @@ function MetisApp() {
     useState<DesktopInstallRemoteSkillResult | null>(null);
   const builtinPathHealth = builtinPathHealthForAgents(agents);
   const customPathHealth = pathHealthForAgents(agents, "custom");
-  const trustedSourceCount = skills.filter((skill) => skill.source?.trusted).length;
-  const autoUpdateCount = skills.filter((skill) => skill.source?.auto_update).length;
-  const trustedAutoUpdateSkills = skills.filter(
-    (skill) => skill.source?.trusted && skill.source.auto_update && skill.local_modified !== true,
+  const autoUpdateSourceSkills = skills.filter(
+    (skill) => skill.source?.trusted && skill.source.auto_update,
+  );
+  const trustedAutoUpdateSkills = autoUpdateSourceSkills.filter(
+    (skill) => skill.local_modified !== true,
   );
   const sourceRequiredSkill = sourceRequiredSkillId
     ? skills.find((skill) => skill.id === sourceRequiredSkillId) ?? null
@@ -695,6 +696,40 @@ function MetisApp() {
           .length;
       const failureText = failed > 0 ? `，失败 ${failed} 个` : "";
       setActionMessage(`自动更新完成：已更新 ${applied} 个，跳过 ${skipped} 个${failureText}`);
+    } catch (caught) {
+      setActionError(desktopError(caught));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleRemoveAutoUpdateSkill(skill: DesktopSkill) {
+    if (!skill.source) {
+      return;
+    }
+    const confirmed = window.confirm(
+      `确定将「${skill.name}」移出自动更新列表吗？移除后不会再自动更新这个 Skill。`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setActionBusy(`remove-auto-update:${skill.id}`);
+    setActionError(null);
+    setActionMessage(null);
+
+    try {
+      await bindSkillSource({
+        skill_id: skill.id,
+        url: skill.source.url,
+        repo_path: skill.source.repo_path,
+        ref_: skill.source.ref_,
+        credential_ref: skill.source.credential_ref ?? null,
+        trusted: false,
+        auto_update: false,
+      });
+      await refreshIndexedSkills();
+      setActionMessage("已移出自动更新列表");
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1282,12 +1317,38 @@ function MetisApp() {
           <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
             <div>
               <h3>自动更新</h3>
-              <p>只会更新已标记 trusted、已开启 auto update、且本地没有修改的 skill。</p>
+              <p>只会更新已加入自动更新列表、且本地没有修改的 Skill。</p>
             </div>
             <div className="policy-summary">
-              <span>Trusted source {trustedSourceCount} 个</span>
-              <span>Auto update {autoUpdateCount} 个</span>
-              <span>本次候选 {trustedAutoUpdateSkills.length} 个</span>
+              <span>自动更新列表 {autoUpdateSourceSkills.length} 个</span>
+              <span>本次可更新候选 {trustedAutoUpdateSkills.length} 个</span>
+            </div>
+            <div className="auto-update-source-list" data-testid="auto-update-source-list">
+              {autoUpdateSourceSkills.length === 0 ? (
+                <span className="settings-muted">暂无加入自动更新列表的 Skill</span>
+              ) : (
+                autoUpdateSourceSkills.map((skill) => (
+                  <div
+                    className="auto-update-source-row"
+                    data-testid={`auto-update-source-row-${skill.id}`}
+                    key={skill.id}
+                  >
+                    <div>
+                      <strong>{skill.name}</strong>
+                      <span>{skill.source?.url}</span>
+                    </div>
+                    <button
+                      className="ghost-button compact auto-update-remove"
+                      data-testid={`remove-auto-update-${skill.id}`}
+                      disabled={actionBusy === `remove-auto-update:${skill.id}`}
+                      onClick={() => handleRemoveAutoUpdateSkill(skill)}
+                      type="button"
+                    >
+                      {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "移除"}
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
             <button
               className="compact"
@@ -1390,38 +1451,34 @@ function isUiRedesignPreviewRoute() {
 
 function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
   const boundSourceCount = skills.filter((skill) => skill.source).length;
-  const trustedSourceCount = skills.filter((skill) => skill.source?.trusted).length;
-  const autoUpdateSourceCount = skills.filter((skill) => skill.source?.auto_update).length;
+  const autoUpdateSourceCount = skills.filter(
+    (skill) => skill.source?.trusted && skill.source.auto_update,
+  ).length;
   const blockedByLocalChanges = skills.some(
     (skill) => skill.source?.trusted && skill.source.auto_update && skill.local_modified === true,
   );
 
   if (boundSourceCount === 0) {
-    return "请先为 Skill 绑定 Git 来源，再勾选「信任此来源」并开启 auto update。";
-  }
-
-  if (trustedSourceCount === 0) {
-    return "请先在来源里勾选「信任此来源」并开启 auto update。";
+    return "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入自动更新列表」。";
   }
 
   if (autoUpdateSourceCount === 0) {
-    return "请先在来源里开启 auto update。";
+    return "请先在来源里开启「信任此来源并加入自动更新列表」。";
   }
 
   if (blockedByLocalChanges) {
     return "候选 Skill 都有本地修改，请先检查或手动处理本地修改。";
   }
 
-  return "请确认来源已信任、已开启 auto update，且本地没有修改。";
+  return "请确认 Skill 已加入自动更新列表，且本地没有修改。";
 }
 
 function isAutoUpdateUnavailableMessage(message: string | null) {
   return (
-    message === "请先为 Skill 绑定 Git 来源，再勾选「信任此来源」并开启 auto update。" ||
-    message === "请先在来源里勾选「信任此来源」并开启 auto update。" ||
-    message === "请先在来源里开启 auto update。" ||
+    message === "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入自动更新列表」。" ||
+    message === "请先在来源里开启「信任此来源并加入自动更新列表」。" ||
     message === "候选 Skill 都有本地修改，请先检查或手动处理本地修改。" ||
-    message === "请确认来源已信任、已开启 auto update，且本地没有修改。"
+    message === "请确认 Skill 已加入自动更新列表，且本地没有修改。"
   );
 }
 

@@ -278,6 +278,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-form")).toContain("grid-template-rows: minmax(0, 1fr) auto;");
     expect(latestBlockFor(".source-form-body")).toContain("overflow-y: auto;");
     expect(latestBlockFor(".source-form-body")).toContain("gap: 18px;");
+    expect(latestBlockFor(".source-form-body")).toContain("user-select: text;");
+    expect(latestBlockFor(".source-field-label-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
+    expect(exactBlockFor(".source-help-popover")).toContain("user-select: text;");
     expect(latestBlockFor(".source-form-field input")).toContain("min-height: 48px;");
     expect(latestBlockFor(".source-form-field input::placeholder")).toContain("font-weight: 600;");
     expect(latestBlockFor(".source-settings-grid")).toContain("gap: 10px;");
@@ -289,6 +292,10 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
+    expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");
+    expect(latestBlockFor(".auto-update-source-row")).toContain(
+      "grid-template-columns: minmax(0, 1fr) auto;",
+    );
     expect(latestBlockFor(".skill-intro-copy")).toContain("-webkit-line-clamp: 3");
   });
 

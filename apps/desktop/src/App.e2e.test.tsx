@@ -82,11 +82,17 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("source-required-toast-action"));
     const sourceDrawer = within(await screen.findByTestId("source-drawer-e2e-skill"));
     expect(sourceDrawer.getByTestId("source-form-body-e2e-skill")).toBeTruthy();
+    const sourceUrlHelp = within(sourceDrawer.getByTestId("source-url-help-e2e-skill"));
+    expect(sourceUrlHelp.getByText("HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("https://github.com/multica-ai/andrej-karpathy-skills.git")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("git@github.com:multica-ai/andrej-karpathy-skills.git")).toBeTruthy();
     const sourceSettings = within(sourceDrawer.getByTestId("source-settings-grid-e2e-skill"));
-    expect(sourceSettings.getByText("可信来源")).toBeTruthy();
-    expect(sourceSettings.getByText("允许 Metis 将这个仓库作为受信任的更新来源。")).toBeTruthy();
-    expect(sourceSettings.getByText("自动更新")).toBeTruthy();
-    expect(sourceSettings.getByText("仅在来源可信且本地无修改时参与自动更新。")).toBeTruthy();
+    expect(sourceDrawer.getByText("主分支名")).toBeTruthy();
+    expect(sourceDrawer.queryByText("分支 / Tag / Commit")).toBeNull();
+    expect(sourceDrawer.queryByText("凭据引用（可选）")).toBeNull();
+    expect(sourceSettings.getByText("信任此来源并加入自动更新列表")).toBeTruthy();
+    expect(sourceSettings.getByText("开启后，Metis 只会在本地无修改时自动更新这个 Skill。")).toBeTruthy();
+    expect(sourceSettings.queryByText("可信来源")).toBeNull();
     const sourceVerification = within(
       sourceDrawer.getByTestId("source-verification-panel-e2e-skill"),
     );
@@ -99,6 +105,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
     await user.clear(screen.getByTestId("bind-ref-e2e-skill"));
     await user.type(screen.getByTestId("bind-ref-e2e-skill"), "main");
+    await user.click(screen.getByTestId("bind-auto-update-e2e-skill"));
     await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
 
     expect(await screen.findByText("连接成功，可以保存来源。")).toBeTruthy();
@@ -111,6 +118,13 @@ describe("Metis desktop GUI main flow", () => {
       },
     });
     await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
+      request: expect.objectContaining({
+        trusted: true,
+        auto_update: true,
+        ref_: "main",
+      }),
+    });
 
     expect(await screen.findByText("修改来源")).toBeTruthy();
     const boundSourceSummary = within(screen.getByTestId("skill-source-summary-e2e-skill"));
@@ -306,7 +320,11 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     expect(await screen.findByText("自动更新")).toBeTruthy();
-    expect(screen.getByText("只会更新已标记 trusted、已开启 auto update、且本地没有修改的 skill。")).toBeTruthy();
+    expect(screen.getByText("只会更新已加入自动更新列表、且本地没有修改的 Skill。")).toBeTruthy();
+    const autoUpdateList = within(screen.getByTestId("auto-update-source-list"));
+    expect(autoUpdateList.getByText("Trusted Skill")).toBeTruthy();
+    expect(autoUpdateList.getByText("file:///tmp/metis-trusted-repo")).toBeTruthy();
+    expect(autoUpdateList.queryByText("Untrusted Skill")).toBeNull();
     expect(screen.getByTestId("run-auto-update").textContent).toBe("开启自动更新");
     expect(screen.queryByText("团队清单合规")).toBeNull();
     expect(screen.queryByText("企业网络")).toBeNull();
@@ -316,6 +334,28 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByText(/自动更新完成：已更新 1 个，跳过 1 个/)).toBeTruthy();
     expect(scenario.appliedSkillIds()).toEqual(["trusted-skill"]);
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValueOnce(false);
+    await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
+    expect(
+      invokeMock.mock.calls.filter(([command]) => command === "bind_skill_source"),
+    ).toHaveLength(0);
+    confirmSpy.mockReturnValueOnce(true);
+    await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
+    await waitFor(() => expect(screen.queryByTestId("auto-update-source-row-trusted-skill")).toBeNull());
+    expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
+      request: expect.objectContaining({
+        skill_id: "trusted-skill",
+        url: "file:///tmp/metis-trusted-repo",
+        trusted: false,
+        auto_update: false,
+      }),
+    });
+    await user.click(screen.getByTestId("workspace-tab-skills"));
+    await user.click(await screen.findByTestId("skill-row-trusted-skill"));
+    await user.click(screen.getByTestId("open-bind-source-trusted-skill"));
+    expect((await screen.findByTestId("bind-auto-update-trusted-skill") as HTMLInputElement).checked).toBe(false);
+    confirmSpy.mockRestore();
   });
 
   test("guides the user when auto update has no trusted source candidates", async () => {
@@ -332,9 +372,8 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     expect(await screen.findByText("自动更新")).toBeTruthy();
-    expect(screen.getByText("Trusted source 0 个")).toBeTruthy();
-    expect(screen.getByText("Auto update 0 个")).toBeTruthy();
-    expect(screen.getByText("本次候选 0 个")).toBeTruthy();
+    expect(screen.getByText("自动更新列表 0 个")).toBeTruthy();
+    expect(screen.getByText("本次可更新候选 0 个")).toBeTruthy();
 
     await user.click(screen.getByTestId("run-auto-update"));
 
@@ -342,7 +381,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(autoUpdateNotice.getByText("没有可自动更新的 Skill")).toBeTruthy();
     expect(
       autoUpdateNotice.getByText(
-        "请先在来源里勾选「信任此来源」并开启 auto update。",
+        "请先在来源里开启「信任此来源并加入自动更新列表」。",
       ),
     ).toBeTruthy();
     expect(autoUpdateNotice.queryByText(/当前没有可用的自动更新 Skill/)).toBeNull();
@@ -2468,6 +2507,39 @@ function createBetaReadinessScenario(
             previous_commit: request.skillId === "trusted-skill" ? "aaa111" : "ccc333",
             new_commit: request.skillId === "trusted-skill" ? "bbb222" : "ddd444",
           };
+        }
+        case "bind_skill_source": {
+          const request = args as {
+            request: {
+              skill_id: string;
+              url: string;
+              repo_path: string;
+              ref_: string;
+              credential_ref?: string | null;
+              trusted: boolean;
+              auto_update: boolean;
+            };
+          };
+          let updatedSource: DesktopSource | null = null;
+          skills = skills.map((skill) => {
+            if (skill.id !== request.request.skill_id || !skill.source) {
+              return skill;
+            }
+            updatedSource = {
+              ...skill.source,
+              url: request.request.url,
+              repo_path: request.request.repo_path,
+              ref_: request.request.ref_,
+              credential_ref: request.request.credential_ref ?? null,
+              trusted: request.request.trusted,
+              auto_update: request.request.auto_update,
+            };
+            return {
+              ...skill,
+              source: updatedSource,
+            };
+          });
+          return updatedSource;
         }
         default:
           throw new Error(`Unexpected invoke command: ${command}`);

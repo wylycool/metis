@@ -390,11 +390,29 @@ export function BindSourceForm({
       <div className="source-form-body" data-testid={`source-form-body-${skillId}`}>
         <div className="source-field-stack">
           <label className="source-form-field">
-            <span>仓库 Clone 地址</span>
+            <div className="source-field-label-row">
+              <span>仓库 Clone 地址</span>
+              <span className="source-help" data-testid={`source-url-help-${skillId}`}>
+                <button
+                  aria-label="仓库地址填写说明"
+                  className="source-help-button"
+                  type="button"
+                >
+                  ?
+                </button>
+                <span className="source-help-popover">
+                  <strong>仓库地址怎么填</strong>
+                  <span>HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。</span>
+                  <code>https://github.com/multica-ai/andrej-karpathy-skills.git</code>
+                  <span>如果你已经在本机配置好 SSH key，也可以使用 SSH 地址。</span>
+                  <code>git@github.com:multica-ai/andrej-karpathy-skills.git</code>
+                </span>
+              </span>
+            </div>
             <input
               data-testid={`bind-url-${skillId}`}
               value={draft.url}
-              placeholder="git@gitlab.example:team/repo.git"
+              placeholder="https://github.com/multica-ai/andrej-karpathy-skills.git"
               onChange={(event) => onChange({ ...draft, url: event.target.value })}
             />
           </label>
@@ -408,21 +426,12 @@ export function BindSourceForm({
             />
           </label>
           <label className="source-form-field">
-            <span>分支 / Tag / Commit</span>
+            <span>主分支名</span>
             <input
               data-testid={`bind-ref-${skillId}`}
               value={draft.ref_}
-              placeholder="main"
+              placeholder="main 或 master"
               onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
-            />
-          </label>
-          <label className="source-form-field">
-            <span>凭据引用（可选）</span>
-            <input
-              data-testid={`bind-credential-ref-${skillId}`}
-              value={draft.credential_ref}
-              placeholder="github-main"
-              onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
             />
           </label>
         </div>
@@ -430,26 +439,20 @@ export function BindSourceForm({
         <div className="source-settings-grid" data-testid={`source-settings-grid-${skillId}`}>
           <label className="source-setting-row check-label">
             <input
-              data-testid={`bind-trusted-${skillId}`}
-              checked={draft.trusted}
-              type="checkbox"
-              onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
-            />
-            <span>
-              <strong>可信来源</strong>
-              <small>允许 Metis 将这个仓库作为受信任的更新来源。</small>
-            </span>
-          </label>
-          <label className="source-setting-row check-label">
-            <input
               data-testid={`bind-auto-update-${skillId}`}
-              checked={draft.auto_update}
+              checked={draft.trusted && draft.auto_update}
               type="checkbox"
-              onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
+              onChange={(event) =>
+                onChange({
+                  ...draft,
+                  trusted: event.target.checked,
+                  auto_update: event.target.checked,
+                })
+              }
             />
             <span>
-              <strong>自动更新</strong>
-              <small>仅在来源可信且本地无修改时参与自动更新。</small>
+              <strong>信任此来源并加入自动更新列表</strong>
+              <small>开启后，Metis 只会在本地无修改时自动更新这个 Skill。</small>
             </span>
           </label>
         </div>
