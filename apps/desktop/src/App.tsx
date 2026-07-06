@@ -1139,7 +1139,7 @@ function MetisApp() {
       {actionMessage &&
         (guidanceToastVisible ? (
           <div
-            className="redesign-toast source-required-toast"
+            className="redesign-toast warning-toast source-required-toast"
             data-testid="source-required-toast"
             role="status"
           >
@@ -1168,7 +1168,10 @@ function MetisApp() {
             )}
           </div>
         ) : (
-          <div className="redesign-toast" data-testid="redesign-toast">
+          <div
+            className={`redesign-toast ${toastToneForActionMessage(actionMessage)}-toast`}
+            data-testid="redesign-toast"
+          >
             {actionMessage}
           </div>
         ))}
@@ -1414,6 +1417,28 @@ function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
 
 function isAutoUpdateUnavailableMessage(message: string | null) {
   return message?.startsWith("当前没有可用的自动更新 Skill") ?? false;
+}
+
+function toastToneForActionMessage(message: string): "success" | "info" | "warning" {
+  if (
+    message.startsWith("请先") ||
+    message.startsWith("需要") ||
+    message.includes("没有可用") ||
+    message.includes("失败")
+  ) {
+    return "warning";
+  }
+
+  if (
+    message.includes("完成") ||
+    message.includes("已") ||
+    message.includes("成功") ||
+    message.includes("回滚")
+  ) {
+    return "success";
+  }
+
+  return "info";
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {

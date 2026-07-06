@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AgentBadge, normalizeAgentId, type AgentIdentity } from "./AgentBadge";
 import { shortCommit } from "./commitDisplay";
 import {
@@ -99,6 +99,28 @@ export function SkillDetailPage({
   const outdatedAgentRows = installedAgentRows.filter((row) => row.statusKind === "update");
   const applyNeededBusy = actionBusy === "apply-needed-agent-updates";
   const canViewDiff = canViewUpdateDiff(updateResult);
+  const [sourceDrawerMounted, setSourceDrawerMounted] = useState(isBinding);
+  const [sourceDrawerClosing, setSourceDrawerClosing] = useState(false);
+
+  useEffect(() => {
+    if (isBinding) {
+      setSourceDrawerMounted(true);
+      setSourceDrawerClosing(false);
+      return undefined;
+    }
+
+    if (!sourceDrawerMounted) {
+      return undefined;
+    }
+
+    setSourceDrawerClosing(true);
+    const timeout = window.setTimeout(() => {
+      setSourceDrawerMounted(false);
+      setSourceDrawerClosing(false);
+    }, 160);
+
+    return () => window.clearTimeout(timeout);
+  }, [isBinding, sourceDrawerMounted]);
 
   return (
     <section
@@ -220,11 +242,19 @@ export function SkillDetailPage({
         <SkillHistoryPanel events={skillAuditEvents} skillId={skill.id} />
       </div>
 
-      {isBinding && (
-        <div className="source-drawer-backdrop redesign-drawer-scrim" role="presentation" onClick={onCancelBind}>
+      {sourceDrawerMounted && (
+        <div
+          className={`source-drawer-backdrop redesign-drawer-scrim ${
+            sourceDrawerClosing ? "is-closing" : ""
+          }`}
+          role="presentation"
+          onClick={onCancelBind}
+        >
           <aside
             aria-label="修改来源信息"
-            className="source-drawer redesign-source-drawer"
+            className={`source-drawer redesign-source-drawer ${
+              sourceDrawerClosing ? "is-closing" : ""
+            }`}
             data-testid={`source-drawer-${skill.id}`}
             onClick={(event) => event.stopPropagation()}
           >
@@ -353,7 +383,14 @@ function FormalDetailAgentPaths({
                   className="redesign-detail-agent-row-action"
                   data-testid={`overwrite-local-agent-${row.skillId}`}
                   disabled={actionBusy === `apply:${row.skillId}`}
-                  onClick={() => onApplyUpdate(row.skillId, "overwrite-local")}
+                  onClick={() => {
+                    const confirmed = window.confirm(
+                      "覆盖更新会先创建备份，然后用来源版本覆盖这个 Agent 中的本地修改。确定继续吗？",
+                    );
+                    if (confirmed) {
+                      onApplyUpdate(row.skillId, "overwrite-local");
+                    }
+                  }}
                   title="会先创建备份，再用来源版本覆盖这个安装目录"
                 >
                   {actionBusy === `apply:${row.skillId}` ? "覆盖中" : "覆盖更新"}

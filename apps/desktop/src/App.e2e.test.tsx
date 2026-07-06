@@ -994,8 +994,24 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(screen.getByTestId("check-updates-codex-planner"));
 
-    expect(await screen.findByTestId("redesign-toast")).toBeTruthy();
+    expect((await screen.findByTestId("redesign-toast")).className).toContain("success-toast");
     expect(await screen.findByTestId("check-panel-codex-planner")).toBeTruthy();
+  });
+
+  test("keeps the source drawer mounted for its closing animation", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    const drawer = await screen.findByTestId("source-drawer-e2e-skill");
+    expect(drawer.className).not.toContain("is-closing");
+
+    await user.click(within(drawer).getByText("取消"));
+
+    expect(screen.getByTestId("source-drawer-e2e-skill").className).toContain("is-closing");
+    await waitFor(() => expect(screen.queryByTestId("source-drawer-e2e-skill")).toBeNull());
   });
 
   test("redesign toast automatically dismisses after a short delay", async () => {
@@ -1235,6 +1251,7 @@ describe("Metis desktop GUI error paths", () => {
   test("allows a local modified agent row to be overwritten from source", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({ localModifiedAfterCheck: true });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     invokeMock.mockImplementation((command: string, args?: unknown) =>
       scenario.invoke(command, args),
     );
@@ -1254,12 +1271,45 @@ describe("Metis desktop GUI error paths", () => {
 
     await user.click(within(localModifiedRow).getByTestId("overwrite-local-agent-e2e-skill"));
 
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "覆盖更新会先创建备份，然后用来源版本覆盖这个 Agent 中的本地修改。确定继续吗？",
+    );
     expect(invokeMock).toHaveBeenCalledWith("apply_skill_update", {
       skillId: "e2e-skill",
     });
     expect(await screen.findByText(/已用来源版本覆盖本地修改/)).toBeTruthy();
     expect(within(localModifiedRow).getByText("无需更新")).toBeTruthy();
     expect(within(localModifiedRow).queryByText("未检查")).toBeNull();
+    confirmSpy.mockRestore();
+  });
+
+  test("does not overwrite local modifications when confirmation is cancelled", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ localModifiedAfterCheck: true });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+    await user.click(screen.getByTestId("skill-detail-agent-toggle-e2e-skill"));
+
+    const localModifiedRow = screen.getByTestId("skill-detail-agent-path-e2e-skill-generic");
+    await user.click(within(localModifiedRow).getByTestId("overwrite-local-agent-e2e-skill"));
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "覆盖更新会先创建备份，然后用来源版本覆盖这个 Agent 中的本地修改。确定继续吗？",
+    );
+    expect(scenario.commandCalls("apply_skill_update")).toBe(0);
+    expect(within(localModifiedRow).getByText("本地已修改")).toBeTruthy();
+    confirmSpy.mockRestore();
   });
 
   test("shows a calm note when applied update includes security findings", async () => {
@@ -1563,6 +1613,7 @@ describe("Metis desktop GUI error paths", () => {
       localModifiedAfterCheck: true,
       longCommitHashes: true,
     });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     invokeMock.mockImplementation((command: string, args?: unknown) =>
       scenario.invoke(command, args),
     );
@@ -1591,6 +1642,7 @@ describe("Metis desktop GUI error paths", () => {
 
     expect(await screen.findByText(/已用来源版本覆盖本地修改：abcdef12/)).toBeTruthy();
     expect(screen.queryByText(/abcdef1234/)).toBeNull();
+    confirmSpy.mockRestore();
   });
 });
 

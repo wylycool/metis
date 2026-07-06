@@ -483,15 +483,22 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
     expect(latestBlockFor(".redesign-detail-agent-row-action")).toContain("white-space: nowrap;");
     expect(latestBlockFor(".redesign-backup-panel .backup-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
+    expect(exactBlockFor(".redesign-side-nav button")).toContain("color: #526174;");
+    expect(exactBlockFor(".redesign-side-nav button:hover:not(:disabled)")).toContain("background: #eef4ff;");
+    expect(exactBlockFor(".redesign-side-nav button:hover:not(:disabled)")).toContain("box-shadow: none;");
+    expect(latestBlockFor(".redesign-skill-card:hover:not(:disabled)")).toContain("transform: translateY(-2px);");
+    expect(latestBlockFor(".redesign-skill-card:hover:not(:disabled)")).toContain(
+      "box-shadow: 0 14px 28px rgba(30, 48, 78, 0.1);",
+    );
     expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("background: #f8fafc;");
     expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("color: #2f4b77;");
     expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
     expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("color: #ffffff;");
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
-    expect(latestBlockFor(".redesign-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
-    expect(latestBlockFor(".redesign-toast")).toContain("border: 1px solid rgba(214, 139, 38, 0.28);");
-    expect(latestBlockFor(".redesign-toast")).toContain("box-shadow: 0 18px 36px rgba(138, 75, 15, 0.14);");
-    expect(latestBlockFor(".redesign-toast")).not.toContain("background: rgba(255, 255, 255, 0.96);");
+    expect(latestBlockFor(".redesign-toast.success-toast")).toContain("background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 72%);");
+    expect(latestBlockFor(".redesign-toast.info-toast")).toContain("background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);");
+    expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
+    expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("border-color: rgba(214, 139, 38, 0.28);");
     expect(latestBlockFor(".source-required-toast")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
     expect(latestBlockFor(".source-required-toast")).not.toContain("background:");
     expect(latestBlockFor(".source-required-toast")).not.toContain("box-shadow:");
@@ -706,6 +713,10 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.source-drawer\.redesign-source-drawer\s*\{[\s\S]*width:\s*min\(440px,\s*100vw\);/,
     );
+    expect(latestBlockFor(".source-drawer.redesign-source-drawer.is-closing")).toContain(
+      "animation: redesignDrawerOut 140ms ease-in forwards;",
+    );
+    expect(stylesheet).toContain("@keyframes redesignDrawerOut");
     expect(stylesheet).toMatch(
       /\.settings-agent-path-table\.redesign-agent-path-table\s*\{[\s\S]*border-radius:\s*14px;/,
     );
