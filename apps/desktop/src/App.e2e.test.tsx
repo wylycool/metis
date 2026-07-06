@@ -369,6 +369,49 @@ describe("Metis desktop GUI main flow", () => {
     ).toHaveLength(2);
   });
 
+  test("does not test derived URL variants when the main branch name is wrong", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ sourceConnectionRefFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "https://github.com/xx/xx.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    const branchInput = screen.getByTestId("bind-ref-e2e-skill") as HTMLInputElement;
+    await user.clear(branchInput);
+    await user.type(branchInput, "Main1");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("Metis 能访问仓库，但找不到这个主分支名。")).toBeTruthy();
+    expect(
+      screen.getByText("请检查“主分支名”是否填写正确，一般为 main 或者 master。"),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "Metis 已自动尝试当前地址及可推导的 HTTPS / git@ 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+      ),
+    ).toBeNull();
+    const sourceConnectionCalls = invokeMock.mock.calls.filter(
+      ([command]) => command === "test_source_connection",
+    );
+    expect(sourceConnectionCalls).toHaveLength(1);
+    expect(sourceConnectionCalls[0]?.[1]).toEqual({
+      request: {
+        url: "https://github.com/xx/xx.git",
+        repo_path: "skills/e2e-skill",
+        ref_: "Main1",
+      },
+    });
+  });
+
   test("explains when both the current URL and derived variants fail", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({ sourceConnectionFails: true });
@@ -1929,6 +1972,7 @@ function createMainFlowScenario(
     sameCommitApply?: boolean;
     securityFindingOnApply?: boolean;
     sourceConnectionFails?: boolean;
+    sourceConnectionRefFails?: boolean;
     sshSourceConnectionFails?: boolean;
     slowBind?: boolean;
     slowDiff?: boolean;
@@ -2223,9 +2267,20 @@ function createMainFlowScenario(
             };
           };
           if (
+            options.sourceConnectionRefFails ||
             options.sourceConnectionFails ||
             (options.sshSourceConnectionFails && request.request.url.startsWith("git@"))
           ) {
+            if (options.sourceConnectionRefFails) {
+              throw JSON.stringify({
+                category: "git_ref",
+                title: "分支不存在",
+                message: "Metis 能访问仓库，但找不到这个主分支名。",
+                suggestion: "请检查“主分支名”是否填写正确，一般为 main 或者 master。",
+                debug_detail:
+                  "remote ref not found: https://github.com/xx/xx.git Main1",
+              });
+            }
             throw JSON.stringify({
               category: "authentication",
               title: "认证失败",

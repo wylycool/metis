@@ -1356,12 +1356,17 @@ async fn preview_remote_skill_source(
 }
 
 #[tauri::command]
-fn test_source_connection(
+async fn test_source_connection(
     state: tauri::State<'_, DesktopAppState>,
     request: DesktopPreviewRemoteSkillSourceRequest,
 ) -> Result<DesktopSourceConnectionTestResult, String> {
-    let checker = system_git_checker_for_state(&state)?;
-    test_source_connection_for_state_with_checker(&state, request, &checker)
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let checker = system_git_checker_for_state(&state)?;
+        test_source_connection_for_state_with_checker(&state, request, &checker)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

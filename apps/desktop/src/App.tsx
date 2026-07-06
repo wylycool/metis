@@ -415,6 +415,9 @@ function MetisApp() {
           return;
         } catch (caught) {
           lastError = desktopError(caught);
+          if (!candidate.isOriginal || !shouldTryDerivedGitUrl(lastError)) {
+            break;
+          }
         }
       }
 
@@ -422,7 +425,7 @@ function MetisApp() {
       setSourceConnectionErrors((current) => ({
         ...current,
         [skillId]:
-          candidates.length > 1
+          candidates.length > 1 && shouldTryDerivedGitUrl(displayError)
             ? withDerivedGitUrlSuggestion(displayError)
             : displayError,
       }));
@@ -1835,6 +1838,10 @@ function withDerivedGitUrlSuggestion(error: DesktopError): DesktopError {
     suggestion:
       "Metis 已自动尝试当前地址及可推导的 HTTPS / git@ 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
   };
+}
+
+function shouldTryDerivedGitUrl(error: DesktopError): boolean {
+  return !["git_ref", "repo_path", "ssh_host_key"].includes(error.category);
 }
 
 function retainUpdateResultsForSkills(
