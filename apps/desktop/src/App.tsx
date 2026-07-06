@@ -1717,7 +1717,7 @@ function desktopError(caught: unknown): DesktopError {
 
 type GitUrlTestCandidate = {
   url: string;
-  label: "当前" | "HTTPS" | "SSH";
+  label: "当前" | "HTTPS" | "git@";
   isOriginal: boolean;
 };
 
@@ -1742,7 +1742,7 @@ function deriveAlternateGitUrl(rawUrl: string): Omit<GitUrlTestCandidate, "isOri
   const httpsMatch = url.match(/^https:\/\/([^/]+)\/(.+?)(?:\.git)?\/?$/i);
   if (httpsMatch) {
     return {
-      label: "SSH",
+      label: "git@",
       url: `git@${httpsMatch[1]}:${ensureGitSuffix(httpsMatch[2])}`,
     };
   }
@@ -1752,14 +1752,6 @@ function deriveAlternateGitUrl(rawUrl: string): Omit<GitUrlTestCandidate, "isOri
     return {
       label: "HTTPS",
       url: `https://${scpSshMatch[1]}/${ensureGitSuffix(scpSshMatch[2])}`,
-    };
-  }
-
-  const sshUrlMatch = url.match(/^ssh:\/\/git@([^/]+)\/(.+?)(?:\.git)?\/?$/i);
-  if (sshUrlMatch) {
-    return {
-      label: "HTTPS",
-      url: `https://${sshUrlMatch[1]}/${ensureGitSuffix(sshUrlMatch[2])}`,
     };
   }
 
@@ -1774,7 +1766,7 @@ function withDerivedGitUrlSuggestion(error: DesktopError): DesktopError {
   return {
     ...error,
     suggestion:
-      "Metis 已自动尝试当前地址及可推导的 HTTPS/SSH 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+      "Metis 已自动尝试当前地址及可推导的 HTTPS / git@ 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
   };
 }
 

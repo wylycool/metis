@@ -84,6 +84,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceDrawer.getByTestId("source-form-body-e2e-skill")).toBeTruthy();
     const sourceUrlHelp = within(sourceDrawer.getByTestId("source-url-help-e2e-skill"));
     expect(sourceUrlHelp.getByText("HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("如果你已经在本机配置好 SSH key，也可以使用 git@ 地址。")).toBeTruthy();
     expect(sourceUrlHelp.getByText("https://github.com/xx/xx.git")).toBeTruthy();
     expect(sourceUrlHelp.getByText("git@github.com:xx/xx.git")).toBeTruthy();
     expect((screen.getByTestId("bind-url-e2e-skill") as HTMLInputElement).placeholder).toBe(
@@ -309,7 +310,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByText("Metis 访问不了这个仓库")).toBeTruthy();
     expect(
       screen.getByText(
-        "Metis 已自动尝试当前地址及可推导的 HTTPS/SSH 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+        "Metis 已自动尝试当前地址及可推导的 HTTPS / git@ 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
       ),
     ).toBeTruthy();
   });
@@ -362,12 +363,50 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByText("Metis 访问不了这个仓库")).toBeTruthy();
     expect(
       screen.getByText(
-        "Metis 已自动尝试当前地址及可推导的 HTTPS/SSH 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+        "Metis 已自动尝试当前地址及可推导的 HTTPS / git@ 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
       ),
     ).toBeTruthy();
     expect(
       invokeMock.mock.calls.filter(([command]) => command === "test_source_connection"),
     ).toHaveLength(2);
+  });
+
+  test("does not derive variants from ssh URL source input", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ sourceConnectionFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "ssh://git@github.com/xx/xx.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("Metis 访问不了这个仓库")).toBeTruthy();
+    expect(screen.getByText("请确认你有访问权限，或先在本机 Git 工具中完成登录。")).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "Metis 已自动尝试当前地址及可推导的 HTTPS / git@ 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+      ),
+    ).toBeNull();
+    const sourceConnectionCalls = invokeMock.mock.calls.filter(
+      ([command]) => command === "test_source_connection",
+    );
+    expect(sourceConnectionCalls).toHaveLength(1);
+    expect(sourceConnectionCalls[0]?.[1]).toEqual({
+      request: {
+        url: "ssh://git@github.com/xx/xx.git",
+        repo_path: "skills/e2e-skill",
+        ref_: "main",
+      },
+    });
   });
 
   test("removes Updates workspace and runs controlled auto update from Settings", async () => {

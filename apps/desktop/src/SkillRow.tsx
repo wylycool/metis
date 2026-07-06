@@ -404,7 +404,7 @@ export function BindSourceForm({
                   <strong>仓库地址怎么填</strong>
                   <span>HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。</span>
                   <code>https://github.com/xx/xx.git</code>
-                  <span>如果你已经在本机配置好 SSH key，也可以使用 SSH 地址。</span>
+                  <span>如果你已经在本机配置好 SSH key，也可以使用 git@ 地址。</span>
                   <code>git@github.com:xx/xx.git</code>
                 </span>
               </span>
