@@ -491,11 +491,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("凭据引用")).toBeNull();
     const gitHealthSection = within(screen.getByTestId("settings-section-git-health"));
     expect(gitHealthSection.getByText("Git 环境检查")).toBeTruthy();
-    expect(gitHealthSection.getByText("检测本机 Git 是否可运行，并确认能访问公开 Git 仓库。")).toBeTruthy();
-    expect(gitHealthSection.getByText("点击后会用只读方式检查本机 Git 和公开仓库连通性，不会安装、更新或修改任何文件。")).toBeTruthy();
+    expect(gitHealthSection.getByText("检测本机 Git 是否可运行。")).toBeTruthy();
+    expect(gitHealthSection.getByText("点击后只会运行本机 git --version，不会访问仓库、安装、更新或修改任何文件。")).toBeTruthy();
     await user.click(gitHealthSection.getByTestId("test-git-environment"));
-    expect(await screen.findByText("本机 Git 可以正常访问公开仓库。")).toBeTruthy();
-    expect(screen.queryByText("https://github.com/wylycool/metis.git")).toBeNull();
+    expect(await screen.findByText("本机 Git 可以正常运行。")).toBeTruthy();
+    expect(screen.getByText("git version 2.45.0")).toBeTruthy();
+    expect(screen.queryByText(/github\.com/)).toBeNull();
     expect(invokeMock).toHaveBeenCalledWith("test_git_environment");
 
     await user.click(screen.getByTestId("run-auto-update"));
@@ -2195,9 +2196,8 @@ function createMainFlowScenario(
         case "test_git_environment":
           return {
             ok: true,
-            message: "本机 Git 可以正常访问公开仓库。",
-            url: "https://github.com/wylycool/metis.git",
-            commit: "abc123",
+            message: "本机 Git 可以正常运行。",
+            version: "git version 2.45.0",
           };
         case "preview_remote_skill_source":
           if (options.slowRemotePreview) {
@@ -2523,9 +2523,8 @@ function createBetaReadinessScenario(
         case "test_git_environment":
           return {
             ok: true,
-            message: "本机 Git 可以正常访问公开仓库。",
-            url: "https://github.com/wylycool/metis.git",
-            commit: "abc123",
+            message: "本机 Git 可以正常运行。",
+            version: "git version 2.45.0",
           };
         case "load_team_manifest_from_file":
           return JSON.stringify({

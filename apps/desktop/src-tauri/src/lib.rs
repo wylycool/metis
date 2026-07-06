@@ -266,8 +266,7 @@ pub struct DesktopSourceConnectionTestResult {
 pub struct DesktopGitEnvironmentTestResult {
     pub ok: bool,
     pub message: String,
-    pub url: String,
-    pub commit: String,
+    pub version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -837,36 +836,52 @@ pub fn test_source_connection_for_state_with_checker<C: RemoteCommitChecker>(
     .map_err(|error| friendly_desktop_error(&error.to_string()).wire_string())
 }
 
-pub fn test_git_environment_for_state_with_checker<C: RemoteCommitChecker>(
-    state: &DesktopAppState,
-    checker: &C,
+pub trait GitVersionProbe {
+    fn git_version(&self) -> Result<String, String>;
+}
+
+struct SystemGitVersionProbe;
+
+impl GitVersionProbe for SystemGitVersionProbe {
+    fn git_version(&self) -> Result<String, String> {
+        let output = Command::new("git")
+            .arg("--version")
+            .output()
+            .map_err(|error| format!("git unavailable: {error}"))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            let detail = if stderr.is_empty() {
+                format!(
+                    "git unavailable: git --version exited with {}",
+                    output.status
+                )
+            } else {
+                format!("git unavailable: {stderr}")
+            };
+            return Err(detail);
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if stdout.is_empty() {
+            return Err("git unavailable: git --version returned empty output".to_string());
+        }
+
+        Ok(stdout)
+    }
+}
+
+pub fn test_git_environment_with_probe<P: GitVersionProbe>(
+    probe: &P,
 ) -> Result<DesktopGitEnvironmentTestResult, String> {
-    state.ensure_dirs()?;
-    let url = "https://github.com/octocat/Hello-World.git".to_string();
-    let source = SourceRecord {
-        id: "git-environment-check".to_string(),
-        source_type: "git".to_string(),
-        url: url.clone(),
-        repo_path: ".".to_string(),
-        ref_: "HEAD".to_string(),
-        current_commit: None,
-        remote_commit: None,
-        last_checked_at: None,
-        trusted: false,
-        auto_update: false,
-        credential_ref: None,
-        created_at: None,
-        updated_at: None,
-    };
-    let commit = checker
-        .remote_commit(&source)
+    let version = probe
+        .git_version()
         .map_err(|error| friendly_desktop_error(&error).wire_string())?;
 
     Ok(DesktopGitEnvironmentTestResult {
         ok: true,
-        message: "本机 Git 可以正常访问公开仓库。".to_string(),
-        url,
-        commit,
+        message: "本机 Git 可以正常运行。".to_string(),
+        version,
     })
 }
 
@@ -1274,13 +1289,10 @@ fn test_source_connection(
 }
 
 #[tauri::command]
-async fn test_git_environment(
-    state: tauri::State<'_, DesktopAppState>,
-) -> Result<DesktopGitEnvironmentTestResult, String> {
-    let state = state.inner().clone();
+async fn test_git_environment() -> Result<DesktopGitEnvironmentTestResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let checker = system_git_checker_for_state(&state)?;
-        test_git_environment_for_state_with_checker(&state, &checker)
+        let probe = SystemGitVersionProbe;
+        test_git_environment_with_probe(&probe)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -2573,31 +2585,28 @@ mod tests {
         fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
 
+    struct FakeGitVersionProbe {
+        output: Result<String, String>,
+    }
+
+    impl GitVersionProbe for FakeGitVersionProbe {
+        fn git_version(&self) -> Result<String, String> {
+            self.output.clone()
+        }
+    }
+
     #[test]
-    fn test_git_environment_for_state_returns_public_repo_success() {
-        let workspace = temp_dir("test-git-environment");
-        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
-        let checker = FakeUpdateChecker {
-            commits: HashMap::from([("git-environment-check".to_string(), "def456".to_string())]),
-            behind: 0,
-            summary: DiffSummary {
-                files_added: 0,
-                files_modified: 0,
-                files_deleted: 0,
-                total_changes: 0,
-            },
-            details: HashMap::new(),
-            checkout: None,
+    fn test_git_environment_returns_local_git_version_without_remote_probe() {
+        let probe = FakeGitVersionProbe {
+            output: Ok("git version 2.45.0".to_string()),
         };
 
-        let result = test_git_environment_for_state_with_checker(&state, &checker)
-            .expect("git environment test should succeed");
+        let result =
+            test_git_environment_with_probe(&probe).expect("git environment test should succeed");
 
         assert!(result.ok);
-        assert_eq!(result.message, "本机 Git 可以正常访问公开仓库。");
-        assert_eq!(result.commit, "def456");
-        assert_eq!(result.url, "https://github.com/octocat/Hello-World.git");
-        fs::remove_dir_all(workspace).expect("workspace should be removed");
+        assert_eq!(result.message, "本机 Git 可以正常运行。");
+        assert_eq!(result.version, "git version 2.45.0");
     }
 
     #[test]

@@ -1411,7 +1411,7 @@ function MetisApp() {
           <section className="settings-section git-health-section" data-testid="settings-section-git-health">
             <div>
               <h3>Git 环境检查</h3>
-              <p>检测本机 Git 是否可运行，并确认能访问公开 Git 仓库。</p>
+              <p>检测本机 Git 是否可运行。</p>
             </div>
             <div className="settings-git-health-card">
               <div className="settings-git-health-action">
@@ -1424,11 +1424,12 @@ function MetisApp() {
                 >
                   {actionBusy === "git-environment" ? "检测中" : "检测 Git 环境"}
                 </button>
-                <p>点击后会用只读方式检查本机 Git 和公开仓库连通性，不会安装、更新或修改任何文件。</p>
+                <p>点击后只会运行本机 git --version，不会访问仓库、安装、更新或修改任何文件。</p>
               </div>
               {gitEnvironmentResult && (
                 <div className="settings-git-health-result success" data-testid="git-environment-result">
                   <strong>{gitEnvironmentResult.message}</strong>
+                  <span>{gitEnvironmentResult.version}</span>
                 </div>
               )}
               {gitEnvironmentError && (

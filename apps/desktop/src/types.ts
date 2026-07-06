@@ -107,8 +107,7 @@ export interface DesktopSourceConnectionTestResult {
 export interface DesktopGitEnvironmentTestResult {
   ok: boolean;
   message: string;
-  url: string;
-  commit: string;
+  version: string;
 }
 
 export interface DesktopRemoteSkillPreview {
