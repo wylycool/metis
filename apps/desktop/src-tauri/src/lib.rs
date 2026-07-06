@@ -2278,6 +2278,19 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         );
     }
 
+    if lower.contains("host key verification failed")
+        || lower.contains("host key verification")
+        || lower.contains("strict host key checking")
+    {
+        return desktop_error(
+            "ssh_host_key",
+            "SSH 主机未确认",
+            "Metis 不能直接确认这个 Git 主机的 SSH 指纹。",
+            "请先在终端用系统 Git 连接一次该主机并确认指纹，或改用 HTTPS 仓库地址。",
+            message,
+        );
+    }
+
     if lower.contains("local modified") || lower.contains("本地修改") {
         return desktop_error(
             "local_modified",
@@ -2335,8 +2348,8 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         return desktop_error(
             "git_ref",
             "分支不存在",
-            "Metis 能访问仓库，但找不到这个分支、Tag 或 Commit。",
-            "请检查“分支 / Tag / Commit”是否填写正确。",
+            "Metis 能访问仓库，但找不到这个主分支名。",
+            "请检查“主分支名”是否填写正确，一般为 main 或者 master。",
             message,
         );
     }
@@ -3731,6 +3744,39 @@ description: {description}
             error.debug_detail.as_deref(),
             Some("authentication failed: could not read Username for 'https://github.com'")
         );
+    }
+
+    #[test]
+    fn desktop_error_classifies_ssh_host_key_verification_failure() {
+        let raw = "git command failed: git ls-remote git@github.com:example/repo.git main: Host key verification failed.";
+        let error = friendly_desktop_error(raw);
+
+        assert_eq!(error.category, "ssh_host_key");
+        assert_eq!(error.title, "SSH 主机未确认");
+        assert_eq!(
+            error.message,
+            "Metis 不能直接确认这个 Git 主机的 SSH 指纹。"
+        );
+        assert_eq!(
+            error.suggestion,
+            "请先在终端用系统 Git 连接一次该主机并确认指纹，或改用 HTTPS 仓库地址。"
+        );
+        assert_eq!(error.debug_detail.as_deref(), Some(raw));
+    }
+
+    #[test]
+    fn desktop_error_guides_missing_remote_ref_as_main_branch_name() {
+        let raw = "remote ref not found: git@github.com:example/repo.git missing-branch";
+        let error = friendly_desktop_error(raw);
+
+        assert_eq!(error.category, "git_ref");
+        assert_eq!(error.title, "分支不存在");
+        assert_eq!(error.message, "Metis 能访问仓库，但找不到这个主分支名。");
+        assert_eq!(
+            error.suggestion,
+            "请检查“主分支名”是否填写正确，一般为 main 或者 master。"
+        );
+        assert_eq!(error.debug_detail.as_deref(), Some(raw));
     }
 
     #[test]

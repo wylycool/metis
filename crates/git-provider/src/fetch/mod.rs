@@ -92,9 +92,10 @@ fn run_system_git(
     args: &[&str],
     environment: &[(String, String)],
 ) -> Result<GitCommandOutput, GitProviderError> {
+    let merged_environment = merged_git_environment(environment);
     let output = Command::new("git")
         .args(args)
-        .envs(environment.iter().map(|(key, value)| (key, value)))
+        .envs(merged_environment.iter().map(|(key, value)| (key, value)))
         .output()
         .map_err(|error| GitProviderError::GitUnavailable {
             reason: error.to_string(),
@@ -111,6 +112,31 @@ fn run_system_git(
     }
 
     Ok(GitCommandOutput { stdout, stderr })
+}
+
+fn merged_git_environment(environment: &[(String, String)]) -> Vec<(String, String)> {
+    let mut merged = vec![
+        ("GIT_TERMINAL_PROMPT".to_string(), "0".to_string()),
+        ("GIT_ASKPASS".to_string(), String::new()),
+        ("SSH_ASKPASS".to_string(), String::new()),
+        (
+            "GIT_SSH_COMMAND".to_string(),
+            "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes".to_string(),
+        ),
+    ];
+
+    for (key, value) in environment {
+        if let Some((_, existing_value)) = merged
+            .iter_mut()
+            .find(|(existing_key, _)| existing_key == key)
+        {
+            *existing_value = value.clone();
+        } else {
+            merged.push((key.clone(), value.clone()));
+        }
+    }
+
+    merged
 }
 
 #[derive(Debug, Clone)]
@@ -305,5 +331,67 @@ mod tests {
             .expect_err("runner failure should propagate");
 
         assert!(matches!(error, GitProviderError::CommandFailed { .. }));
+    }
+
+    #[test]
+    fn default_git_environment_disables_interactive_prompts() {
+        let environment = merged_git_environment(&[]);
+
+        assert_eq!(
+            environment
+                .iter()
+                .find(|(key, _)| key == "GIT_TERMINAL_PROMPT")
+                .map(|(_, value)| value.as_str()),
+            Some("0")
+        );
+        assert_eq!(
+            environment
+                .iter()
+                .find(|(key, _)| key == "GIT_ASKPASS")
+                .map(|(_, value)| value.as_str()),
+            Some("")
+        );
+        assert_eq!(
+            environment
+                .iter()
+                .find(|(key, _)| key == "SSH_ASKPASS")
+                .map(|(_, value)| value.as_str()),
+            Some("")
+        );
+        let ssh_command = environment
+            .iter()
+            .find(|(key, _)| key == "GIT_SSH_COMMAND")
+            .map(|(_, value)| value.as_str())
+            .expect("ssh command should be set");
+        assert!(ssh_command.contains("BatchMode=yes"));
+        assert!(ssh_command.contains("StrictHostKeyChecking=yes"));
+    }
+
+    #[test]
+    fn explicit_git_environment_overrides_non_interactive_defaults() {
+        let environment = merged_git_environment(&[
+            ("GIT_TERMINAL_PROMPT".to_string(), "1".to_string()),
+            (
+                "GIT_SSH_COMMAND".to_string(),
+                "ssh -F /tmp/metis-ssh-config".to_string(),
+            ),
+        ]);
+
+        assert_eq!(
+            environment
+                .iter()
+                .filter(|(key, _)| key == "GIT_TERMINAL_PROMPT")
+                .map(|(_, value)| value.as_str())
+                .collect::<Vec<_>>(),
+            vec!["1"]
+        );
+        assert_eq!(
+            environment
+                .iter()
+                .filter(|(key, _)| key == "GIT_SSH_COMMAND")
+                .map(|(_, value)| value.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ssh -F /tmp/metis-ssh-config"]
+        );
     }
 }
