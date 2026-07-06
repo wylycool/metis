@@ -1414,19 +1414,21 @@ function MetisApp() {
               <p>检测本机 Git 是否可运行，并确认能访问公开 Git 仓库。</p>
             </div>
             <div className="settings-git-health-card">
-              <button
-                className="settings-git-test-button"
-                data-testid="test-git-environment"
-                disabled={actionBusy === "git-environment"}
-                onClick={handleTestGitEnvironment}
-                type="button"
-              >
-                {actionBusy === "git-environment" ? "检测中" : "检测 Git 环境"}
-              </button>
+              <div className="settings-git-health-action">
+                <button
+                  className="settings-git-test-button"
+                  data-testid="test-git-environment"
+                  disabled={actionBusy === "git-environment"}
+                  onClick={handleTestGitEnvironment}
+                  type="button"
+                >
+                  {actionBusy === "git-environment" ? "检测中" : "检测 Git 环境"}
+                </button>
+                <p>点击后会用只读方式检查本机 Git 和公开仓库连通性，不会安装、更新或修改任何文件。</p>
+              </div>
               {gitEnvironmentResult && (
                 <div className="settings-git-health-result success" data-testid="git-environment-result">
                   <strong>{gitEnvironmentResult.message}</strong>
-                  <span>{gitEnvironmentResult.url}</span>
                 </div>
               )}
               {gitEnvironmentError && (

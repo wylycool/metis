@@ -492,8 +492,10 @@ describe("Metis desktop GUI main flow", () => {
     const gitHealthSection = within(screen.getByTestId("settings-section-git-health"));
     expect(gitHealthSection.getByText("Git 环境检查")).toBeTruthy();
     expect(gitHealthSection.getByText("检测本机 Git 是否可运行，并确认能访问公开 Git 仓库。")).toBeTruthy();
+    expect(gitHealthSection.getByText("点击后会用只读方式检查本机 Git 和公开仓库连通性，不会安装、更新或修改任何文件。")).toBeTruthy();
     await user.click(gitHealthSection.getByTestId("test-git-environment"));
     expect(await screen.findByText("本机 Git 可以正常访问公开仓库。")).toBeTruthy();
+    expect(screen.queryByText("https://github.com/wylycool/metis.git")).toBeNull();
     expect(invokeMock).toHaveBeenCalledWith("test_git_environment");
 
     await user.click(screen.getByTestId("run-auto-update"));

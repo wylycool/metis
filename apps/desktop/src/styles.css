@@ -7694,9 +7694,25 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   justify-items: start;
   gap: 10px;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 14px;
+  border-radius: 10px;
+  padding: 12px 14px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.settings-git-health-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-git-health-action p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
 }
 
 .settings-git-test-button {
@@ -7704,16 +7720,16 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   align-items: center;
   justify-content: center;
   min-height: 36px;
-  min-width: 128px;
-  border: 1px solid #1d4ed8;
-  border-radius: 10px;
-  padding: 0 16px;
+  min-width: 104px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 0 14px;
   color: #ffffff;
   background: #2563eb;
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 750;
   white-space: nowrap;
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
+  box-shadow: none;
 }
 
 .settings-git-test-button:hover:not(:disabled) {
@@ -7739,7 +7755,6 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .settings-git-health-result {
   display: grid;
-  gap: 3px;
   color: #475569;
   font-size: 12px;
   font-weight: 650;

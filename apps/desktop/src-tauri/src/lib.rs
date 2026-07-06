@@ -842,7 +842,7 @@ pub fn test_git_environment_for_state_with_checker<C: RemoteCommitChecker>(
     checker: &C,
 ) -> Result<DesktopGitEnvironmentTestResult, String> {
     state.ensure_dirs()?;
-    let url = "https://github.com/wylycool/metis.git".to_string();
+    let url = "https://github.com/octocat/Hello-World.git".to_string();
     let source = SourceRecord {
         id: "git-environment-check".to_string(),
         source_type: "git".to_string(),
@@ -2596,7 +2596,7 @@ mod tests {
         assert!(result.ok);
         assert_eq!(result.message, "本机 Git 可以正常访问公开仓库。");
         assert_eq!(result.commit, "def456");
-        assert_eq!(result.url, "https://github.com/wylycool/metis.git");
+        assert_eq!(result.url, "https://github.com/octocat/Hello-World.git");
         fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
 
