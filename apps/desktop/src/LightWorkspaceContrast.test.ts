@@ -270,6 +270,25 @@ describe("Phase 6 light workspace contrast", () => {
 
   test("defines source drawer and three-line intro copy constraints", () => {
     expect(latestBlockFor(".source-drawer")).toContain("position: fixed");
+    expect(latestBlockFor(".source-drawer.redesign-source-drawer")).toContain(
+      "grid-template-rows: auto minmax(0, 1fr);",
+    );
+    expect(latestBlockFor(".source-drawer.redesign-source-drawer")).toContain("overflow: hidden;");
+    expect(latestBlockFor(".source-form")).toContain("min-height: 0;");
+    expect(latestBlockFor(".source-form")).toContain("grid-template-rows: minmax(0, 1fr) auto;");
+    expect(latestBlockFor(".source-form-body")).toContain("overflow-y: auto;");
+    expect(latestBlockFor(".source-form-body")).toContain("gap: 18px;");
+    expect(latestBlockFor(".source-form-field input")).toContain("min-height: 48px;");
+    expect(latestBlockFor(".source-form-field input::placeholder")).toContain("font-weight: 600;");
+    expect(latestBlockFor(".source-settings-grid")).toContain("gap: 10px;");
+    expect(latestBlockFor(".source-setting-row")).toContain(
+      "grid-template-columns: 22px minmax(0, 1fr);",
+    );
+    expect(exactBlockFor(".source-connection-check")).toContain(
+      "grid-template-columns: 1fr auto;",
+    );
+    expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
+    expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
     expect(latestBlockFor(".skill-intro-copy")).toContain("-webkit-line-clamp: 3");
   });
 

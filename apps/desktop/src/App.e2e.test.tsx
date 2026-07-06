@@ -80,9 +80,20 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText(/0 个 Agent 需要更新/)).toBeNull();
 
     await user.click(screen.getByTestId("source-required-toast-action"));
-    expect(screen.getByText("测试连接")).toBeTruthy();
+    const sourceDrawer = within(await screen.findByTestId("source-drawer-e2e-skill"));
+    expect(sourceDrawer.getByTestId("source-form-body-e2e-skill")).toBeTruthy();
+    const sourceSettings = within(sourceDrawer.getByTestId("source-settings-grid-e2e-skill"));
+    expect(sourceSettings.getByText("可信来源")).toBeTruthy();
+    expect(sourceSettings.getByText("允许 Metis 将这个仓库作为受信任的更新来源。")).toBeTruthy();
+    expect(sourceSettings.getByText("自动更新")).toBeTruthy();
+    expect(sourceSettings.getByText("仅在来源可信且本地无修改时参与自动更新。")).toBeTruthy();
+    const sourceVerification = within(
+      sourceDrawer.getByTestId("source-verification-panel-e2e-skill"),
+    );
+    expect(sourceVerification.getByText("测试连接")).toBeTruthy();
+    expect(sourceDrawer.getByTestId("source-form-actions-e2e-skill")).toBeTruthy();
     expect(
-      screen.getByText("测试 Metis 是否能访问这个仓库，并确认该路径下有 SKILL.md。不会安装、更新或修改任何文件。"),
+      sourceVerification.getByText("确认仓库、分支和 Skill 路径是否可访问。不会安装、更新或修改任何文件。"),
     ).toBeTruthy();
     await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
     await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");

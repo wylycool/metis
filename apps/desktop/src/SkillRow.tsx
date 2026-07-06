@@ -387,83 +387,111 @@ export function BindSourceForm({
 
   return (
     <div className="source-form">
-      <label>
-        <span>仓库 Clone 地址</span>
-        <input
-          data-testid={`bind-url-${skillId}`}
-          value={draft.url}
-          placeholder="git@gitlab.example:team/repo.git"
-          onChange={(event) => onChange({ ...draft, url: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>Skill 在仓库内的路径</span>
-        <input
-          data-testid={`bind-repo-path-${skillId}`}
-          value={draft.repo_path}
-          placeholder="skills/example；根目录填 ."
-          onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>分支 / Tag / Commit</span>
-        <input
-          data-testid={`bind-ref-${skillId}`}
-          value={draft.ref_}
-          placeholder="main"
-          onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>凭据引用（可选）</span>
-        <input
-          data-testid={`bind-credential-ref-${skillId}`}
-          value={draft.credential_ref}
-          placeholder="github-main"
-          onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
-        />
-      </label>
-      <label className="check-label">
-        <input
-          data-testid={`bind-trusted-${skillId}`}
-          checked={draft.trusted}
-          type="checkbox"
-          onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
-        />
-        <span>Trusted</span>
-      </label>
-      <label className="check-label">
-        <input
-          data-testid={`bind-auto-update-${skillId}`}
-          checked={draft.auto_update}
-          type="checkbox"
-          onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
-        />
-        <span>Auto update</span>
-      </label>
-      <div className="source-connection-check">
-        <button
-          className="ghost-button compact"
-          data-testid={`test-source-connection-${skillId}`}
-          disabled={testDisabled}
-          onClick={onTestConnection}
+      <div className="source-form-body" data-testid={`source-form-body-${skillId}`}>
+        <div className="source-field-stack">
+          <label className="source-form-field">
+            <span>仓库 Clone 地址</span>
+            <input
+              data-testid={`bind-url-${skillId}`}
+              value={draft.url}
+              placeholder="git@gitlab.example:team/repo.git"
+              onChange={(event) => onChange({ ...draft, url: event.target.value })}
+            />
+          </label>
+          <label className="source-form-field">
+            <span>Skill 在仓库内的路径</span>
+            <input
+              data-testid={`bind-repo-path-${skillId}`}
+              value={draft.repo_path}
+              placeholder="skills/example；根目录填 ."
+              onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
+            />
+          </label>
+          <label className="source-form-field">
+            <span>分支 / Tag / Commit</span>
+            <input
+              data-testid={`bind-ref-${skillId}`}
+              value={draft.ref_}
+              placeholder="main"
+              onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
+            />
+          </label>
+          <label className="source-form-field">
+            <span>凭据引用（可选）</span>
+            <input
+              data-testid={`bind-credential-ref-${skillId}`}
+              value={draft.credential_ref}
+              placeholder="github-main"
+              onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
+            />
+          </label>
+        </div>
+
+        <div className="source-settings-grid" data-testid={`source-settings-grid-${skillId}`}>
+          <label className="source-setting-row check-label">
+            <input
+              data-testid={`bind-trusted-${skillId}`}
+              checked={draft.trusted}
+              type="checkbox"
+              onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
+            />
+            <span>
+              <strong>可信来源</strong>
+              <small>允许 Metis 将这个仓库作为受信任的更新来源。</small>
+            </span>
+          </label>
+          <label className="source-setting-row check-label">
+            <input
+              data-testid={`bind-auto-update-${skillId}`}
+              checked={draft.auto_update}
+              type="checkbox"
+              onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
+            />
+            <span>
+              <strong>自动更新</strong>
+              <small>仅在来源可信且本地无修改时参与自动更新。</small>
+            </span>
+          </label>
+        </div>
+
+        <div
+          className="source-verification-panel"
+          data-testid={`source-verification-panel-${skillId}`}
         >
-          {testBusy ? "测试中" : "测试连接"}
-        </button>
-        <p>测试 Metis 是否能访问这个仓库，并确认该路径下有 SKILL.md。不会安装、更新或修改任何文件。</p>
+          <div className="source-connection-check">
+            <div>
+              <strong>连接验证</strong>
+              <p>确认仓库、分支和 Skill 路径是否可访问。不会安装、更新或修改任何文件。</p>
+            </div>
+            <button
+              className="ghost-button compact"
+              data-testid={`test-source-connection-${skillId}`}
+              disabled={testDisabled}
+              onClick={onTestConnection}
+            >
+              {testBusy ? "测试中" : "测试连接"}
+            </button>
+          </div>
+          {testResult && (
+            <div
+              className="source-connection-result success"
+              data-testid={`source-connection-result-${skillId}`}
+            >
+              <strong>{testResult.message}</strong>
+              <span>已找到 {testResult.skill_name}</span>
+            </div>
+          )}
+          {testError && (
+            <div
+              className="source-connection-result failure"
+              data-testid={`source-connection-error-${skillId}`}
+            >
+              <InlineError error={testError} />
+            </div>
+          )}
+        </div>
       </div>
-      {testResult && (
-        <div className="source-connection-result success" data-testid={`source-connection-result-${skillId}`}>
-          <strong>{testResult.message}</strong>
-          <span>已找到 {testResult.skill_name}</span>
-        </div>
-      )}
-      {testError && (
-        <div className="source-connection-result failure" data-testid={`source-connection-error-${skillId}`}>
-          <InlineError error={testError} />
-        </div>
-      )}
-      <div className="form-actions">
+      <div className="form-actions" data-testid={`source-form-actions-${skillId}`}>
         <button className="ghost-button compact" onClick={onCancel}>
           取消
         </button>
