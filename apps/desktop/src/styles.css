@@ -7711,7 +7711,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
 }
 
 .settings-git-test-button {

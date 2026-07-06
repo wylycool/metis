@@ -306,6 +306,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".settings-git-health-card")).toContain("display: flex;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("border: 0;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("padding: 0;");
+    expect(latestBlockFor(".settings-git-health-action")).toContain("gap: 16px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-height: 36px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 76px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("padding: 0 14px;");
