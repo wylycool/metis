@@ -307,7 +307,67 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
 
     expect(await screen.findByText("Metis 访问不了这个仓库")).toBeTruthy();
-    expect(screen.getByText("请确认你有访问权限，或先在本机 Git 工具中完成登录。")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Metis 已自动尝试当前地址及可推导的 HTTPS/SSH 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+      ),
+    ).toBeTruthy();
+  });
+
+  test("automatically tests the HTTPS variant when the SSH source URL fails", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ sshSourceConnectionFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "git@github.com:xx/xx.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("已自动切换为可访问的 HTTPS 地址，可以保存来源。")).toBeTruthy();
+    expect((screen.getByTestId("bind-url-e2e-skill") as HTMLInputElement).value).toBe(
+      "https://github.com/xx/xx.git",
+    );
+    expect(
+      invokeMock.mock.calls.filter(([command]) => command === "test_source_connection"),
+    ).toHaveLength(2);
+  });
+
+  test("explains when both the current URL and derived variants fail", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ sourceConnectionFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "git@github.com:xx/xx.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("Metis 访问不了这个仓库")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Metis 已自动尝试当前地址及可推导的 HTTPS/SSH 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+      ),
+    ).toBeTruthy();
+    expect(
+      invokeMock.mock.calls.filter(([command]) => command === "test_source_connection"),
+    ).toHaveLength(2);
   });
 
   test("removes Updates workspace and runs controlled auto update from Settings", async () => {
@@ -1714,6 +1774,7 @@ function createMainFlowScenario(
     sameCommitApply?: boolean;
     securityFindingOnApply?: boolean;
     sourceConnectionFails?: boolean;
+    sshSourceConnectionFails?: boolean;
     slowBind?: boolean;
     slowDiff?: boolean;
     slowRemotePreview?: boolean;
@@ -1999,7 +2060,17 @@ function createMainFlowScenario(
           return source;
         }
         case "test_source_connection": {
-          if (options.sourceConnectionFails) {
+          const request = args as {
+            request: {
+              url: string;
+              repo_path: string;
+              ref_: string;
+            };
+          };
+          if (
+            options.sourceConnectionFails ||
+            (options.sshSourceConnectionFails && request.request.url.startsWith("git@"))
+          ) {
             throw JSON.stringify({
               category: "authentication",
               title: "认证失败",
@@ -2008,13 +2079,6 @@ function createMainFlowScenario(
               debug_detail: "authentication failed: could not read Username",
             });
           }
-          const request = args as {
-            request: {
-              url: string;
-              repo_path: string;
-              ref_: string;
-            };
-          };
           return {
             ok: true,
             message: "连接成功，可以保存来源。",

@@ -382,17 +382,44 @@ function MetisApp() {
     setActionError(null);
     clearSourceConnectionState(skillId);
 
+    const repoPath = bindDraft.repo_path.trim();
+    const ref = bindDraft.ref_.trim() || "main";
+    const candidates = gitUrlTestCandidates(bindDraft.url.trim());
+    let lastError: DesktopError | null = null;
+
     try {
-      const result = await testSourceConnection({
-        url: bindDraft.url.trim(),
-        repo_path: bindDraft.repo_path.trim(),
-        ref_: bindDraft.ref_.trim() || "main",
-      });
-      setSourceConnectionResults((current) => ({ ...current, [skillId]: result }));
-    } catch (caught) {
+      for (const candidate of candidates) {
+        try {
+          const result = await testSourceConnection({
+            url: candidate.url,
+            repo_path: repoPath,
+            ref_: ref,
+          });
+          if (!candidate.isOriginal) {
+            setBindDraft((current) => ({ ...current, url: candidate.url }));
+          }
+          setSourceConnectionResults((current) => ({
+            ...current,
+            [skillId]: {
+              ...result,
+              message: candidate.isOriginal
+                ? result.message
+                : `已自动切换为可访问的 ${candidate.label} 地址，可以保存来源。`,
+            },
+          }));
+          return;
+        } catch (caught) {
+          lastError = desktopError(caught);
+        }
+      }
+
+      const displayError = lastError ?? unknownDesktopError("测试连接失败");
       setSourceConnectionErrors((current) => ({
         ...current,
-        [skillId]: desktopError(caught),
+        [skillId]:
+          candidates.length > 1
+            ? withDerivedGitUrlSuggestion(displayError)
+            : displayError,
       }));
     } finally {
       setActionBusy(null);
@@ -1686,6 +1713,69 @@ function desktopError(caught: unknown): DesktopError {
     return unknownDesktopError(caught.message);
   }
   return unknownDesktopError("桌面后端返回了无法识别的错误");
+}
+
+type GitUrlTestCandidate = {
+  url: string;
+  label: "当前" | "HTTPS" | "SSH";
+  isOriginal: boolean;
+};
+
+function gitUrlTestCandidates(rawUrl: string): GitUrlTestCandidate[] {
+  const original = rawUrl.trim();
+  if (!original) {
+    return [];
+  }
+
+  const candidates: GitUrlTestCandidate[] = [
+    { url: original, label: "当前", isOriginal: true },
+  ];
+  const derived = deriveAlternateGitUrl(original);
+  if (derived && derived.url !== original) {
+    candidates.push({ ...derived, isOriginal: false });
+  }
+  return candidates;
+}
+
+function deriveAlternateGitUrl(rawUrl: string): Omit<GitUrlTestCandidate, "isOriginal"> | null {
+  const url = rawUrl.trim();
+  const httpsMatch = url.match(/^https:\/\/([^/]+)\/(.+?)(?:\.git)?\/?$/i);
+  if (httpsMatch) {
+    return {
+      label: "SSH",
+      url: `git@${httpsMatch[1]}:${ensureGitSuffix(httpsMatch[2])}`,
+    };
+  }
+
+  const scpSshMatch = url.match(/^git@([^:]+):(.+?)(?:\.git)?\/?$/i);
+  if (scpSshMatch) {
+    return {
+      label: "HTTPS",
+      url: `https://${scpSshMatch[1]}/${ensureGitSuffix(scpSshMatch[2])}`,
+    };
+  }
+
+  const sshUrlMatch = url.match(/^ssh:\/\/git@([^/]+)\/(.+?)(?:\.git)?\/?$/i);
+  if (sshUrlMatch) {
+    return {
+      label: "HTTPS",
+      url: `https://${sshUrlMatch[1]}/${ensureGitSuffix(sshUrlMatch[2])}`,
+    };
+  }
+
+  return null;
+}
+
+function ensureGitSuffix(path: string) {
+  return path.endsWith(".git") ? path : `${path}.git`;
+}
+
+function withDerivedGitUrlSuggestion(error: DesktopError): DesktopError {
+  return {
+    ...error,
+    suggestion:
+      "Metis 已自动尝试当前地址及可推导的 HTTPS/SSH 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
+  };
 }
 
 function retainUpdateResultsForSkills(
