@@ -109,11 +109,16 @@ describe("Metis desktop GUI main flow", () => {
     expect(repoPathHelpButton.getAttribute("aria-expanded")).toBe("true");
     expect(sourceDrawer.getByText("如果 SKILL.md 就在仓库根目录，这里可以不填。")).toBeTruthy();
     expect(sourceDrawer.getByText("skills/example")).toBeTruthy();
+    expect((screen.getByTestId("bind-repo-path-e2e-skill") as HTMLInputElement).placeholder).toBe(
+      "skills/example；根目录可留空",
+    );
+    expect(sourceDrawer.queryByText("skills/example；根目录填 .")).toBeNull();
     const refHelpButton = sourceDrawer.getByLabelText("主分支名填写说明");
     await user.click(refHelpButton);
     expect(repoPathHelpButton.getAttribute("aria-expanded")).toBe("false");
     expect(refHelpButton.getAttribute("aria-expanded")).toBe("true");
     expect(sourceDrawer.getByText("多数仓库使用 main，较早的仓库可能使用 master。")).toBeTruthy();
+    expect(sourceDrawer.queryByText("不确定时先试 main；测试失败后再试 master。")).toBeNull();
     expect((screen.getByTestId("bind-ref-e2e-skill") as HTMLInputElement).placeholder).toBe(
       "一般为 main 或者 master",
     );
@@ -434,7 +439,9 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
 
     expect(await screen.findByText("仓库能访问，但这个路径不存在。")).toBeTruthy();
-    expect(screen.getByText("请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。")).toBeTruthy();
+    expect(
+      screen.getByText("请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。"),
+    ).toBeTruthy();
     expect(screen.queryByText("repo_path")).toBeNull();
     expect(screen.queryByText("调试详情")).toBeNull();
     expect(screen.queryByText(/repo path not found/)).toBeNull();
@@ -2351,7 +2358,7 @@ function createMainFlowScenario(
                 title: "仓库路径不存在",
                 message: "仓库能访问，但这个路径不存在。",
                 suggestion:
-                  "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。",
+                  "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。",
                 debug_detail: "repo path not found: skills/missing",
               });
             }

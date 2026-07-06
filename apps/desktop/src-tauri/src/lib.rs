@@ -2345,7 +2345,7 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
             "repo_path",
             "没有找到 SKILL.md",
             "仓库能访问，但这个路径下没有找到 SKILL.md。",
-            "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。",
+            "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。",
             message,
         );
     }
@@ -2358,7 +2358,7 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
             "repo_path",
             "仓库路径不存在",
             "仓库能访问，但这个路径不存在。",
-            "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。",
+            "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。",
             message,
         );
     }
@@ -3778,6 +3778,22 @@ description: {description}
             "请检查 Git 地址是否正确；如果是私有仓库，请确认你有访问权限。"
         );
         assert_eq!(error.debug_detail.as_deref(), Some(raw));
+    }
+
+    #[test]
+    fn desktop_error_guides_root_repo_path_as_empty_input() {
+        for raw in [
+            "preview failed: repo path not found: skills/missing",
+            "preview failed: not a skill directory: docs",
+        ] {
+            let error = friendly_desktop_error(raw);
+
+            assert_eq!(error.category, "repo_path");
+            assert_eq!(
+                error.suggestion,
+                "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。"
+            );
+        }
     }
 
     #[test]

@@ -498,7 +498,7 @@ export function BindSourceForm({
                       <strong>根目录</strong>
                       <small>留空即可，Metis 会按仓库根目录测试和保存。</small>
                     </span>
-                    <code>.</code>
+                    <code>留空</code>
                   </span>
                 </>,
               )}
@@ -507,7 +507,7 @@ export function BindSourceForm({
               aria-label="Skill 在仓库内的路径"
               data-testid={`bind-repo-path-${skillId}`}
               value={draft.repo_path}
-              placeholder="skills/example；根目录填 ."
+              placeholder="skills/example；根目录可留空"
               onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
             />
           </div>
@@ -525,7 +525,7 @@ export function BindSourceForm({
                   <span className="source-help-card">
                     <span>
                       <strong>常见名称</strong>
-                      <small>不确定时先试 main；测试失败后再试 master。</small>
+                      <small>通常是仓库默认分支名称。</small>
                     </span>
                     <code>main</code>
                     <code>master</code>
