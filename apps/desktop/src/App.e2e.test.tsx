@@ -7,6 +7,7 @@ import type {
   DesktopApplyUpdateResult,
   DesktopBackupSummary,
   DesktopDiffDetail,
+  DesktopError,
   DesktopSettings,
   DesktopSkill,
   DesktopSource,
@@ -528,6 +529,52 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("open-bind-source-trusted-skill"));
     expect((await screen.findByTestId("bind-auto-update-trusted-skill") as HTMLInputElement).checked).toBe(false);
     confirmSpy.mockRestore();
+  });
+
+  test("shows a compact notice when local Git is not installed", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario({
+      gitEnvironmentFailure: "missing",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
+    const gitHealthSection = within(screen.getByTestId("settings-section-git-health"));
+    await user.click(gitHealthSection.getByTestId("test-git-environment"));
+
+    const notice = within(await screen.findByTestId("git-environment-notice"));
+    expect(notice.getByText("本机未安装Git")).toBeTruthy();
+    expect(screen.queryByTestId("git-environment-error")).toBeNull();
+    expect(screen.queryByText("无法使用 Git")).toBeNull();
+    expect(screen.queryByText("调试详情")).toBeNull();
+  });
+
+  test("shows a compact notice when local Git clone self-check fails", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario({
+      gitEnvironmentFailure: "self-check",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
+    const gitHealthSection = within(screen.getByTestId("settings-section-git-health"));
+    await user.click(gitHealthSection.getByTestId("test-git-environment"));
+
+    const notice = within(await screen.findByTestId("git-environment-notice"));
+    expect(
+      notice.getByText("Git 可启动，但本地 clone/fetch 命令自检失败，请自行确认"),
+    ).toBeTruthy();
+    expect(screen.queryByTestId("git-environment-error")).toBeNull();
+    expect(screen.queryByText("无法使用 Git")).toBeNull();
+    expect(screen.queryByText("调试详情")).toBeNull();
   });
 
   test("guides the user when auto update has no trusted source candidates", async () => {
@@ -2431,6 +2478,7 @@ function createBetaReadinessScenario(
   options: {
     trustedSources?: boolean;
     autoUpdateSources?: boolean;
+    gitEnvironmentFailure?: "missing" | "self-check";
   } = {},
 ) {
   const trustedEnabled = options.trustedSources ?? true;
@@ -2524,13 +2572,34 @@ function createBetaReadinessScenario(
                 : null,
             })),
           };
-        case "test_git_environment":
+        case "test_git_environment": {
+          if (options.gitEnvironmentFailure) {
+            const error: DesktopError =
+              options.gitEnvironmentFailure === "missing"
+                ? {
+                    category: "git_unavailable",
+                    title: "无法使用 Git",
+                    message: "这台电脑还不能使用 Git。",
+                    suggestion: "请先安装 Git，或确认 Git 可以在终端中正常运行。",
+                    debug_detail: "git unavailable: No such file or directory (os error 2)",
+                  }
+                : {
+                    category: "git_unavailable",
+                    title: "无法使用 Git",
+                    message: "这台电脑还不能使用 Git。",
+                    suggestion: "请先安装 Git，或确认 Git 可以在终端中正常运行。",
+                    debug_detail:
+                      "git unavailable: git clone self-check failed: git command failed",
+                  };
+            throw JSON.stringify(error);
+          }
           return {
             ok: true,
             message: "Git 可用",
             version: "git version 2.45.0",
             clone_ok: true,
           };
+        }
         case "load_team_manifest_from_file":
           return JSON.stringify({
             version: "1",

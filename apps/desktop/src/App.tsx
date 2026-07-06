@@ -1429,8 +1429,12 @@ function MetisApp() {
                 )}
               </div>
               {gitEnvironmentError && (
-                <div className="settings-git-health-result failure" data-testid="git-environment-error">
-                  <InlineError error={gitEnvironmentError} />
+                <div
+                  className="settings-git-health-notice"
+                  data-testid="git-environment-notice"
+                  role="status"
+                >
+                  <span>{gitEnvironmentNoticeText(gitEnvironmentError)}</span>
                 </div>
               )}
             </div>
@@ -1762,6 +1766,20 @@ function desktopError(caught: unknown): DesktopError {
     return unknownDesktopError(caught.message);
   }
   return unknownDesktopError("桌面后端返回了无法识别的错误");
+}
+
+function gitEnvironmentNoticeText(error: DesktopError): string {
+  const detail = `${error.debug_detail ?? ""} ${error.message}`.toLowerCase();
+  if (
+    detail.includes("no such file") ||
+    detail.includes("os error 2") ||
+    detail.includes("command not found") ||
+    detail.includes("not found") ||
+    detail.includes("找不到")
+  ) {
+    return "本机未安装Git";
+  }
+  return "Git 可启动，但本地 clone/fetch 命令自检失败，请自行确认";
 }
 
 type GitUrlTestCandidate = {
