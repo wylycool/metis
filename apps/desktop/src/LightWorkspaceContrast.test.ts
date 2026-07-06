@@ -488,12 +488,13 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
     expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("color: #ffffff;");
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
-    expect(latestBlockFor(".redesign-toast")).toContain("background: rgba(255, 255, 255, 0.96);");
-    expect(latestBlockFor(".redesign-toast")).toContain("color: #263247;");
-    expect(latestBlockFor(".redesign-toast")).toContain("box-shadow: 0 12px 28px rgba(30, 48, 78, 0.14);");
+    expect(latestBlockFor(".redesign-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
+    expect(latestBlockFor(".redesign-toast")).toContain("border: 1px solid rgba(214, 139, 38, 0.28);");
+    expect(latestBlockFor(".redesign-toast")).toContain("box-shadow: 0 18px 36px rgba(138, 75, 15, 0.14);");
+    expect(latestBlockFor(".redesign-toast")).not.toContain("background: rgba(255, 255, 255, 0.96);");
     expect(latestBlockFor(".source-required-toast")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
-    expect(latestBlockFor(".source-required-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
-    expect(latestBlockFor(".source-required-toast")).toContain("box-shadow: 0 18px 36px rgba(138, 75, 15, 0.14);");
+    expect(latestBlockFor(".source-required-toast")).not.toContain("background:");
+    expect(latestBlockFor(".source-required-toast")).not.toContain("box-shadow:");
     expect(latestBlockFor(".source-required-toast-icon")).toContain("background: #f5b84b;");
     expect(latestBlockFor(".source-required-toast-action")).toContain("background: #fff7ed;");
     expect(latestBlockFor(".source-required-toast-action")).not.toContain("background: var(--ink)");

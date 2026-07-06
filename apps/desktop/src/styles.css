@@ -7380,12 +7380,12 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   bottom: 34px;
   z-index: 60;
   max-width: min(420px, calc(100vw - 48px));
-  border: 1px solid rgba(49, 84, 223, 0.14);
+  border: 1px solid rgba(214, 139, 38, 0.28);
   border-radius: 16px;
   padding: 13px 16px;
-  color: #263247;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12px 28px rgba(30, 48, 78, 0.14);
+  color: #2f2415;
+  background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);
+  box-shadow: 0 18px 36px rgba(138, 75, 15, 0.14);
   font-size: 13px;
   font-weight: 760;
   line-height: 1.45;
@@ -7397,10 +7397,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   align-items: center;
   gap: 13px;
   max-width: min(560px, calc(100vw - 48px));
-  border-color: rgba(214, 139, 38, 0.28);
   padding: 14px;
-  background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);
-  box-shadow: 0 18px 36px rgba(138, 75, 15, 0.14);
   font-weight: 520;
 }
 
