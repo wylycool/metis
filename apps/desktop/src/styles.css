@@ -1228,6 +1228,33 @@ h1 {
   background: transparent;
 }
 
+.source-connection-error-card {
+  border: 1px solid var(--danger-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--danger-fg);
+  background: var(--danger-bg);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.source-connection-error-card strong {
+  display: block;
+  color: var(--danger-fg);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.source-connection-error-card p {
+  margin: 8px 0 0;
+  color: var(--danger-fg);
+  line-height: 1.55;
+}
+
+.source-connection-error-suggestion {
+  font-weight: 700;
+}
+
 .source-connection-result strong,
 .source-connection-result span {
   display: block;

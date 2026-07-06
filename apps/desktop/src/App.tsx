@@ -1841,7 +1841,7 @@ function withDerivedGitUrlSuggestion(error: DesktopError): DesktopError {
 }
 
 function shouldTryDerivedGitUrl(error: DesktopError): boolean {
-  return !["git_ref", "repo_path", "ssh_host_key"].includes(error.category);
+  return !["git_ref", "git_url", "repo_path", "ssh_host_key"].includes(error.category);
 }
 
 function retainUpdateResultsForSkills(

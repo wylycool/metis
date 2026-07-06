@@ -2257,11 +2257,25 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         );
     }
 
+    if lower.contains("repository not found")
+        || lower.contains("could not resolve host")
+        || lower.contains("could not resolve hostname")
+        || lower.contains("does not appear to be a git repository")
+        || lower.contains("not appear to be a git repository")
+    {
+        return desktop_error(
+            "git_url",
+            "仓库地址不可访问",
+            "Metis 没有找到或无法访问这个 Git 仓库。",
+            "请检查 Git 地址是否正确；如果是私有仓库，请确认你有访问权限。",
+            message,
+        );
+    }
+
     if lower.contains("auth")
         || lower.contains("authentication")
         || lower.contains("permission denied")
         || lower.contains("could not read username")
-        || lower.contains("repository not found")
         || lower.contains("access denied")
     {
         return desktop_error(
@@ -3749,6 +3763,21 @@ description: {description}
             error.debug_detail.as_deref(),
             Some("authentication failed: could not read Username for 'https://github.com'")
         );
+    }
+
+    #[test]
+    fn desktop_error_classifies_repository_not_found_as_git_url() {
+        let raw = "git command failed: git ls-remote https://github.com/example/missing.git main: remote: Repository not found.";
+        let error = friendly_desktop_error(raw);
+
+        assert_eq!(error.category, "git_url");
+        assert_eq!(error.title, "仓库地址不可访问");
+        assert_eq!(error.message, "Metis 没有找到或无法访问这个 Git 仓库。");
+        assert_eq!(
+            error.suggestion,
+            "请检查 Git 地址是否正确；如果是私有仓库，请确认你有访问权限。"
+        );
+        assert_eq!(error.debug_detail.as_deref(), Some(raw));
     }
 
     #[test]

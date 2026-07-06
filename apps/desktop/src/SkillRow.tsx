@@ -592,7 +592,7 @@ export function BindSourceForm({
               className="source-connection-result failure"
               data-testid={`source-connection-error-${skillId}`}
             >
-              <InlineError error={testError} />
+              <SourceConnectionError error={testError} />
             </div>
           )}
         </div>
@@ -638,6 +638,16 @@ export function InlineError({ error }: { error: DesktopError }) {
           <code>{error.debug_detail}</code>
         </details>
       )}
+    </div>
+  );
+}
+
+function SourceConnectionError({ error }: { error: DesktopError }) {
+  return (
+    <div className="source-connection-error-card">
+      <strong>{error.title}</strong>
+      <p>{error.message}</p>
+      <p className="source-connection-error-suggestion">{error.suggestion}</p>
     </div>
   );
 }

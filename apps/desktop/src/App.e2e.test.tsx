@@ -394,6 +394,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(
       screen.getByText("请检查“主分支名”是否填写正确，一般为 main 或者 master。"),
     ).toBeTruthy();
+    expect(screen.queryByText("git_ref")).toBeNull();
+    expect(screen.queryByText("调试详情")).toBeNull();
+    expect(screen.queryByText(/remote ref not found/)).toBeNull();
     expect(
       screen.queryByText(
         "Metis 已自动尝试当前地址及可推导的 HTTPS / git@ 地址，仍然无法访问。请检查仓库地址、主分支名、仓库内路径，以及本机 Git 登录、token 或 SSH key 配置。",
@@ -410,6 +413,64 @@ describe("Metis desktop GUI main flow", () => {
         ref_: "Main1",
       },
     });
+  });
+
+  test("shows source path errors without internal category or debug details", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ sourceConnectionPathFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "https://github.com/xx/xx.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/missing");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("仓库能访问，但这个路径不存在。")).toBeTruthy();
+    expect(screen.getByText("请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。")).toBeTruthy();
+    expect(screen.queryByText("repo_path")).toBeNull();
+    expect(screen.queryByText("调试详情")).toBeNull();
+    expect(screen.queryByText(/repo path not found/)).toBeNull();
+  });
+
+  test("shows unavailable repository URL errors without SSH host key guidance", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ sourceConnectionUrlFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(
+      screen.getByTestId("bind-url-e2e-skill"),
+      "https://github.com/xx/not-exists.git",
+    );
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("test-source-connection-e2e-skill"));
+
+    expect(await screen.findByText("仓库地址不可访问")).toBeTruthy();
+    expect(screen.getByText("Metis 没有找到或无法访问这个 Git 仓库。")).toBeTruthy();
+    expect(
+      screen.getByText("请检查 Git 地址是否正确；如果是私有仓库，请确认你有访问权限。"),
+    ).toBeTruthy();
+    expect(screen.queryByText("SSH 主机未确认")).toBeNull();
+    expect(screen.queryByText("git_url")).toBeNull();
+    expect(screen.queryByText("ssh_host_key")).toBeNull();
+    expect(screen.queryByText("调试详情")).toBeNull();
+    const sourceConnectionCalls = invokeMock.mock.calls.filter(
+      ([command]) => command === "test_source_connection",
+    );
+    expect(sourceConnectionCalls).toHaveLength(1);
   });
 
   test("explains when both the current URL and derived variants fail", async () => {
@@ -1972,7 +2033,9 @@ function createMainFlowScenario(
     sameCommitApply?: boolean;
     securityFindingOnApply?: boolean;
     sourceConnectionFails?: boolean;
+    sourceConnectionPathFails?: boolean;
     sourceConnectionRefFails?: boolean;
+    sourceConnectionUrlFails?: boolean;
     sshSourceConnectionFails?: boolean;
     slowBind?: boolean;
     slowDiff?: boolean;
@@ -2267,10 +2330,31 @@ function createMainFlowScenario(
             };
           };
           if (
+            options.sourceConnectionPathFails ||
             options.sourceConnectionRefFails ||
+            options.sourceConnectionUrlFails ||
             options.sourceConnectionFails ||
             (options.sshSourceConnectionFails && request.request.url.startsWith("git@"))
           ) {
+            if (options.sourceConnectionUrlFails) {
+              throw JSON.stringify({
+                category: "git_url",
+                title: "仓库地址不可访问",
+                message: "Metis 没有找到或无法访问这个 Git 仓库。",
+                suggestion: "请检查 Git 地址是否正确；如果是私有仓库，请确认你有访问权限。",
+                debug_detail: "repository not found: https://github.com/xx/not-exists.git",
+              });
+            }
+            if (options.sourceConnectionPathFails) {
+              throw JSON.stringify({
+                category: "repo_path",
+                title: "仓库路径不存在",
+                message: "仓库能访问，但这个路径不存在。",
+                suggestion:
+                  "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，路径填 .。",
+                debug_detail: "repo path not found: skills/missing",
+              });
+            }
             if (options.sourceConnectionRefFails) {
               throw JSON.stringify({
                 category: "git_ref",
