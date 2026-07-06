@@ -382,7 +382,7 @@ function MetisApp() {
     setActionError(null);
     clearSourceConnectionState(skillId);
 
-    const repoPath = bindDraft.repo_path.trim();
+    const repoPath = bindDraft.repo_path.trim() || ".";
     const ref = bindDraft.ref_.trim() || "main";
     const candidates = gitUrlTestCandidates(bindDraft.url.trim());
     let lastError: DesktopError | null = null;

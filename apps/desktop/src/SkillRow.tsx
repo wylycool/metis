@@ -382,58 +382,87 @@ export function BindSourceForm({
   onSubmit: () => void;
   onTestConnection: () => void;
 }) {
+  const [sourceHelpOpen, setSourceHelpOpen] = useState(false);
   const disabled = busy || !draft.url.trim() || !draft.repo_path.trim();
-  const testDisabled = disabled || testBusy;
+  const testDisabled = busy || testBusy || !draft.url.trim();
 
   return (
     <div className="source-form">
       <div className="source-form-body" data-testid={`source-form-body-${skillId}`}>
         <div className="source-field-stack">
-          <label className="source-form-field">
+          <div className="source-form-field">
             <div className="source-field-label-row">
               <span>仓库 Clone 地址</span>
-              <span className="source-help" data-testid={`source-url-help-${skillId}`}>
+              <span
+                className="source-help"
+                data-testid={`source-url-help-${skillId}`}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setSourceHelpOpen(false);
+                  }
+                }}
+              >
                 <button
+                  aria-expanded={sourceHelpOpen}
                   aria-label="仓库地址填写说明"
                   className="source-help-button"
+                  onClick={() => setSourceHelpOpen((current) => !current)}
                   type="button"
                 >
-                  ?
+                  <span aria-hidden="true">?</span>
                 </button>
-                <span className="source-help-popover">
-                  <strong>仓库地址怎么填</strong>
-                  <span>HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。</span>
-                  <code>https://github.com/xx/xx.git</code>
-                  <span>如果你已经在本机配置好 SSH key，也可以使用 git@ 地址。</span>
-                  <code>git@github.com:xx/xx.git</code>
-                </span>
+                {sourceHelpOpen && (
+                  <span className="source-help-popover" role="tooltip">
+                    <span className="source-help-heading">
+                      <strong>仓库地址怎么填</strong>
+                      <span>只需要填 Git 的 clone 地址，Metis 会用只读方式测试可访问性。</span>
+                    </span>
+                    <span className="source-help-card">
+                      <span>
+                        <strong>HTTPS</strong>
+                        <small>公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。</small>
+                      </span>
+                      <code>https://github.com/xx/xx.git</code>
+                    </span>
+                    <span className="source-help-card">
+                      <span>
+                        <strong>git@</strong>
+                        <small>如果你已经在本机配置好 SSH key，也可以使用这个地址。</small>
+                      </span>
+                      <code>git@github.com:xx/xx.git</code>
+                    </span>
+                  </span>
+                )}
               </span>
             </div>
             <input
+              aria-label="仓库 Clone 地址"
               data-testid={`bind-url-${skillId}`}
               value={draft.url}
               placeholder="https://github.com/xx/xx.git"
               onChange={(event) => onChange({ ...draft, url: event.target.value })}
             />
-          </label>
-          <label className="source-form-field">
+          </div>
+          <div className="source-form-field">
             <span>Skill 在仓库内的路径</span>
             <input
+              aria-label="Skill 在仓库内的路径"
               data-testid={`bind-repo-path-${skillId}`}
               value={draft.repo_path}
               placeholder="skills/example；根目录填 ."
               onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
             />
-          </label>
-          <label className="source-form-field">
+          </div>
+          <div className="source-form-field">
             <span>主分支名</span>
             <input
+              aria-label="主分支名"
               data-testid={`bind-ref-${skillId}`}
               value={draft.ref_}
               placeholder="main 或 master"
               onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
             />
-          </label>
+          </div>
         </div>
 
         <div className="source-settings-grid" data-testid={`source-settings-grid-${skillId}`}>
@@ -452,7 +481,6 @@ export function BindSourceForm({
             />
             <span>
               <strong>信任此来源并加入自动更新列表</strong>
-              <small>开启后，Metis 只会在本地无修改时自动更新这个 Skill。</small>
             </span>
           </label>
         </div>
@@ -462,18 +490,15 @@ export function BindSourceForm({
           data-testid={`source-verification-panel-${skillId}`}
         >
           <div className="source-connection-check">
-            <div>
-              <strong>连接验证</strong>
-              <p>检测当前 URL、主分支名、仓库内路径和 SKILL.md 是否可访问。不会安装、更新或修改任何文件。</p>
-            </div>
             <button
-              className="ghost-button compact"
+              className="source-test-button"
               data-testid={`test-source-connection-${skillId}`}
               disabled={testDisabled}
               onClick={onTestConnection}
             >
               {testBusy ? "测试中" : "测试连接"}
             </button>
+            <p>检测当前 URL、主分支名、仓库内路径和 SKILL.md 是否可访问。不会安装、更新或修改任何文件。</p>
           </div>
           {testResult && (
             <div

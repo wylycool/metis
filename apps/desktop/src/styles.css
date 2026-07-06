@@ -7467,72 +7467,97 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .source-help-button {
-  width: 22px;
-  height: 22px;
-  min-height: 22px;
-  border: 1px solid #cbd5e1;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  border: 1px solid #c9d9ee;
   border-radius: 999px;
   padding: 0;
-  color: #475569;
-  background: #ffffff;
+  color: #2563eb;
+  background: #f8fbff;
   font-size: 12px;
   font-weight: 850;
   line-height: 1;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.1);
 }
 
 .source-help-button:hover,
-.source-help-button:focus-visible {
-  border-color: #93c5fd;
+.source-help-button:focus-visible,
+.source-help-button[aria-expanded="true"] {
+  border-color: #9ec5fe;
   color: #1d4ed8;
-  background: #eff6ff;
+  background: #eef6ff;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
 }
 
 .source-help-popover {
   position: absolute;
-  top: 28px;
+  top: 32px;
   right: 0;
   z-index: 3;
-  width: min(320px, calc(100vw - 72px));
+  width: min(380px, calc(100vw - 72px));
   display: grid;
-  gap: 7px;
-  border: 1px solid #dbe7f3;
-  border-radius: 14px;
-  padding: 12px;
-  color: #475569;
-  background: #ffffff;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
+  gap: 12px;
+  border: 1px solid #cfe0f5;
+  border-radius: 16px;
+  padding: 14px;
+  color: #334155;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  box-shadow: 0 22px 54px rgba(15, 23, 42, 0.16);
   font-size: 12px;
   font-weight: 650;
   line-height: 1.45;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition: opacity 120ms ease, transform 120ms ease;
+  transform: translateY(0);
   user-select: text;
 }
 
-.source-help:hover .source-help-popover,
-.source-help:focus-within .source-help-popover {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
+.source-help-heading {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 2px;
 }
 
-.source-help-popover strong {
+.source-help-heading strong,
+.source-help-card strong {
   color: #1f2937;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 850;
 }
 
-.source-help-popover code {
-  border: 1px solid #e2e8f0;
-  border-radius: 9px;
-  padding: 6px 8px;
+.source-help-heading span,
+.source-help-card small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.source-help-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e0ebf8;
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.source-help-card > span {
+  display: grid;
+  gap: 3px;
+}
+
+.source-help-card code {
+  border: 1px solid #dbe8f7;
+  border-radius: 10px;
+  padding: 8px 10px;
   color: #1e293b;
-  background: #f8fafc;
+  background: #f8fbff;
   font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 11px;
   overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .source-form-field input {
@@ -7607,26 +7632,44 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   gap: 10px;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 12px;
-  background: #ffffff;
+  padding: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
-.source-connection-check {
+.source-verification-panel .source-connection-check {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
+  justify-items: start;
+  gap: 8px;
 }
 
-.source-connection-check strong {
-  display: block;
-  color: #334155;
+.source-test-button {
+  min-height: 36px;
+  border: 1px solid #1d4ed8;
+  border-radius: 10px;
+  padding: 0 16px;
+  color: #ffffff;
+  background: #2563eb;
   font-size: 13px;
   font-weight: 850;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
+}
+
+.source-test-button:hover,
+.source-test-button:focus-visible {
+  border-color: #1e40af;
+  background: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28), 0 12px 24px rgba(37, 99, 235, 0.2);
+}
+
+.source-test-button:disabled {
+  border-color: #bfdbfe;
+  color: #3b82f6;
+  background: #dbeafe;
+  box-shadow: none;
 }
 
 .source-connection-check p {
-  margin: 4px 0 0;
+  margin: 0;
   color: #64748b;
   font-size: 12px;
   font-weight: 650;

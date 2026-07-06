@@ -83,8 +83,14 @@ describe("Metis desktop GUI main flow", () => {
     const sourceDrawer = within(await screen.findByTestId("source-drawer-e2e-skill"));
     expect(sourceDrawer.getByTestId("source-form-body-e2e-skill")).toBeTruthy();
     const sourceUrlHelp = within(sourceDrawer.getByTestId("source-url-help-e2e-skill"));
-    expect(sourceUrlHelp.getByText("HTTPS 地址更通用，公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。")).toBeTruthy();
-    expect(sourceUrlHelp.getByText("如果你已经在本机配置好 SSH key，也可以使用 git@ 地址。")).toBeTruthy();
+    const sourceHelpButton = sourceDrawer.getByLabelText("仓库地址填写说明");
+    expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("false");
+    await user.click(sourceHelpButton);
+    expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("true");
+    expect(sourceUrlHelp.getByText("HTTPS")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("公开仓库通常可直接访问；私有仓库需要本机 Git 已登录或配置 token。")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("git@")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("如果你已经在本机配置好 SSH key，也可以使用这个地址。")).toBeTruthy();
     expect(sourceUrlHelp.getByText("https://github.com/xx/xx.git")).toBeTruthy();
     expect(sourceUrlHelp.getByText("git@github.com:xx/xx.git")).toBeTruthy();
     expect((screen.getByTestId("bind-url-e2e-skill") as HTMLInputElement).placeholder).toBe(
@@ -95,13 +101,18 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceDrawer.getByText("主分支名")).toBeTruthy();
     expect(sourceDrawer.queryByText("分支 / Tag / Commit")).toBeNull();
     expect(sourceDrawer.queryByText("凭据引用（可选）")).toBeNull();
+    await user.click(sourceDrawer.getByText("Skill 在仓库内的路径"));
+    expect(document.activeElement).not.toBe(screen.getByTestId("bind-repo-path-e2e-skill"));
+    await user.click(sourceDrawer.getByText("主分支名"));
+    expect(document.activeElement).not.toBe(screen.getByTestId("bind-ref-e2e-skill"));
     expect(sourceSettings.getByText("信任此来源并加入自动更新列表")).toBeTruthy();
-    expect(sourceSettings.getByText("开启后，Metis 只会在本地无修改时自动更新这个 Skill。")).toBeTruthy();
+    expect(sourceSettings.queryByText("开启后，Metis 只会在本地无修改时自动更新这个 Skill。")).toBeNull();
     expect(sourceSettings.queryByText("可信来源")).toBeNull();
     const sourceVerification = within(
       sourceDrawer.getByTestId("source-verification-panel-e2e-skill"),
     );
     expect(sourceVerification.getByText("测试连接")).toBeTruthy();
+    expect(sourceVerification.queryByText("连接验证")).toBeNull();
     expect(sourceDrawer.getByTestId("source-form-actions-e2e-skill")).toBeTruthy();
     expect(
       sourceVerification.getByText("检测当前 URL、主分支名、仓库内路径和 SKILL.md 是否可访问。不会安装、更新或修改任何文件。"),
@@ -404,6 +415,29 @@ describe("Metis desktop GUI main flow", () => {
       request: {
         url: "ssh://git@github.com/xx/xx.git",
         repo_path: "skills/e2e-skill",
+        ref_: "main",
+      },
+    });
+  });
+
+  test("tests the repository root when source path is empty", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(await screen.findByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "https://github.com/xx/xx.git");
+
+    const testButton = screen.getByTestId("test-source-connection-e2e-skill") as HTMLButtonElement;
+    expect(testButton.disabled).toBe(false);
+    await user.click(testButton);
+
+    expect(await screen.findByText("连接成功，可以保存来源。")).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith("test_source_connection", {
+      request: {
+        url: "https://github.com/xx/xx.git",
+        repo_path: ".",
         ref_: "main",
       },
     });

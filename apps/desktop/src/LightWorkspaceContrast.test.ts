@@ -281,15 +281,21 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-form-body")).toContain("user-select: text;");
     expect(latestBlockFor(".source-field-label-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
     expect(exactBlockFor(".source-help-popover")).toContain("user-select: text;");
+    expect(latestBlockFor(".source-help-button")).toContain("background: #f8fbff;");
+    expect(latestBlockFor(".source-help-button[aria-expanded=\"true\"]")).toContain("background: #eef6ff;");
+    expect(latestBlockFor(".source-help-popover")).toContain("gap: 12px;");
+    expect(latestBlockFor(".source-help-popover")).toContain("border-radius: 16px;");
+    expect(latestBlockFor(".source-help-card")).toContain("display: grid;");
+    expect(latestBlockFor(".source-help-card code")).toContain("user-select: text;");
     expect(latestBlockFor(".source-form-field input")).toContain("min-height: 48px;");
     expect(latestBlockFor(".source-form-field input::placeholder")).toContain("font-weight: 600;");
     expect(latestBlockFor(".source-settings-grid")).toContain("gap: 10px;");
     expect(latestBlockFor(".source-setting-row")).toContain(
       "grid-template-columns: 22px minmax(0, 1fr);",
     );
-    expect(exactBlockFor(".source-connection-check")).toContain(
-      "grid-template-columns: 1fr auto;",
-    );
+    expect(latestBlockFor(".source-verification-panel .source-connection-check")).toContain("justify-items: start;");
+    expect(latestBlockFor(".source-test-button")).toContain("background: #2563eb;");
+    expect(latestBlockFor(".source-test-button:disabled")).toContain("background: #dbeafe;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");
