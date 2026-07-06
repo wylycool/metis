@@ -410,10 +410,11 @@ export function BindSourceForm({
 
   function renderSourceHelp(helpId: SourceHelpId, ariaLabel: string, content: ReactNode) {
     const isOpen = activeSourceHelp === helpId;
+    const tone = helpId === "repoPath" ? "path" : helpId;
 
     return (
       <span
-        className="source-help"
+        className={`source-help source-help--${tone}`}
         data-source-help-root={`${skillId}-${helpId}`}
         data-testid={`source-${helpId}-help-${skillId}`}
       >

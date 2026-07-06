@@ -83,8 +83,10 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("source-required-toast-action"));
     const sourceDrawer = within(await screen.findByTestId("source-drawer-e2e-skill"));
     expect(sourceDrawer.getByTestId("source-form-body-e2e-skill")).toBeTruthy();
-    const sourceUrlHelp = within(sourceDrawer.getByTestId("source-url-help-e2e-skill"));
+    const sourceUrlHelpRoot = sourceDrawer.getByTestId("source-url-help-e2e-skill");
+    const sourceUrlHelp = within(sourceUrlHelpRoot);
     const sourceHelpButton = sourceDrawer.getByLabelText("仓库地址填写说明");
+    expect(sourceUrlHelpRoot.className).toContain("source-help--url");
     expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("false");
     await user.click(sourceHelpButton);
     expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("true");
@@ -104,6 +106,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceDrawer.getByText("主分支名")).toBeTruthy();
     expect(sourceDrawer.queryByText("分支 / Tag / Commit")).toBeNull();
     expect(sourceDrawer.queryByText("凭据引用（可选）")).toBeNull();
+    expect(sourceDrawer.getByTestId("source-repoPath-help-e2e-skill").className).toContain(
+      "source-help--path",
+    );
+    expect(sourceDrawer.getByTestId("source-ref-help-e2e-skill").className).toContain(
+      "source-help--ref",
+    );
     const repoPathHelpButton = sourceDrawer.getByLabelText("仓库内路径填写说明");
     await user.click(repoPathHelpButton);
     expect(repoPathHelpButton.getAttribute("aria-expanded")).toBe("true");

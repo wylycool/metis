@@ -7491,6 +7491,61 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 .source-help {
   position: relative;
   display: inline-flex;
+  --source-help-accent: var(--source-help-url-accent);
+  --source-help-border: #c9d9ee;
+  --source-help-button-color: #2563eb;
+  --source-help-button-bg: #f8fbff;
+  --source-help-button-shadow: rgba(37, 99, 235, 0.1);
+  --source-help-hover-border: #9ec5fe;
+  --source-help-hover-color: #1d4ed8;
+  --source-help-hover-bg: #eef6ff;
+  --source-help-focus-ring: rgba(147, 197, 253, 0.28);
+  --source-help-popover-border: #cfe0f5;
+  --source-help-popover-bg: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  --source-help-card-border: #e0ebf8;
+  --source-help-code-border: #dbe8f7;
+  --source-help-code-bg: #f8fbff;
+}
+
+.source-help--url {
+  --source-help-url-accent: #2563eb;
+  --source-help-accent: var(--source-help-url-accent);
+}
+
+.source-help--path {
+  --source-help-path-accent: #0f766e;
+  --source-help-accent: var(--source-help-path-accent);
+  --source-help-border: #bfe3dc;
+  --source-help-button-color: #0f766e;
+  --source-help-button-bg: #f5fffb;
+  --source-help-button-shadow: rgba(15, 118, 110, 0.1);
+  --source-help-hover-border: #84d8c5;
+  --source-help-hover-color: #0f5f59;
+  --source-help-hover-bg: #e9fbf5;
+  --source-help-focus-ring: rgba(20, 184, 166, 0.2);
+  --source-help-popover-border: #c9eadf;
+  --source-help-popover-bg: linear-gradient(180deg, #ffffff 0%, #f6fffb 100%);
+  --source-help-card-border: #d7efe7;
+  --source-help-code-border: #d0ebe3;
+  --source-help-code-bg: #f7fffb;
+}
+
+.source-help--ref {
+  --source-help-ref-accent: #b45309;
+  --source-help-accent: var(--source-help-ref-accent);
+  --source-help-border: #f0d29a;
+  --source-help-button-color: #a16207;
+  --source-help-button-bg: #fffaf0;
+  --source-help-button-shadow: rgba(180, 83, 9, 0.1);
+  --source-help-hover-border: #e8bd66;
+  --source-help-hover-color: #854d0e;
+  --source-help-hover-bg: #fff4da;
+  --source-help-focus-ring: rgba(245, 158, 11, 0.22);
+  --source-help-popover-border: #efd7a6;
+  --source-help-popover-bg: linear-gradient(180deg, #ffffff 0%, #fffcf4 100%);
+  --source-help-card-border: #f2e1bd;
+  --source-help-code-border: #eed7a4;
+  --source-help-code-bg: #fffbeb;
 }
 
 .source-help-button {
@@ -7499,24 +7554,24 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   width: 24px;
   height: 24px;
   min-height: 24px;
-  border: 1px solid #c9d9ee;
+  border: 1px solid var(--source-help-border);
   border-radius: 999px;
   padding: 0;
-  color: #2563eb;
-  background: #f8fbff;
+  color: var(--source-help-button-color);
+  background: var(--source-help-button-bg);
   font-size: 12px;
   font-weight: 850;
   line-height: 1;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 6px 14px var(--source-help-button-shadow);
 }
 
 .source-help-button:hover,
 .source-help-button:focus-visible,
 .source-help-button[aria-expanded="true"] {
-  border-color: #9ec5fe;
-  color: #1d4ed8;
-  background: #eef6ff;
-  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
+  border-color: var(--source-help-hover-border);
+  color: var(--source-help-hover-color);
+  background: var(--source-help-hover-bg);
+  box-shadow: 0 0 0 3px var(--source-help-focus-ring);
 }
 
 .source-help-popover {
@@ -7527,17 +7582,28 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   width: min(380px, calc(100vw - 72px));
   display: grid;
   gap: 12px;
-  border: 1px solid #cfe0f5;
+  border: 1px solid var(--source-help-popover-border);
   border-radius: 16px;
   padding: 14px;
   color: #334155;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  background: var(--source-help-popover-bg);
   box-shadow: 0 22px 54px rgba(15, 23, 42, 0.16);
   font-size: 12px;
   font-weight: 650;
   line-height: 1.45;
   transform: translateY(0);
   user-select: text;
+  overflow: hidden;
+}
+
+.source-help-popover::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--source-help-accent);
 }
 
 .source-help-heading {
@@ -7564,7 +7630,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 .source-help-card {
   display: grid;
   gap: 8px;
-  border: 1px solid #e0ebf8;
+  border: 1px solid var(--source-help-card-border);
   border-radius: 12px;
   padding: 10px;
   background: rgba(255, 255, 255, 0.76);
@@ -7576,11 +7642,11 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .source-help-card code {
-  border: 1px solid #dbe8f7;
+  border: 1px solid var(--source-help-code-border);
   border-radius: 10px;
   padding: 8px 10px;
   color: #1e293b;
-  background: #f8fbff;
+  background: var(--source-help-code-bg);
   font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 11px;
   overflow-wrap: anywhere;

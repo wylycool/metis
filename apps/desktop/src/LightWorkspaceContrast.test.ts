@@ -281,8 +281,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-form-body")).toContain("user-select: text;");
     expect(latestBlockFor(".source-field-label-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
     expect(exactBlockFor(".source-help-popover")).toContain("user-select: text;");
-    expect(latestBlockFor(".source-help-button")).toContain("background: #f8fbff;");
-    expect(latestBlockFor(".source-help-button[aria-expanded=\"true\"]")).toContain("background: #eef6ff;");
+    expect(latestBlockFor(".source-help-button")).toContain(
+      "background: var(--source-help-button-bg);",
+    );
+    expect(latestBlockFor(".source-help-button[aria-expanded=\"true\"]")).toContain(
+      "background: var(--source-help-hover-bg);",
+    );
     expect(latestBlockFor(".source-help-popover")).toContain("gap: 12px;");
     expect(latestBlockFor(".source-help-popover")).toContain("border-radius: 16px;");
     expect(latestBlockFor(".source-help-card")).toContain("display: grid;");
@@ -800,5 +804,25 @@ describe("Phase 6 light workspace contrast", () => {
     expect(sourceButtonBlock).toContain("padding: 0 18px;");
     expect(sourceButtonBlock).toContain("background: linear-gradient(135deg, #3154df, #4b7df0);");
     expect(sourceButtonBlock).toContain("color: #ffffff;");
+  });
+
+  test("gives source help popovers distinct low-saturation field tones", () => {
+    expect(blockFor(".source-help--url")).toContain("--source-help-accent:");
+    expect(blockFor(".source-help--path")).toContain("--source-help-accent:");
+    expect(blockFor(".source-help--ref")).toContain("--source-help-accent:");
+
+    const urlAccent = latestVariableValue("--source-help-url-accent");
+    const pathAccent = latestVariableValue("--source-help-path-accent");
+    const refAccent = latestVariableValue("--source-help-ref-accent");
+
+    expect(urlAccent).not.toBe(pathAccent);
+    expect(urlAccent).not.toBe(refAccent);
+    expect(pathAccent).not.toBe(refAccent);
+    expect(latestBlockFor(".source-help-popover::before")).toContain(
+      "background: var(--source-help-accent);",
+    );
+    expect(latestBlockFor(".source-help-card code")).toContain(
+      "background: var(--source-help-code-bg);",
+    );
   });
 });
