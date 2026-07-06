@@ -497,7 +497,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(gitHealthSection.queryByText(/git --version/)).toBeNull();
     await user.click(gitHealthSection.getByTestId("test-git-environment"));
     expect(await screen.findByText("Git 可用")).toBeTruthy();
-    expect(screen.getByText("git version 2.45.0 · clone/fetch 已通过")).toBeTruthy();
+    expect(screen.getByText("git version 2.45.0")).toBeTruthy();
+    expect(screen.queryByText(/clone\/fetch/)).toBeNull();
     expect(screen.queryByText(/github\.com/)).toBeNull();
     expect(invokeMock).toHaveBeenCalledWith("test_git_environment");
 

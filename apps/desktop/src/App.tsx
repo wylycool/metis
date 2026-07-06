@@ -1424,7 +1424,7 @@ function MetisApp() {
                 {gitEnvironmentResult && (
                   <div className="settings-git-health-result success" data-testid="git-environment-result">
                     <strong>{gitEnvironmentResult.message}</strong>
-                    <span>{gitEnvironmentResult.version} · clone/fetch 已通过</span>
+                    <span>{gitEnvironmentResult.version}</span>
                   </div>
                 )}
               </div>
