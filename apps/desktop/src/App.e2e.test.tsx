@@ -645,20 +645,25 @@ describe("Metis desktop GUI main flow", () => {
     ).length;
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
     const removeActions = within(screen.getByTestId("auto-update-remove-actions-trusted-skill"));
-    expect(removeActions.getByTestId("confirm-remove-auto-update-trusted-skill").textContent).toBe(
-      "确认",
-    );
-    expect(removeActions.getByTestId("cancel-remove-auto-update-trusted-skill").textContent).toBe(
+    expect(removeActions.queryByTestId("confirm-remove-auto-update-trusted-skill")).toBeNull();
+    expect(removeActions.queryByTestId("cancel-remove-auto-update-trusted-skill")).toBeNull();
+    const confirmPanel = within(screen.getByTestId("auto-update-remove-confirm-trusted-skill"));
+    expect(confirmPanel.getByText("移出自动更新列表？")).toBeTruthy();
+    expect(
+      confirmPanel.getByText("不会删除本地 Skill，只会关闭这个来源的信任与自动更新。"),
+    ).toBeTruthy();
+    expect(confirmPanel.getByTestId("cancel-remove-auto-update-trusted-skill").textContent).toBe(
       "取消",
     );
-    expect(screen.queryByTestId("auto-update-remove-confirm-trusted-skill")).toBeNull();
-    expect(screen.queryByText("确认移出自动更新列表？")).toBeNull();
+    expect(confirmPanel.getByTestId("confirm-remove-auto-update-trusted-skill").textContent).toBe(
+      "确认移出",
+    );
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(
       invokeMock.mock.calls.filter(([command]) => command === "bind_skill_source"),
     ).toHaveLength(bindCallCountBeforeRemove);
     await user.click(screen.getByTestId("cancel-remove-auto-update-trusted-skill"));
-    expect(screen.queryByTestId("confirm-remove-auto-update-trusted-skill")).toBeNull();
+    expect(screen.queryByTestId("auto-update-remove-confirm-trusted-skill")).toBeNull();
 
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
     await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));

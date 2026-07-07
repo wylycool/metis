@@ -7968,9 +7968,109 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   padding: 0 10px;
 }
 
+.auto-update-remove-confirm {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #f3d59b;
+  border-radius: 14px;
+  padding: 11px 12px 11px 14px;
+  background: #fff8eb;
+}
+
+.auto-update-remove-confirm-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.auto-update-remove-confirm-copy strong {
+  color: #6f4300;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.auto-update-remove-confirm-copy span {
+  color: #7a5b27;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.auto-update-remove-confirm-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.auto-update-remove-confirm-actions button {
+  min-width: 72px;
+  padding: 0 12px;
+}
+
+.auto-update-confirm {
+  color: #b42318;
+  border: 1px solid #ffc7bd;
+  background: #fff1ed;
+}
+
+.auto-update-confirm:hover:not(:disabled) {
+  color: #991b1b;
+  border-color: #fda29b;
+  background: #ffe7df;
+}
+
+.auto-update-confirm:disabled {
+  color: #9f6b62;
+  background: #fff7f4;
+}
+
 @media (max-width: 520px) {
   .source-drawer .source-connection-check {
     grid-template-columns: 1fr;
+  }
+
+  .settings-section.auto-update-section {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-section.auto-update-section > button {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+
+  .auto-update-source-row,
+  .auto-update-remove-confirm {
+    grid-template-columns: 1fr;
+  }
+
+  .auto-update-remove {
+    justify-self: stretch;
+  }
+
+  .auto-update-remove-actions {
+    display: inline-flex;
+    justify-self: stretch;
+  }
+
+  .auto-update-remove-actions button {
+    width: 100%;
+  }
+
+  .auto-update-remove-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .auto-update-remove-confirm-actions button {
+    width: 100%;
   }
 }
 

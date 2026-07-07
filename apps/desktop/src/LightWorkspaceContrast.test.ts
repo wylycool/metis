@@ -338,9 +338,16 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".auto-update-source-row")).toContain(
       "grid-template-columns: minmax(0, 1fr) auto;",
     );
-    expect(latestBlockFor(".auto-update-remove-actions")).toContain("display: inline-flex;");
-    expect(latestBlockFor(".auto-update-remove-actions")).toContain("justify-self: end;");
-    expect(latestBlockFor(".auto-update-remove-actions")).not.toContain("grid-column: 1 / -1;");
+    expect(exactBlockFor(".auto-update-remove-actions")).toContain("display: inline-flex;");
+    expect(exactBlockFor(".auto-update-remove-actions")).toContain("justify-self: end;");
+    expect(exactBlockFor(".auto-update-remove-actions")).not.toContain("grid-column: 1 / -1;");
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("grid-column: 1 / -1;");
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("background: #fff8eb;");
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("border: 1px solid #f3d59b;");
+    expect(exactBlockFor(".auto-update-remove-confirm-actions")).toContain("display: inline-flex;");
+    expect(latestBlockFor(".auto-update-confirm")).toContain("color: #b42318;");
+    expect(latestBlockFor(".auto-update-confirm")).toContain("background: #fff1ed;");
+    expect(latestBlockFor(".auto-update-confirm")).toContain("border: 1px solid #ffc7bd;");
     expect(latestBlockFor(".skill-intro-copy")).toContain("-webkit-line-clamp: 3");
   });
 

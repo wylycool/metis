@@ -1385,17 +1385,26 @@ function MetisApp() {
                       className="auto-update-remove-actions"
                       data-testid={`auto-update-remove-actions-${skill.id}`}
                     >
-                      {pendingAutoUpdateRemovalSkillId === skill.id ? (
-                        <>
-                          <button
-                            className="compact auto-update-confirm"
-                            data-testid={`confirm-remove-auto-update-${skill.id}`}
-                            disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                            onClick={() => handleRemoveAutoUpdateSkill(skill)}
-                            type="button"
-                          >
-                            {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "确认"}
-                          </button>
+                      <button
+                        className="ghost-button compact auto-update-remove"
+                        data-testid={`remove-auto-update-${skill.id}`}
+                        disabled={actionBusy === `remove-auto-update:${skill.id}`}
+                        onClick={() => setPendingAutoUpdateRemovalSkillId(skill.id)}
+                        type="button"
+                      >
+                        {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "移除"}
+                      </button>
+                    </div>
+                    {pendingAutoUpdateRemovalSkillId === skill.id ? (
+                      <div
+                        className="auto-update-remove-confirm"
+                        data-testid={`auto-update-remove-confirm-${skill.id}`}
+                      >
+                        <div className="auto-update-remove-confirm-copy">
+                          <strong>移出自动更新列表？</strong>
+                          <span>不会删除本地 Skill，只会关闭这个来源的信任与自动更新。</span>
+                        </div>
+                        <div className="auto-update-remove-confirm-actions">
                           <button
                             className="ghost-button compact auto-update-cancel"
                             data-testid={`cancel-remove-auto-update-${skill.id}`}
@@ -1405,19 +1414,18 @@ function MetisApp() {
                           >
                             取消
                           </button>
-                        </>
-                      ) : (
-                        <button
-                          className="ghost-button compact auto-update-remove"
-                          data-testid={`remove-auto-update-${skill.id}`}
-                          disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                          onClick={() => setPendingAutoUpdateRemovalSkillId(skill.id)}
-                          type="button"
-                        >
-                          {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "移除"}
-                        </button>
-                      )}
-                    </div>
+                          <button
+                            className="compact auto-update-confirm"
+                            data-testid={`confirm-remove-auto-update-${skill.id}`}
+                            disabled={actionBusy === `remove-auto-update:${skill.id}`}
+                            onClick={() => handleRemoveAutoUpdateSkill(skill)}
+                            type="button"
+                          >
+                            {actionBusy === `remove-auto-update:${skill.id}` ? "移出中" : "确认移出"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}
