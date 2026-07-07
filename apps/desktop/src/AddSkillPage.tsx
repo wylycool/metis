@@ -87,16 +87,26 @@ export function AddSkillPage({
         </div>
         {previewError && <InlineError error={previewError} />}
         {preview && (
-          <div className="remote-preview-card" style={remotePreviewAccentStyle(preview)}>
-            <div className="remote-preview-copy">
-              <strong>{preview.name}</strong>
-              <span>{preview.description ?? "无描述"}</span>
+          <>
+            <div className="remote-preview-card" style={remotePreviewAccentStyle(preview)}>
+              <div className="remote-preview-copy">
+                <strong>{preview.name}</strong>
+                <span>{preview.description ?? "无描述"}</span>
+              </div>
+              <div className="remote-preview-version">
+                <span className="remote-preview-version-label">远端版本</span>
+                <code>{shortCommit(preview.commit)}</code>
+              </div>
             </div>
-            <div className="remote-preview-version">
-              <span className="remote-preview-version-label">远端版本</span>
-              <code>{shortCommit(preview.commit)}</code>
+            <div
+              className="remote-preview-success-hint"
+              data-testid="remote-preview-success-hint"
+              role="status"
+            >
+              <span aria-hidden="true">✓</span>
+              <strong>已成功获取Skill。确认信息无误后，选择下方 Agent / 目录完成安装。</strong>
             </div>
-          </div>
+          </>
         )}
         {(preview || targets.length > 0 || actionBusy === "remote-sync-preview") && (
           <CrossAgentTargetMatrix
@@ -107,7 +117,6 @@ export function AddSkillPage({
             targets={targets}
             title="安装到以下 Agent / 目录"
             onInstall={onInstallTargets}
-            onRefresh={onPreview}
             onSelectAllValid={onSelectAllValidTargets}
             onToggleTarget={onToggleTarget}
           />

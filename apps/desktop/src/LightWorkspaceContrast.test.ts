@@ -227,15 +227,13 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".add-skill-page .remote-target-row")).toContain(
       "background: rgba(248, 250, 252, 0.72);",
     );
-    expect(latestBlockFor(".add-skill-page .target-matrix-refresh")).not.toContain(
-      "background: var(--ink)",
-    );
-    expect(latestBlockFor(".add-skill-page .target-matrix-refresh:hover:not(:disabled)")).toContain(
-      "background: var(--command-selected);",
-    );
     expect(latestBlockFor(".remote-preview-version-label")).toContain("color: var(--muted);");
     expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-start");
     expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-end");
+    expect(latestBlockFor(".remote-preview-success-hint")).toContain(
+      "background: linear-gradient(135deg, #f0fdf8 0%, #ecfeff 100%);",
+    );
+    expect(latestBlockFor(".remote-preview-success-hint strong")).toContain("color: #0f766e;");
     expect(latestBlockFor(".add-skill-page .remote-target-row .remote-target-checkbox")).toContain(
       "accent-color: var(--command-accent);",
     );
@@ -488,15 +486,16 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(/\.skill-row-marker,\s*\.skill-row:nth-child\(n\) \.skill-row-marker\s*\{[\s\S]*background:\s*linear-gradient\(180deg,\s*#6fd8ff,\s*#3e7bfa 48%,\s*#9857ff\);/);
   });
 
-  test("renders cross-agent target statuses as colored badges with a spinner affordance", () => {
+  test("renders cross-agent target statuses as colored badges", () => {
     expect(stylesheet).toContain(".target-status-badge");
     expect(stylesheet).toContain(".target-status-good");
     expect(stylesheet).toContain(".target-status-warning");
     expect(stylesheet).toContain(".target-status-danger");
     expect(stylesheet).toContain(".target-status-muted");
-    expect(stylesheet).toContain(".target-matrix-spinner");
     expect(latestBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
-    expect(latestBlockFor(".target-matrix-spinner")).toContain("animation:");
+    expect(latestBlockFor(".add-skill-page .target-matrix-select-all")).not.toContain(
+      "background: var(--ink)",
+    );
   });
 
   test("defines the static UI redesign preview shell, orb, rows, and detail panels", () => {

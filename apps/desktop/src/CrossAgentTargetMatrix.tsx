@@ -15,7 +15,6 @@ export function CrossAgentTargetMatrix({
   targets,
   title,
   onInstall,
-  onRefresh,
   onSelectAllValid,
   onToggleTarget,
 }: {
@@ -27,7 +26,6 @@ export function CrossAgentTargetMatrix({
   targets: DesktopSkillTarget[];
   title: string;
   onInstall: () => void;
-  onRefresh: () => void;
   onSelectAllValid?: () => void;
   onToggleTarget: (target: DesktopSkillTarget) => void;
 }) {
@@ -55,16 +53,6 @@ export function CrossAgentTargetMatrix({
               {allSelectableTargetsSelected ? "一键取消选中" : "一键选中有效路径"}
             </button>
           )}
-          <button
-            aria-busy={loading}
-            className="ghost-button compact target-matrix-refresh"
-            data-testid="refresh-target-matrix"
-            disabled={loading}
-            onClick={onRefresh}
-          >
-            {loading && <span className="target-matrix-spinner" data-testid="target-matrix-spinner" />}
-            {loading ? "检查中" : "重新检查状态"}
-          </button>
         </div>
       </div>
       {error && <InlineError error={error} />}

@@ -868,24 +868,6 @@ h1 {
   background: var(--surface-muted, #f8fafc);
 }
 
-.target-matrix-spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  margin-right: 7px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 999px;
-  vertical-align: -2px;
-  animation: target-spin 720ms linear infinite;
-}
-
-@keyframes target-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .remote-install-result {
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -2350,31 +2332,13 @@ textarea:disabled {
   color: var(--muted);
 }
 
-.add-skill-page .target-matrix-refresh {
-  border-color: var(--command-border);
-  color: var(--ink);
-  background: var(--command-surface);
-}
-
 .add-skill-page .target-matrix-select-all {
   border-color: var(--command-border);
   color: var(--ink);
   background: var(--command-surface);
 }
 
-.add-skill-page .target-matrix-refresh:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--command-selected-border);
-  background: var(--command-selected);
-}
-
 .add-skill-page .target-matrix-select-all:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--command-selected-border);
-  background: var(--command-selected);
-}
-
-.add-skill-page .target-matrix-refresh:focus-visible {
   color: var(--ink);
   border-color: var(--command-selected-border);
   background: var(--command-selected);
@@ -2503,6 +2467,37 @@ textarea:disabled {
 .remote-preview-card code {
   color: var(--ink);
   background: var(--surface-subtle);
+}
+
+.remote-preview-success-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #a9e8cf;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #0f766e;
+  background: linear-gradient(135deg, #f0fdf8 0%, #ecfeff 100%);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.remote-preview-success-hint span {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #14a076;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.remote-preview-success-hint strong {
+  color: #0f766e;
+  font-weight: 780;
 }
 
 .beta-panel,

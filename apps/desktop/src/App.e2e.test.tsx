@@ -329,7 +329,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByText("Remote Skill")).toBeTruthy();
     expect(screen.getByText("远端版本")).toBeTruthy();
     expect(screen.getByText("abc123")).toBeTruthy();
+    expect(
+      screen.getByText("已成功获取Skill。确认信息无误后，选择下方 Agent / 目录完成安装。"),
+    ).toBeTruthy();
     expect(screen.getByText("安装到以下 Agent / 目录")).toBeTruthy();
+    expect(screen.queryByText("重新检查状态")).toBeNull();
+    expect(screen.queryByTestId("refresh-target-matrix")).toBeNull();
     expect((await screen.findByTestId("target-row-codex")).className).toContain(
       "redesign-detail-agent-path-row",
     );
