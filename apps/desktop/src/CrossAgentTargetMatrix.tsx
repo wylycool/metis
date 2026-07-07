@@ -49,10 +49,10 @@ export function CrossAgentTargetMatrix({
             <button
               className="ghost-button compact target-matrix-select-all"
               data-testid="select-all-valid-targets"
-              disabled={loading || selectableCount === 0 || allSelectableTargetsSelected}
+              disabled={loading || selectableCount === 0}
               onClick={onSelectAllValid}
             >
-              选中所有有效路径
+              {allSelectableTargetsSelected ? "一键取消选中" : "一键选中有效路径"}
             </button>
           )}
           <button

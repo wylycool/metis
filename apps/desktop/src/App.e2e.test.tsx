@@ -375,7 +375,7 @@ describe("Metis desktop GUI main flow", () => {
     ).toBeTruthy();
   });
 
-  test("selects every valid remote install target in one click", async () => {
+  test("toggles every valid remote install target in one click", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({ includeCustomInstallTarget: true });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -394,7 +394,9 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("add-skill-preview"));
 
     await screen.findByText("安装到以下 Agent / 目录");
-    await user.click(await screen.findByTestId("select-all-valid-targets"));
+    const selectAllButton = await screen.findByTestId("select-all-valid-targets");
+    expect(selectAllButton.textContent).toBe("一键选中有效路径");
+    await user.click(selectAllButton);
 
     expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByTestId("target-checkbox-custom-team-memory") as HTMLInputElement).checked).toBe(
@@ -403,6 +405,18 @@ describe("Metis desktop GUI main flow", () => {
     expect((screen.getByTestId("target-checkbox-claude-code") as HTMLInputElement).checked).toBe(
       false,
     );
+    expect(selectAllButton.textContent).toBe("一键取消选中");
+
+    await user.click(selectAllButton);
+
+    expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByTestId("target-checkbox-custom-team-memory") as HTMLInputElement).checked).toBe(
+      false,
+    );
+    expect((screen.getByTestId("target-checkbox-claude-code") as HTMLInputElement).checked).toBe(
+      false,
+    );
+    expect(selectAllButton.textContent).toBe("一键选中有效路径");
   });
 
   test("explains source connection test failures in user language", async () => {

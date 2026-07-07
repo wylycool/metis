@@ -638,9 +638,17 @@ function MetisApp() {
   }
 
   function handleSelectAllValidRemoteTargets() {
-    setSelectedRemoteTargetIds(
-      remoteTargets.filter(isRemoteTargetSelectable).map((target) => remoteTargetId(target)),
-    );
+    const selectableTargetIds = remoteTargets
+      .filter(isRemoteTargetSelectable)
+      .map((target) => remoteTargetId(target));
+    setSelectedRemoteTargetIds((current) => {
+      const allSelectableTargetsSelected =
+        selectableTargetIds.length > 0 && selectableTargetIds.every((id) => current.includes(id));
+      if (allSelectableTargetsSelected) {
+        return [];
+      }
+      return Array.from(new Set([...current, ...selectableTargetIds]));
+    });
   }
 
   function toggleRemoteTarget(target: DesktopSkillTarget) {
