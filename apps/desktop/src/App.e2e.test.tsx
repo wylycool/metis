@@ -154,8 +154,11 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceVerification.queryByText("连接验证")).toBeNull();
     expect(sourceDrawer.getByTestId("source-form-actions-e2e-skill")).toBeTruthy();
     expect(
-      sourceVerification.getByText("检测当前已填来源是否可访问。不会安装、更新或修改任何文件。"),
+      sourceVerification.getByText("检测当前已填来源是否可访问。不会修改本地 Skill 或保存来源。"),
     ).toBeTruthy();
+    expect(
+      sourceVerification.queryByText("检测当前已填来源是否可访问。不会安装、更新或修改任何文件。"),
+    ).toBeNull();
     await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
     await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
     await user.clear(screen.getByTestId("bind-ref-e2e-skill"));
@@ -188,6 +191,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(
       boundSourceSummary.getByTestId("open-bind-source-e2e-skill").className,
     ).toContain("redesign-source-action");
+    expect(
+      invokeMock.mock.calls.filter(([command]) => command === "check_skill_updates"),
+    ).toHaveLength(0);
     await user.click(screen.getByText("返回"));
     const boundHomeCard = within(await screen.findByTestId("skill-row-e2e-skill"));
     expect(boundHomeCard.getByText("已绑定来源")).toBeTruthy();
@@ -2032,7 +2038,10 @@ describe("Metis desktop GUI error paths", () => {
     expect(checkPanel.getByText("未绑定来源")).toBeTruthy();
     expect(checkPanel.getByText("远端版本")).toBeTruthy();
     expect(checkPanel.getByText("差异")).toBeTruthy();
-    expect(checkPanel.getAllByText("等待检查")).toHaveLength(2);
+    const waitingCheckLabels = checkPanel.getAllByText("等待检查");
+    expect(waitingCheckLabels).toHaveLength(2);
+    expect(waitingCheckLabels.every((label) => label.tagName === "STRONG")).toBe(true);
+    expect(checkPanel.queryByText("等待检查", { selector: "b" })).toBeNull();
     expect(checkPanel.queryByText("Local")).toBeNull();
     expect(checkPanel.queryByText("Diff summary")).toBeNull();
     expect(checkPanel.queryByText("未检查")).toBeNull();

@@ -578,7 +578,7 @@ export function BindSourceForm({
             >
               {testBusy ? "测试中" : "测试连接"}
             </button>
-            <p>检测当前已填来源是否可访问。不会安装、更新或修改任何文件。</p>
+            <p>检测当前已填来源是否可访问。不会修改本地 Skill 或保存来源。</p>
           </div>
           {testResult && (
             <div

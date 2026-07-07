@@ -418,6 +418,7 @@ function FormalCheckPanel({
   const targetCommit = updateResult?.source?.remote_commit
     ? shortCommit(updateResult.source.remote_commit)
     : "等待检查";
+  const diffPending = !updateResult?.diff_summary && updateResult?.status !== "UpToDate";
   const summary = updateResult?.diff_summary
     ? diffSummaryParts(updateResult.diff_summary)
     : updateResult?.status === "UpToDate"
@@ -436,13 +437,17 @@ function FormalCheckPanel({
       </div>
       <div className="redesign-check-diff-summary">
         <span>差异</span>
-        <div className="redesign-diff-summary-chips">
-          {summary.map((part) => (
-            <b className={part.className} key={part.label}>
-              {part.label}
-            </b>
-          ))}
-        </div>
+        {diffPending ? (
+          <strong>等待检查</strong>
+        ) : (
+          <div className="redesign-diff-summary-chips">
+            {summary.map((part) => (
+              <b className={part.className} key={part.label}>
+                {part.label}
+              </b>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
