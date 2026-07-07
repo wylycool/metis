@@ -1363,30 +1363,38 @@ function MetisApp() {
           </section>
 
           <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
-            <div>
+            <div className="auto-update-copy">
               <h3>自动更新</h3>
               <p>只会更新已加入自动更新列表、且本地没有修改的 Skill。</p>
             </div>
             <div className="auto-update-source-list" data-testid="auto-update-source-list">
               {autoUpdateSourceSkills.length === 0 ? (
-                <span className="settings-muted">暂无加入自动更新列表的 Skill</span>
+                <div className="auto-update-empty-state" data-testid="auto-update-empty-state">
+                  <strong>暂无加入自动更新列表的 Skill</strong>
+                  <span>去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。</span>
+                </div>
               ) : (
                 autoUpdateSourceSkills.map((skill) => (
                   <div
-                    className="auto-update-source-row"
+                    className={`auto-update-source-row${
+                      pendingAutoUpdateRemovalSkillId === skill.id ? " is-open" : ""
+                    }`}
                     data-testid={`auto-update-source-row-${skill.id}`}
                     key={skill.id}
                   >
-                    <div>
-                      <strong>{skill.name}</strong>
-                      <span>{skill.source?.url}</span>
+                    <div className="auto-update-source-main">
+                      <div className="auto-update-source-name-line">
+                        <strong className="auto-update-source-name">{skill.name}</strong>
+                        <span className="auto-update-trusted-chip">已信任</span>
+                      </div>
+                      <span className="auto-update-source-url">{skill.source?.url}</span>
                     </div>
                     <div
                       className="auto-update-remove-actions"
                       data-testid={`auto-update-remove-actions-${skill.id}`}
                     >
                       <button
-                        className="ghost-button compact auto-update-remove"
+                        className="auto-update-remove"
                         data-testid={`remove-auto-update-${skill.id}`}
                         disabled={actionBusy === `remove-auto-update:${skill.id}`}
                         onClick={() => setPendingAutoUpdateRemovalSkillId(skill.id)}
@@ -1406,7 +1414,7 @@ function MetisApp() {
                         </div>
                         <div className="auto-update-remove-confirm-actions">
                           <button
-                            className="ghost-button compact auto-update-cancel"
+                            className="auto-update-cancel"
                             data-testid={`cancel-remove-auto-update-${skill.id}`}
                             disabled={actionBusy === `remove-auto-update:${skill.id}`}
                             onClick={() => setPendingAutoUpdateRemovalSkillId(null)}
@@ -1415,7 +1423,7 @@ function MetisApp() {
                             取消
                           </button>
                           <button
-                            className="compact auto-update-confirm"
+                            className="auto-update-confirm"
                             data-testid={`confirm-remove-auto-update-${skill.id}`}
                             disabled={actionBusy === `remove-auto-update:${skill.id}`}
                             onClick={() => handleRemoveAutoUpdateSkill(skill)}
@@ -1431,7 +1439,7 @@ function MetisApp() {
               )}
             </div>
             <button
-              className="compact"
+              className="auto-update-run"
               data-testid="run-auto-update"
               disabled={actionBusy === "auto-update" || skills.length === 0}
               onClick={handleRunAutoUpdate}

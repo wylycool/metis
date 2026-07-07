@@ -334,20 +334,57 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".settings-git-health-notice")).not.toContain("#dc2626");
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("gap: 16px 28px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("align-items: start;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border: 1px solid #d9e1ee;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border-radius: 22px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("padding: 28px 30px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
+      "background: rgba(255, 255, 255, 0.9);",
+    );
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
+      "box-shadow: 0 18px 46px rgba(23, 32, 51, 0.12);",
+    );
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("min-height: 42px;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("border-radius: 12px;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("color: #142033;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("background: #ffffff;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");
+    expect(latestBlockFor(".auto-update-source-list")).toContain("grid-column: 1 / -1;");
+    expect(latestBlockFor(".auto-update-source-list")).toContain("gap: 10px;");
     expect(latestBlockFor(".auto-update-source-row")).toContain(
       "grid-template-columns: minmax(0, 1fr) auto;",
     );
+    expect(exactBlockFor(".auto-update-source-row")).toContain("gap: 10px 16px;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain("border: 1px solid #dde6f2;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain("border-radius: 18px;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain("padding: 13px 14px;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain(
+      "background: linear-gradient(180deg, #fbfdff, #f8fafc);",
+    );
+    expect(exactBlockFor(".auto-update-source-row.is-open")).toContain("border-color: #c9d9ec;");
+    expect(exactBlockFor(".auto-update-trusted-chip")).toContain("color: #0f766e;");
+    expect(exactBlockFor(".auto-update-trusted-chip")).toContain("background: #e8faf5;");
+    expect(exactBlockFor(".auto-update-empty-state")).toContain("border: 1px dashed #cdd8e7;");
+    expect(exactBlockFor(".auto-update-empty-state")).toContain("background: #f8fbff;");
     expect(exactBlockFor(".auto-update-remove-actions")).toContain("display: inline-flex;");
     expect(exactBlockFor(".auto-update-remove-actions")).toContain("justify-self: end;");
     expect(exactBlockFor(".auto-update-remove-actions")).not.toContain("grid-column: 1 / -1;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("min-width: 78px;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("min-height: 38px;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("background: #ffffff;");
     expect(exactBlockFor(".auto-update-remove-confirm")).toContain("grid-column: 1 / -1;");
-    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("background: #fff8eb;");
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain(
+      "linear-gradient(90deg, rgba(245, 158, 11, 0.1), transparent 42%),",
+    );
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("#fff8eb;");
     expect(exactBlockFor(".auto-update-remove-confirm")).toContain("border: 1px solid #f3d59b;");
     expect(exactBlockFor(".auto-update-remove-confirm-actions")).toContain("display: inline-flex;");
-    expect(latestBlockFor(".auto-update-confirm")).toContain("color: #b42318;");
-    expect(latestBlockFor(".auto-update-confirm")).toContain("background: #fff1ed;");
-    expect(latestBlockFor(".auto-update-confirm")).toContain("border: 1px solid #ffc7bd;");
+    expect(exactBlockFor(".auto-update-cancel")).toContain("background: #ffffff;");
+    expect(exactBlockFor(".auto-update-cancel")).toContain("border: 1px solid #c8d5e4;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("color: #b42318;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("background: #fff1ed;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("border: 1px solid #ffc7bd;");
     expect(latestBlockFor(".skill-intro-copy")).toContain("-webkit-line-clamp: 3");
   });
 
