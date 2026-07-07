@@ -427,6 +427,59 @@ describe("Metis desktop GUI main flow", () => {
     expect(selectAllButton.textContent).toBe("一键选中有效路径");
   });
 
+  test("resets the add skill form and opens it fresh from the home page", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ includeCustomInstallTarget: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-e2e-skill");
+    await user.click(screen.getByTestId("open-add-skill"));
+    await user.type(
+      screen.getByTestId("add-skill-url"),
+      "https://github.com/example/metis-skills.git",
+    );
+    await user.type(screen.getByTestId("add-skill-repo-path"), "skills/remote");
+    await user.clear(screen.getByTestId("add-skill-ref"));
+    await user.type(screen.getByTestId("add-skill-ref"), "main");
+    await user.click(screen.getByTestId("add-skill-preview"));
+
+    expect(await screen.findByText("Remote Skill")).toBeTruthy();
+    await user.click(await screen.findByTestId("select-all-valid-targets"));
+    expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).checked).toBe(true);
+
+    await user.click(await screen.findByTestId("add-skill-reset"));
+
+    expect((screen.getByTestId("add-skill-url") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("add-skill-repo-path") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("add-skill-ref") as HTMLInputElement).value).toBe("");
+    expect(screen.queryByText("Remote Skill")).toBeNull();
+    expect(screen.queryByTestId("remote-preview-success-hint")).toBeNull();
+    expect(screen.queryByText("安装到以下 Agent / 目录")).toBeNull();
+
+    await user.type(
+      screen.getByTestId("add-skill-url"),
+      "https://github.com/example/metis-skills.git",
+    );
+    await user.type(screen.getByTestId("add-skill-repo-path"), "skills/remote");
+    await user.click(screen.getByTestId("add-skill-preview"));
+    expect(await screen.findByText("Remote Skill")).toBeTruthy();
+
+    await user.click(screen.getByText("Skills / 添加 Skill"));
+    expect(await screen.findByTestId("skill-card-grid")).toBeTruthy();
+    await user.click(screen.getByTestId("open-add-skill"));
+
+    expect((screen.getByTestId("add-skill-url") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("add-skill-repo-path") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("add-skill-ref") as HTMLInputElement).value).toBe("");
+    expect(screen.queryByText("Remote Skill")).toBeNull();
+    expect(screen.queryByTestId("remote-preview-success-hint")).toBeNull();
+    expect(screen.queryByText("安装到以下 Agent / 目录")).toBeNull();
+  });
+
   test("explains source connection test failures in user language", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({ sourceConnectionFails: true });

@@ -27,6 +27,7 @@ export function AddSkillPage({
   onDraftChange,
   onInstallTargets,
   onPreview,
+  onReset,
   onSelectAllValidTargets,
   onToggleTarget,
 }: {
@@ -41,6 +42,7 @@ export function AddSkillPage({
   onDraftChange: (draft: RemoteSyncDraft) => void;
   onInstallTargets: () => void;
   onPreview: () => void;
+  onReset: () => void;
   onSelectAllValidTargets: () => void;
   onToggleTarget: (target: DesktopSkillTarget) => void;
 }) {
@@ -56,14 +58,23 @@ export function AddSkillPage({
             <h2>Skill 来源信息</h2>
             <p>填写 Git URL、Skill 路径和分支名，填好后可以点击预览查看确认后，再选择安装</p>
           </div>
-          <button
-            className="compact"
-            data-testid="add-skill-preview"
-            disabled={actionBusy === "remote-sync-preview" || draft.url.trim().length === 0}
-            onClick={onPreview}
-          >
-            {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
-          </button>
+          <div className="remote-sync-actions">
+            <button
+              className="compact add-skill-reset-button"
+              data-testid="add-skill-reset"
+              onClick={onReset}
+            >
+              重置
+            </button>
+            <button
+              className="compact"
+              data-testid="add-skill-preview"
+              disabled={actionBusy === "remote-sync-preview" || draft.url.trim().length === 0}
+              onClick={onPreview}
+            >
+              {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
+            </button>
+          </div>
         </div>
         <div className="remote-sync-form">
           <input

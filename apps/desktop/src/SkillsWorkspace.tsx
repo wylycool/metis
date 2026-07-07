@@ -62,6 +62,7 @@ export function SkillsWorkspace({
   onOpenSettings,
   onPreviewRemoteSync,
   onApplyNeededAgentUpdates,
+  onResetRemoteSync,
   onSelectAllValidRemoteTargets,
   onRestoreBackup,
   onRouteKindChange,
@@ -111,6 +112,7 @@ export function SkillsWorkspace({
   onOpenBind: (skill: DesktopSkill) => void;
   onOpenSettings: () => void;
   onPreviewRemoteSync: () => void;
+  onResetRemoteSync: () => void;
   onSelectAllValidRemoteTargets: () => void;
   onRestoreBackup: (skillId: string, backupId: string) => void;
   onRouteKindChange: (kind: SkillsRoute["kind"]) => void;
@@ -270,6 +272,7 @@ export function SkillsWorkspace({
           onDraftChange={onSetRemoteSyncDraft}
           onInstallTargets={onInstallRemoteTargets}
           onPreview={onPreviewRemoteSync}
+          onReset={onResetRemoteSync}
           onSelectAllValidTargets={onSelectAllValidRemoteTargets}
           onToggleTarget={onToggleRemoteTarget}
         />
@@ -313,7 +316,10 @@ export function SkillsWorkspace({
                 <button
                   className="compact add-skill-button"
                   data-testid="open-add-skill"
-                  onClick={() => setRoute({ kind: "add" })}
+                  onClick={() => {
+                    onResetRemoteSync();
+                    setRoute({ kind: "add" });
+                  }}
                 >
                   + 添加 Skill
                 </button>

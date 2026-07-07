@@ -2391,6 +2391,13 @@ textarea:disabled {
   align-items: start;
 }
 
+.add-skill-page .remote-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .add-skill-page .remote-sync-header h2 {
   margin-bottom: 4px;
   color: var(--text);
@@ -2412,6 +2419,18 @@ textarea:disabled {
   color: var(--command-accent);
   border-color: #8bd8bf;
   background: #ddf7ee;
+}
+
+.add-skill-page .remote-sync-header .add-skill-reset-button {
+  color: #5f6c7b;
+  border-color: #d7dee8;
+  background: #ffffff;
+}
+
+.add-skill-page .remote-sync-header .add-skill-reset-button:hover:not(:disabled) {
+  color: #334155;
+  border-color: #bac5d4;
+  background: #f8fafc;
 }
 
 .add-skill-page .target-install-button {

@@ -105,11 +105,7 @@ function MetisApp() {
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>("skills");
   const [skillsViewKind, setSkillsViewKind] = useState<SkillsViewKind>("list");
   const [skillSearchQuery, setSkillSearchQuery] = useState("");
-  const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>({
-    url: "",
-    repo_path: "",
-    ref_: "main",
-  });
+  const [remoteSyncDraft, setRemoteSyncDraft] = useState<RemoteSyncDraft>(emptyRemoteSyncDraft());
   const [remotePreview, setRemotePreview] = useState<DesktopRemoteSkillPreview | null>(null);
   const [remotePreviewError, setRemotePreviewError] = useState<DesktopError | null>(null);
   const [remoteTargets, setRemoteTargets] = useState<DesktopSkillTarget[]>([]);
@@ -635,6 +631,17 @@ function MetisApp() {
     } finally {
       setActionBusy(null);
     }
+  }
+
+  function resetRemoteSyncState() {
+    setRemoteSyncDraft(emptyRemoteSyncDraft());
+    setRemotePreview(null);
+    setRemotePreviewError(null);
+    setRemoteTargets([]);
+    setSelectedRemoteTargetIds([]);
+    setRemoteInstallResult(null);
+    setActionError(null);
+    setActionMessage(null);
   }
 
   function handleSelectAllValidRemoteTargets() {
@@ -1555,6 +1562,7 @@ function MetisApp() {
           onOpenBind={openBindForm}
           onOpenSettings={() => setActiveWorkspace("settings")}
           onPreviewRemoteSync={handlePreviewRemoteSync}
+          onResetRemoteSync={resetRemoteSyncState}
           onRestoreBackup={handleRestoreBackup}
           onScan={handleScan}
           onSetRemoteSyncDraft={setRemoteSyncDraft}
@@ -1692,6 +1700,14 @@ function emptyBindDraft(): BindDraft {
     credential_ref: "",
     trusted: false,
     auto_update: false,
+  };
+}
+
+function emptyRemoteSyncDraft(): RemoteSyncDraft {
+  return {
+    url: "",
+    repo_path: "",
+    ref_: "",
   };
 }
 
