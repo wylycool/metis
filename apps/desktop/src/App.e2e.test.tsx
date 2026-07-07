@@ -294,6 +294,27 @@ describe("Metis desktop GUI main flow", () => {
     expect(await screen.findByText("回退前版本")).toBeTruthy();
   });
 
+  test("disables text assistance for add skill source fields", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-e2e-skill");
+    await user.click(screen.getByTestId("open-add-skill"));
+
+    for (const testId of ["add-skill-url", "add-skill-repo-path", "add-skill-ref"]) {
+      const input = screen.getByTestId(testId) as HTMLInputElement;
+      expect(input.autocomplete).toBe("off");
+      expect(input.getAttribute("autocorrect")).toBe("off");
+      expect(input.getAttribute("autocapitalize")).toBe("none");
+      expect(input.getAttribute("spellcheck")).toBe("false");
+    }
+  });
+
   test("previews a remote skill and syncs it to selected agents", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({

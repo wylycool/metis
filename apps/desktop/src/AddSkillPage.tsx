@@ -78,19 +78,31 @@ export function AddSkillPage({
         </div>
         <div className="remote-sync-form">
           <input
+            autoCapitalize="none"
+            autoComplete="off"
+            autoCorrect="off"
             data-testid="add-skill-url"
+            spellCheck={false}
             value={draft.url}
             placeholder="https://github.com/example/metis-skills.git"
             onChange={(event) => onDraftChange({ ...draft, url: event.target.value })}
           />
           <input
+            autoCapitalize="none"
+            autoComplete="off"
+            autoCorrect="off"
             data-testid="add-skill-repo-path"
+            spellCheck={false}
             value={draft.repo_path}
             placeholder="skills/example"
             onChange={(event) => onDraftChange({ ...draft, repo_path: event.target.value })}
           />
           <input
+            autoCapitalize="none"
+            autoComplete="off"
+            autoCorrect="off"
             data-testid="add-skill-ref"
+            spellCheck={false}
             value={draft.ref_}
             placeholder="main"
             onChange={(event) => onDraftChange({ ...draft, ref_: event.target.value })}
