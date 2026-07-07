@@ -1341,6 +1341,28 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByTestId("skill-row-shared-claude")).toBeNull();
   });
 
+  test("deduplicates the same skill across agents even when only one install has a source", async () => {
+    const scenario = createPartialSourceDedupeScenario();
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    const brainstormingRow = await screen.findByTestId("skill-row-brainstorming-codex");
+    expect(screen.queryByTestId("skill-row-brainstorming-claude")).toBeNull();
+    expect(screen.getAllByTestId(/^skill-row-/)).toHaveLength(1);
+    expect(within(brainstormingRow).getByText("brainstorming")).toBeTruthy();
+    expect(within(brainstormingRow).getByText("已绑定来源")).toBeTruthy();
+
+    const agentStack = within(brainstormingRow).getByTestId(
+      "skill-agent-stack-brainstorming-codex",
+    );
+    expect(agentStack.getAttribute("aria-label")).toBe("存在于 Codex、Claude Code");
+    expect(within(agentStack).getByTestId("agent-logo-codex")).toBeTruthy();
+    expect(within(agentStack).getByTestId("agent-logo-claude-code")).toBeTruthy();
+  });
+
   test("sorts home skill cards by recent discovery by default, name, and source state", async () => {
     const user = userEvent.setup();
     const scenario = createHomeSortScenario();
@@ -1462,7 +1484,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByTestId("redesign-toast")).toBeNull();
   });
 
-  test("reuses an existing source when opening the same skill from another agent", async () => {
+  test("reuses an existing source for an unbound same-name agent from the merged detail page", async () => {
     const user = userEvent.setup();
     const scenario = createAgentDetailScenario({ includeUnboundDuplicate: true });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -1471,13 +1493,15 @@ describe("Metis desktop GUI main flow", () => {
 
     render(<App />);
 
-    await user.click(await screen.findByTestId("skill-row-claude-codex-planner"));
+    await screen.findByTestId("skill-row-codex-planner");
+    expect(screen.queryByTestId("skill-row-claude-codex-planner")).toBeNull();
+    await user.click(screen.getByTestId("skill-row-codex-planner"));
 
-    expect(await screen.findByTestId("skill-detail-claude-codex-planner")).toBeTruthy();
+    expect(await screen.findByTestId("skill-detail-codex-planner")).toBeTruthy();
     expect(screen.getByText("修改来源")).toBeTruthy();
     expect(screen.queryByText("跨 Agent 安装状态")).toBeNull();
 
-    await user.click(screen.getByTestId("check-updates-claude-codex-planner"));
+    await user.click(screen.getByTestId("check-updates-codex-planner"));
 
     expect(scenario.boundSkillIds()).toContain("claude-codex-planner");
     expect(scenario.checkedSkillIds()).toContainEqual(["codex-planner", "claude-codex-planner"]);
@@ -3307,6 +3331,83 @@ function createSearchDedupeScenario() {
       description: "Claude-only helper",
       install_path: "/Users/me/.claude/skills/claude-only",
       metadata_path: "/Users/me/.claude/skills/claude-only/SKILL.md",
+    },
+  ];
+
+  return {
+    async invoke(command: string, _args?: unknown) {
+      switch (command) {
+        case "list_agents":
+          return agents;
+        case "list_indexed_skills":
+          return skills;
+        case "get_desktop_settings":
+          return { custom_scan_paths: [] };
+        default:
+          throw new Error(`Unexpected invoke command: ${command}`);
+      }
+    },
+  };
+}
+
+function createPartialSourceDedupeScenario() {
+  const brainstormingSource: DesktopSource = {
+    id: "source-brainstorming",
+    source_type: "git",
+    url: "file:///tmp/metis-brainstorming",
+    repo_path: "skills/brainstorming",
+    ref_: "main",
+    current_commit: "aaa111",
+    remote_commit: "aaa111",
+    last_checked_at: null,
+    trusted: true,
+    auto_update: false,
+    credential_ref: null,
+  };
+  const agents: DesktopAgentStatus[] = [
+    {
+      agent_id: "codex",
+      agent_name: "Codex",
+      enabled: true,
+      paths: [
+        {
+          path: "/Users/me/.codex/skills",
+          scope: "user",
+          exists: true,
+          readable: true,
+          writable: true,
+        },
+      ],
+    },
+    {
+      agent_id: "claude-code",
+      agent_name: "Claude Code",
+      enabled: true,
+      paths: [
+        {
+          path: "/Users/me/.claude/skills",
+          scope: "user",
+          exists: true,
+          readable: true,
+          writable: true,
+        },
+      ],
+    },
+  ];
+  const skills: DesktopSkill[] = [
+    {
+      ...agentDetailSkill("brainstorming-codex", "codex", "Codex", brainstormingSource),
+      name: "brainstorming",
+      description: "Brainstorming skill",
+      install_path: "/Users/me/.codex/skills/brainstorming",
+      metadata_path: "/Users/me/.codex/skills/brainstorming/SKILL.md",
+    },
+    {
+      ...agentDetailSkill("brainstorming-claude", "claude-code", "Claude Code", null),
+      name: "brainstorming",
+      description: "Brainstorming skill",
+      install_path: "/Users/me/.claude/skills/brainstorming",
+      metadata_path: "/Users/me/.claude/skills/brainstorming/SKILL.md",
     },
   ];
 

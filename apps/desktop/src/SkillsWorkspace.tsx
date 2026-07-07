@@ -543,14 +543,6 @@ function relatedAgentMembershipsForSkill(skill: DesktopSkill, skills: DesktopSki
 }
 
 function skillIdentityKey(skill: DesktopSkill) {
-  if (skill.source) {
-    return [
-      "source",
-      skill.source.url,
-      skill.source.repo_path,
-      skill.source.ref_ || "main",
-    ].join("\u0000");
-  }
   return `name\u0000${skill.name.trim().toLocaleLowerCase()}`;
 }
 
