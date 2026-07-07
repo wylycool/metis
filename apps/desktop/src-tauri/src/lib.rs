@@ -2242,7 +2242,7 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
             "apply_rollback_succeeded",
             "更新失败，已自动回滚",
             "应用更新时发生错误，Metis 已恢复到更新前备份。",
-            "确认本地目录可写、磁盘空间充足后重新检查更新；如问题重复，请保留调试详情。",
+            "确认本地目录可写、磁盘空间充足后重新检查更新；如问题重复，请保留当前错误提示。",
             message,
         );
     }
@@ -2252,7 +2252,7 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
             "apply_rollback_failed",
             "更新失败，自动回滚也失败",
             "应用更新和自动回滚都没有完成，本地 skill 可能处于不完整状态。",
-            "请先不要继续更新，使用备份面板或备份目录手动恢复，并保留调试详情排查。",
+            "请先不要继续更新，使用备份面板或备份目录手动恢复，并保留当前错误提示或截图。",
             message,
         );
     }
@@ -2411,7 +2411,7 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         "unknown",
         "操作失败",
         "桌面后端返回了暂未分类的错误。",
-        "请保留调试详情，并在重试前确认当前操作目标没有被其他进程占用。",
+        "请保留当前错误提示，并在重试前确认当前操作目标没有被其他进程占用。",
         message,
     )
 }

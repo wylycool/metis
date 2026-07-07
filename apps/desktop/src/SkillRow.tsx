@@ -632,19 +632,12 @@ export function StatusBadge({
 
 export function InlineError({ error }: { error: DesktopError }) {
   return (
-    <div className="inline-error" data-error-category={error.category}>
+    <div className="inline-error">
       <div className="error-heading">
         <strong>{error.title}</strong>
-        <span>{error.category}</span>
       </div>
       <p>{error.message}</p>
       <p className="error-suggestion">{error.suggestion}</p>
-      {error.debug_detail && (
-        <details>
-          <summary>调试详情</summary>
-          <code>{error.debug_detail}</code>
-        </details>
-      )}
     </div>
   );
 }

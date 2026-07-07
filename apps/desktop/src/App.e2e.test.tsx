@@ -373,6 +373,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(
       sourceCard.compareDocumentPosition(errorCard as Element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    expect(within(errorCard as HTMLElement).queryByText("repo_path")).toBeNull();
+    expect(within(errorCard as HTMLElement).queryByText("调试详情")).toBeNull();
+    expect(within(errorCard as HTMLElement).queryByText("missing SKILL.md at skills/missing")).toBeNull();
   });
 
   test("toggles every valid remote install target in one click", async () => {

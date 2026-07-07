@@ -943,39 +943,8 @@ h1 {
   color: #ffd0d0;
 }
 
-.error-heading span {
-  border: 1px solid rgba(224, 95, 95, 0.45);
-  border-radius: 999px;
-  padding: 2px 7px;
-  color: #f4b4b4;
-  background: rgba(224, 95, 95, 0.12);
-  font-size: 11px;
-  font-weight: 800;
-}
-
 .error-suggestion {
   color: #f4d0d0;
-}
-
-.inline-error details {
-  margin-top: 8px;
-}
-
-.inline-error summary {
-  cursor: pointer;
-  color: #f3bbbb;
-  font-weight: 700;
-}
-
-.inline-error code {
-  display: block;
-  margin-top: 6px;
-  border: 1px solid rgba(224, 95, 95, 0.28);
-  border-radius: 6px;
-  padding: 7px 8px;
-  color: #ffd8d8;
-  background: rgba(18, 20, 24, 0.7);
-  white-space: pre-wrap;
 }
 
 .inline-success {
@@ -2172,17 +2141,8 @@ h1 {
 }
 
 .error-heading strong,
-.error-heading span,
-.error-suggestion,
-.inline-error summary,
-.inline-error code {
+.error-suggestion {
   color: var(--danger-fg);
-}
-
-.error-heading span,
-.inline-error code {
-  border-color: var(--danger-border);
-  background: var(--surface-panel);
 }
 
 .inline-success {
