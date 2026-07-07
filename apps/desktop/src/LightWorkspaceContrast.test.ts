@@ -338,6 +338,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".auto-update-source-row")).toContain(
       "grid-template-columns: minmax(0, 1fr) auto;",
     );
+    expect(latestBlockFor(".auto-update-remove-actions")).toContain("display: inline-flex;");
+    expect(latestBlockFor(".auto-update-remove-actions")).toContain("justify-self: end;");
+    expect(latestBlockFor(".auto-update-remove-actions")).not.toContain("grid-column: 1 / -1;");
     expect(latestBlockFor(".skill-intro-copy")).toContain("-webkit-line-clamp: 3");
   });
 

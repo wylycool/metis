@@ -611,6 +611,8 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     expect(await screen.findByText("自动更新")).toBeTruthy();
     expect(screen.getByText("只会更新已加入自动更新列表、且本地没有修改的 Skill。")).toBeTruthy();
+    expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
+    expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
     const autoUpdateList = within(screen.getByTestId("auto-update-source-list"));
     expect(autoUpdateList.getByText("Trusted Skill")).toBeTruthy();
     expect(autoUpdateList.getByText("file:///tmp/metis-trusted-repo")).toBeTruthy();
@@ -642,7 +644,15 @@ describe("Metis desktop GUI main flow", () => {
       ([command]) => command === "bind_skill_source",
     ).length;
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
-    expect(screen.getByTestId("confirm-remove-auto-update-trusted-skill")).toBeTruthy();
+    const removeActions = within(screen.getByTestId("auto-update-remove-actions-trusted-skill"));
+    expect(removeActions.getByTestId("confirm-remove-auto-update-trusted-skill").textContent).toBe(
+      "确认",
+    );
+    expect(removeActions.getByTestId("cancel-remove-auto-update-trusted-skill").textContent).toBe(
+      "取消",
+    );
+    expect(screen.queryByTestId("auto-update-remove-confirm-trusted-skill")).toBeNull();
+    expect(screen.queryByText("确认移出自动更新列表？")).toBeNull();
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(
       invokeMock.mock.calls.filter(([command]) => command === "bind_skill_source"),
@@ -728,8 +738,8 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     expect(await screen.findByText("自动更新")).toBeTruthy();
-    expect(screen.getByText("自动更新列表 0 个")).toBeTruthy();
-    expect(screen.getByText("本次可更新候选 0 个")).toBeTruthy();
+    expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
+    expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
 
     await user.click(screen.getByTestId("run-auto-update"));
 
