@@ -16,6 +16,7 @@ export function CrossAgentTargetMatrix({
   title,
   onInstall,
   onRefresh,
+  onSelectAllValid,
   onToggleTarget,
 }: {
   currentAgentId: string | null;
@@ -27,9 +28,14 @@ export function CrossAgentTargetMatrix({
   title: string;
   onInstall: () => void;
   onRefresh: () => void;
+  onSelectAllValid?: () => void;
   onToggleTarget: (target: DesktopSkillTarget) => void;
 }) {
   const selectedCount = selectedTargetIds.length;
+  const selectableTargetIds = targets.filter(isRemoteTargetSelectable).map(remoteTargetId);
+  const selectableCount = selectableTargetIds.length;
+  const allSelectableTargetsSelected =
+    selectableCount > 0 && selectableTargetIds.every((id) => selectedTargetIds.includes(id));
 
   return (
     <section className="target-matrix cross-agent-matrix" aria-label={title}>
@@ -38,16 +44,28 @@ export function CrossAgentTargetMatrix({
           <h3>{title}</h3>
           <p>选择要安装或更新的位置。自定义路径会和内置 Agent 一起显示。</p>
         </div>
-        <button
-          aria-busy={loading}
-          className="ghost-button compact target-matrix-refresh"
-          data-testid="refresh-target-matrix"
-          disabled={loading}
-          onClick={onRefresh}
-        >
-          {loading && <span className="target-matrix-spinner" data-testid="target-matrix-spinner" />}
-          {loading ? "检查中" : "重新检查状态"}
-        </button>
+        <div className="target-matrix-actions">
+          {onSelectAllValid && targets.length > 0 && (
+            <button
+              className="ghost-button compact target-matrix-select-all"
+              data-testid="select-all-valid-targets"
+              disabled={loading || selectableCount === 0 || allSelectableTargetsSelected}
+              onClick={onSelectAllValid}
+            >
+              选中所有有效路径
+            </button>
+          )}
+          <button
+            aria-busy={loading}
+            className="ghost-button compact target-matrix-refresh"
+            data-testid="refresh-target-matrix"
+            disabled={loading}
+            onClick={onRefresh}
+          >
+            {loading && <span className="target-matrix-spinner" data-testid="target-matrix-spinner" />}
+            {loading ? "检查中" : "重新检查状态"}
+          </button>
+        </div>
       </div>
       {error && <InlineError error={error} />}
       {loading && targets.length === 0 && (
@@ -124,7 +142,7 @@ export function remoteTargetId(target: DesktopSkillTarget) {
   return `${target.agent_id}:${target.install_path}`;
 }
 
-function isRemoteTargetSelectable(target: DesktopSkillTarget) {
+export function isRemoteTargetSelectable(target: DesktopSkillTarget) {
   if (target.local_modified) {
     return ["UpToDate", "UpdateAvailable", "InstalledUnbound"].includes(target.status);
   }

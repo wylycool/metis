@@ -26,7 +26,7 @@ import { shortCommit } from "./commitDisplay";
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { GitHubIcon } from "./GitHubIcon";
 import { METIS_GITHUB_URL } from "./projectLinks";
-import { remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
+import { isRemoteTargetSelectable, remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
 import { InlineError, type BindDraft } from "./SkillRow";
 import { UiRedesignPreview } from "./UiRedesignPreview";
 import type {
@@ -111,6 +111,7 @@ function MetisApp() {
     ref_: "main",
   });
   const [remotePreview, setRemotePreview] = useState<DesktopRemoteSkillPreview | null>(null);
+  const [remotePreviewError, setRemotePreviewError] = useState<DesktopError | null>(null);
   const [remoteTargets, setRemoteTargets] = useState<DesktopSkillTarget[]>([]);
   const [selectedRemoteTargetIds, setSelectedRemoteTargetIds] = useState<string[]>([]);
   const [pendingAutoUpdateRemovalSkillId, setPendingAutoUpdateRemovalSkillId] =
@@ -606,6 +607,7 @@ function MetisApp() {
   async function handlePreviewRemoteSync() {
     setActionBusy("remote-sync-preview");
     setActionError(null);
+    setRemotePreviewError(null);
     setActionMessage(null);
     setRemotePreview(null);
     setRemoteTargets([]);
@@ -629,10 +631,16 @@ function MetisApp() {
       setRemoteTargets(targets);
       setSelectedRemoteTargetIds([]);
     } catch (caught) {
-      setActionError(desktopError(caught));
+      setRemotePreviewError(desktopError(caught));
     } finally {
       setActionBusy(null);
     }
+  }
+
+  function handleSelectAllValidRemoteTargets() {
+    setSelectedRemoteTargetIds(
+      remoteTargets.filter(isRemoteTargetSelectable).map((target) => remoteTargetId(target)),
+    );
   }
 
   function toggleRemoteTarget(target: DesktopSkillTarget) {
@@ -655,6 +663,7 @@ function MetisApp() {
 
     setActionBusy("remote-sync-install");
     setActionError(null);
+    setRemotePreviewError(null);
     setActionMessage(null);
 
     try {
@@ -1108,6 +1117,12 @@ function MetisApp() {
 
   const settingsAgentRows = agentPathRows(agents);
   const isSkillDetailView = activeWorkspace === "skills" && skillsViewKind === "detail";
+  const handleSkillsRouteKindChange = useCallback((kind: SkillsViewKind) => {
+    setSkillsViewKind(kind);
+    if (kind !== "add") {
+      setRemotePreviewError(null);
+    }
+  }, []);
   const openMetisGithub = () => {
     void openExternalUrl(METIS_GITHUB_URL).catch(() => {
       if (navigator.userAgent.toLowerCase().includes("jsdom")) {
@@ -1505,6 +1520,7 @@ function MetisApp() {
           error={error}
           remoteInstallResult={remoteInstallResult}
           remotePreview={remotePreview}
+          remotePreviewError={remotePreviewError}
           remoteSyncDraft={remoteSyncDraft}
           remoteTargets={remoteTargets}
           selectedRemoteTargetIds={selectedRemoteTargetIds}
@@ -1534,7 +1550,8 @@ function MetisApp() {
           onRestoreBackup={handleRestoreBackup}
           onScan={handleScan}
           onSetRemoteSyncDraft={setRemoteSyncDraft}
-          onRouteKindChange={setSkillsViewKind}
+          onRouteKindChange={handleSkillsRouteKindChange}
+          onSelectAllValidRemoteTargets={handleSelectAllValidRemoteTargets}
           onToggleDetailDiff={handleToggleDetailDiff}
           onToggleDiff={handleToggleDiff}
           onToggleRemoteTarget={toggleRemoteTarget}

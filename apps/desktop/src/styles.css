@@ -1984,6 +1984,14 @@ h1 {
   gap: 12px;
 }
 
+.target-matrix-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .target-matrix-header h3 {
   font-size: 14px;
 }
@@ -2388,13 +2396,31 @@ textarea:disabled {
   background: var(--command-surface);
 }
 
+.add-skill-page .target-matrix-select-all {
+  border-color: var(--command-border);
+  color: var(--ink);
+  background: var(--command-surface);
+}
+
 .add-skill-page .target-matrix-refresh:hover:not(:disabled) {
   color: var(--ink);
   border-color: var(--command-selected-border);
   background: var(--command-selected);
 }
 
+.add-skill-page .target-matrix-select-all:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--command-selected-border);
+  background: var(--command-selected);
+}
+
 .add-skill-page .target-matrix-refresh:focus-visible {
+  color: var(--ink);
+  border-color: var(--command-selected-border);
+  background: var(--command-selected);
+}
+
+.add-skill-page .target-matrix-select-all:focus-visible {
   color: var(--ink);
   border-color: var(--command-selected-border);
   background: var(--command-selected);

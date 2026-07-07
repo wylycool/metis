@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddSkillPage, type RemoteSyncDraft } from "./AddSkillPage";
-import { remoteTargetId } from "./CrossAgentTargetMatrix";
+import { isRemoteTargetSelectable, remoteTargetId } from "./CrossAgentTargetMatrix";
 import { SkillDetailPage } from "./SkillDetailPage";
 import { InlineError, SkillRow, type BindDraft } from "./SkillRow";
 import type {
@@ -35,6 +35,7 @@ export function SkillsWorkspace({
   error,
   remoteInstallResult,
   remotePreview,
+  remotePreviewError,
   remoteSyncDraft,
   remoteTargets,
   selectedRemoteTargetIds,
@@ -61,6 +62,7 @@ export function SkillsWorkspace({
   onOpenSettings,
   onPreviewRemoteSync,
   onApplyNeededAgentUpdates,
+  onSelectAllValidRemoteTargets,
   onRestoreBackup,
   onRouteKindChange,
   onScan,
@@ -82,6 +84,7 @@ export function SkillsWorkspace({
   error: DesktopError | null;
   remoteInstallResult: DesktopInstallRemoteSkillResult | null;
   remotePreview: DesktopRemoteSkillPreview | null;
+  remotePreviewError: DesktopError | null;
   remoteSyncDraft: RemoteSyncDraft;
   remoteTargets: DesktopSkillTarget[];
   selectedRemoteTargetIds: string[];
@@ -108,6 +111,7 @@ export function SkillsWorkspace({
   onOpenBind: (skill: DesktopSkill) => void;
   onOpenSettings: () => void;
   onPreviewRemoteSync: () => void;
+  onSelectAllValidRemoteTargets: () => void;
   onRestoreBackup: (skillId: string, backupId: string) => void;
   onRouteKindChange: (kind: SkillsRoute["kind"]) => void;
   onScan: () => void;
@@ -259,12 +263,14 @@ export function SkillsWorkspace({
           draft={remoteSyncDraft}
           installResult={remoteInstallResult}
           preview={remotePreview}
+          previewError={remotePreviewError}
           selectedTargetIds={selectedRemoteTargetIds}
           targets={remoteTargets}
           onBack={() => setRoute({ kind: "list" })}
           onDraftChange={onSetRemoteSyncDraft}
           onInstallTargets={onInstallRemoteTargets}
           onPreview={onPreviewRemoteSync}
+          onSelectAllValidTargets={onSelectAllValidRemoteTargets}
           onToggleTarget={onToggleRemoteTarget}
         />
       )}
@@ -587,4 +593,4 @@ function reusableSourceForSkill(
   );
 }
 
-export { remoteTargetId };
+export { isRemoteTargetSelectable, remoteTargetId };

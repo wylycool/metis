@@ -345,6 +345,66 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText(/custom-team-memory：Updated/)).toBeNull();
   });
 
+  test("keeps remote preview errors inside the add skill source area", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ remotePreviewFails: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-e2e-skill");
+    await user.click(screen.getByTestId("open-add-skill"));
+    await user.type(
+      screen.getByTestId("add-skill-url"),
+      "https://github.com/example/metis-skills.git",
+    );
+    await user.type(screen.getByTestId("add-skill-repo-path"), "skills/missing");
+    await user.clear(screen.getByTestId("add-skill-ref"));
+    await user.type(screen.getByTestId("add-skill-ref"), "main");
+    await user.click(screen.getByTestId("add-skill-preview"));
+
+    const sourceCard = await screen.findByLabelText("添加 Skill");
+    const errorHeading = await screen.findByText("没有找到 Skill");
+    const errorCard = errorHeading.closest(".inline-error");
+    expect(errorCard).toBeTruthy();
+    expect(errorCard?.closest(".add-skill-source-card")).toBe(sourceCard);
+    expect(
+      sourceCard.compareDocumentPosition(errorCard as Element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  test("selects every valid remote install target in one click", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ includeCustomInstallTarget: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-e2e-skill");
+    await user.click(screen.getByTestId("open-add-skill"));
+    await user.type(
+      screen.getByTestId("add-skill-url"),
+      "https://github.com/example/metis-skills.git",
+    );
+    await user.type(screen.getByTestId("add-skill-repo-path"), "skills/remote");
+    await user.click(screen.getByTestId("add-skill-preview"));
+
+    await screen.findByText("安装到以下 Agent / 目录");
+    await user.click(await screen.findByTestId("select-all-valid-targets"));
+
+    expect((screen.getByTestId("target-checkbox-codex") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId("target-checkbox-custom-team-memory") as HTMLInputElement).checked).toBe(
+      true,
+    );
+    expect((screen.getByTestId("target-checkbox-claude-code") as HTMLInputElement).checked).toBe(
+      false,
+    );
+  });
+
   test("explains source connection test failures in user language", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({ sourceConnectionFails: true });
@@ -2138,6 +2198,7 @@ function createMainFlowScenario(
     sshSourceConnectionFails?: boolean;
     slowBind?: boolean;
     slowDiff?: boolean;
+    remotePreviewFails?: boolean;
     slowRemotePreview?: boolean;
     upToDateAfterCheck?: boolean;
     updatedSkillSizeBytes?: number;
@@ -2491,6 +2552,15 @@ function createMainFlowScenario(
         case "preview_remote_skill_source":
           if (options.slowRemotePreview) {
             await delay(80);
+          }
+          if (options.remotePreviewFails) {
+            throw JSON.stringify({
+              title: "没有找到 Skill",
+              message: "仓库里没有找到 SKILL.md，请检查 Skill 路径。",
+              suggestion: "如果 Skill 位于仓库根目录，可以把 Skill 路径留空。",
+              category: "repo_path",
+              debug_detail: "missing SKILL.md at skills/missing",
+            } satisfies DesktopError);
           }
           return {
             name: "Remote Skill",

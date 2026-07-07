@@ -1,7 +1,9 @@
 import { CrossAgentTargetMatrix } from "./CrossAgentTargetMatrix";
 import { shortCommit } from "./commitDisplay";
+import { InlineError } from "./SkillRow";
 import type { CSSProperties } from "react";
 import type {
+  DesktopError,
   DesktopInstallRemoteSkillResult,
   DesktopRemoteSkillPreview,
   DesktopSkillTarget,
@@ -18,24 +20,28 @@ export function AddSkillPage({
   draft,
   installResult,
   preview,
+  previewError,
   selectedTargetIds,
   targets,
   onBack,
   onDraftChange,
   onInstallTargets,
   onPreview,
+  onSelectAllValidTargets,
   onToggleTarget,
 }: {
   actionBusy: string | null;
   draft: RemoteSyncDraft;
   installResult: DesktopInstallRemoteSkillResult | null;
   preview: DesktopRemoteSkillPreview | null;
+  previewError: DesktopError | null;
   selectedTargetIds: string[];
   targets: DesktopSkillTarget[];
   onBack: () => void;
   onDraftChange: (draft: RemoteSyncDraft) => void;
   onInstallTargets: () => void;
   onPreview: () => void;
+  onSelectAllValidTargets: () => void;
   onToggleTarget: (target: DesktopSkillTarget) => void;
 }) {
   return (
@@ -79,6 +85,7 @@ export function AddSkillPage({
             onChange={(event) => onDraftChange({ ...draft, ref_: event.target.value })}
           />
         </div>
+        {previewError && <InlineError error={previewError} />}
         {preview && (
           <div className="remote-preview-card" style={remotePreviewAccentStyle(preview)}>
             <div className="remote-preview-copy">
@@ -101,6 +108,7 @@ export function AddSkillPage({
             title="安装到以下 Agent / 目录"
             onInstall={onInstallTargets}
             onRefresh={onPreview}
+            onSelectAllValid={onSelectAllValidTargets}
             onToggleTarget={onToggleTarget}
           />
         )}
