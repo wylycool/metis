@@ -24,9 +24,9 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 ## 当前阶段
 
-项目处于 **Phase 6 UI 重构完成点 / Beta 5 已发布**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地企业治理能力、Phase 5 产品化收口和 Phase 6 前端体验重构均已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出、团队清单合规、团队策略审计、企业网络配置、受控自动更新和跨 Agent Git skill 同步。
+项目处于 **Phase 6 UI 重构完成点 / Beta 5 已发布**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地治理能力、Phase 5 产品化收口和 Phase 6 前端体验重构均已完成。桌面应用当前提供 `Skills` 和 `Settings` 两个工作区：Skills 用于扫描、来源绑定、更新检查、diff、手动更新、备份回滚和安装；Settings 用于管理内置 Agent 路径、自定义路径、受控自动更新列表和本机 Git 检测。
 
-当前推荐下载版本是 `desktop-v0.1.0-beta.5`；该版本包含 Phase 6 UI 重设计、Skills 首页与详情页视觉收口、Command Sheet 操作面 polish、搜索去重、前端组件拆分、Git checkout cache 性能与容量优化，以及跨 Agent 安装矩阵。
+当前推荐下载版本是 `desktop-v0.1.0-beta.5`；该版本包含 Phase 6 UI 重设计、Skills 首页与详情页视觉收口、搜索去重、前端组件拆分和 Git checkout cache 优化。添加 Skill 页面支持预览远端 Git Skill 后安装到选中路径；已安装 Skill 的详情页支持把当前本地目录直接复制到其他未安装路径。
 
 ## 技术栈
 
@@ -72,28 +72,28 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 - 解析 `SKILL.md` 中的名称、描述和基础元数据。
 - 给 skill 绑定 Git 来源 URL、仓库内路径、ref 和当前 commit。
 - 检测远端是否有更新。
-- 显示当前版本、远端版本和本地修改状态。
+- 显示检查结果、文件差异和本地修改状态。
 - 支持手动确认更新。
 - 更新前自动备份。
 - 更新失败自动回滚。
 - 支持查看更新 diff。
 - 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称作为引用名/备注名，真实认证由本机 Git、SSH agent 或 Git credential helper 完成，Metis 不读取 Keychain 或 token。
-- 支持导出和导入团队 skill 清单。
-- 支持导出本机环境报告；报告只包含 skill/source/agent 摘要，不包含 token 或 `credential_ref` 值。
 - 支持受控自动更新：只处理用户同时标记为 trusted 和 auto update、且本地未修改的 source。
-- 支持跨 Agent 同步：预览远端 Git skill 后，选择 Codex、Claude Code、OpenClaw、Hermes、opencode 目标进行安装或更新，并逐目标展示安装、更新、跳过或失败结果。
+- 支持添加远端 Skill：预览 Git 来源后，选择 Codex、Claude Code、OpenClaw、Hermes、opencode 或自定义路径进行安装或更新。
+- 支持详情页本地复制：展开安装位置后，把当前已安装 Skill 复制到其他尚未安装的 Agent 或自定义路径；此过程不检查远端更新，也不覆盖已有目录。
+- 支持在 Settings 编辑内置 Agent 路径、管理命名自定义路径和检测本机 Git 环境。
 
 ## 本地验证
 
 ```bash
 cargo test
 cargo clippy
-cd apps/desktop && pnpm build
-cd apps/desktop && pnpm tauri build
-cd apps/desktop && pnpm tauri:build:mac-universal
+(cd apps/desktop && pnpm build)
+(cd apps/desktop && pnpm tauri build)
+(cd apps/desktop && pnpm tauri:build:mac-universal)
 ```
 
-macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已在 run `27862207405` 成功构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
+macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包由 GitHub Actions workflow `Desktop Preview Packages` 构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
 
 ## 安装提示
 
@@ -109,10 +109,10 @@ Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 
 首次打开后的建议路径：
 
 1. 在 `Skills` 工作区点击重新扫描，确认本机已安装 skills。
-2. 对需要治理的 skill 绑定 Git source，并按需标记 trusted source。
-3. 在 `Skills` 工作区使用跨 Agent 同步面板预览远端 Git skill，并安装到选中的本机 Agent。
-4. 在 `Governance` 工作区导出环境报告，或粘贴团队清单检查合规状态。
-5. 在 `Settings` 工作区配置额外扫描路径、团队策略文件和企业代理/CA bundle。
+2. 对需要跟踪更新的 Skill 绑定 Git 来源，并按需加入受控自动更新列表。
+3. 点击“添加 Skill”，预览远端 Git Skill 后安装或更新到选中的 Agent 或自定义路径。
+4. 进入已安装 Skill 的详情页，展开安装位置，把当前本地 Skill 复制到其他尚未安装的路径；此操作不会检查远端更新。
+5. 在 `Settings` 工作区调整内置 Agent 路径、添加命名自定义路径或检测本机 Git 环境。
 
 ## 当前不做
 
