@@ -225,53 +225,79 @@ export function SkillDetailPage({
           className="skill-detail-card local-operations-card redesign-update-workbench"
           data-testid={`skill-operations-card-${skill.id}`}
         >
-          <div className="detail-action-row local-action-row redesign-operation-tabs">
+          <div
+            aria-label="Skill 版本操作"
+            className="detail-action-row local-action-row redesign-operation-tabs"
+            role="group"
+          >
             <button
-              className="operation-button compact"
+              aria-busy={checkBusy}
+              className="operation-button compact operation-button--check"
               data-testid={`check-updates-${skill.id}`}
               disabled={installedAgentRows.length === 0 || checkBusy}
               onClick={onCheck}
+              type="button"
             >
               {checkBusy ? "检查中" : "检查更新"}
             </button>
             <button
-              className={`operation-button compact ${diffDetail ? "active" : ""}`}
+              aria-busy={diffBusy}
+              aria-controls={`detail-diff-panel-${skill.id}`}
+              aria-expanded={Boolean(diffDetail)}
+              className={`operation-button compact operation-button--diff ${
+                diffDetail ? "active" : ""
+              }`}
               data-testid={`toggle-diff-${skill.id}`}
-              disabled={!source || diffBusy || (!diffDetail && !canViewDiff)}
+              disabled={!source || diffBusy || backupBusy || (!diffDetail && !canViewDiff)}
               onClick={onToggleDiff}
               title={!source || canViewDiff || diffDetail ? undefined : "先检查更新后查看 diff"}
+              type="button"
             >
               {diffBusy ? "加载 diff" : diffDetail ? "隐藏 diff" : "查看 diff"}
             </button>
             <button
-              className={`operation-button compact ${backupOpen ? "active" : ""}`}
+              aria-busy={backupBusy}
+              aria-controls={`detail-backup-panel-${skill.id}`}
+              aria-expanded={backupOpen}
+              className={`operation-button compact operation-button--backup ${
+                backupOpen ? "active" : ""
+              }`}
               data-testid={`toggle-backups-${skill.id}`}
-              disabled={!source || backupBusy}
+              disabled={!source || backupBusy || diffBusy}
               onClick={onToggleBackups}
+              type="button"
             >
               {backupBusy ? "读取备份" : backupOpen ? "隐藏备份" : "备份/回滚"}
             </button>
             {outdatedAgentRows.length > 0 && (
               <button
-                className="operation-button compact pending"
+                aria-busy={applyNeededBusy}
+                className="operation-button compact operation-button--update pending"
                 data-testid={`apply-needed-agent-updates-${skill.id}`}
                 disabled={applyNeededBusy}
                 onClick={() =>
                   onApplyNeededAgentUpdates(outdatedAgentRows.map((row) => row.skillId))
                 }
+                type="button"
               >
                 {applyNeededBusy ? "更新中" : "更新需要更新的 Agent"}
               </button>
             )}
           </div>
 
-          {diffError && <InlineError error={diffError} />}
+          {diffError && !backupOpen && <InlineError error={diffError} />}
           {!diffDetail && !backupOpen && (
             <FormalCheckPanel skill={skill} updateResult={updateResult} />
           )}
-          {diffDetail && <DiffPanel detail={diffDetail} repoPath={source?.repo_path} />}
+          {diffDetail && (
+            <DiffPanel
+              detail={diffDetail}
+              id={`detail-diff-panel-${skill.id}`}
+              repoPath={source?.repo_path}
+            />
+          )}
 
-          {backupError && <InlineError error={backupError} />}
+          {backupOpen && backupError && <InlineError error={backupError} />}
           {backupOpen && (
             <BackupPanel
               backups={backups}

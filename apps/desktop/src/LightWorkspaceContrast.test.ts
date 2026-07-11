@@ -857,6 +857,69 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(/\.settings-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
   });
 
+  test("keeps detail operation buttons semantic and light across interaction states", () => {
+    const base = latestBlockFor(".redesign-operation-tabs .operation-button");
+    expect(base).toContain("display: inline-flex;");
+    expect(base).toContain("background: var(--operation-surface);");
+    expect(base).toContain("border-color: var(--operation-border);");
+    expect(base).toContain("transition:");
+    expect(base).toContain("transform: none;");
+
+    expect(latestBlockFor(".redesign-operation-tabs .operation-button--check")).toContain(
+      "--operation-accent: #2f6fd6;",
+    );
+    expect(latestBlockFor(".redesign-operation-tabs .operation-button--diff")).toContain(
+      "--operation-accent: #6d5bd0;",
+    );
+    expect(latestBlockFor(".redesign-operation-tabs .operation-button--backup")).toContain(
+      "--operation-accent: #b7791f;",
+    );
+    expect(latestBlockFor(".redesign-operation-tabs .operation-button--update")).toContain(
+      "--operation-accent: #0f8a72;",
+    );
+
+    expect(
+      latestBlockFor(".redesign-operation-tabs .operation-button:hover:not(:disabled)"),
+    ).toContain("background: var(--operation-hover-surface);");
+    expect(latestBlockFor(".redesign-operation-tabs .operation-button:focus-visible")).toContain(
+      "box-shadow: 0 0 0 3px var(--operation-ring);",
+    );
+    expect(
+      latestBlockFor(".redesign-operation-tabs .operation-button:active:not(:disabled)"),
+    ).toContain("box-shadow: inset 0 1px 2px var(--operation-pressed-shadow);");
+
+    const selected = latestBlockFor(
+      '.redesign-operation-tabs .operation-button[aria-expanded="true"]',
+    );
+    expect(selected).toContain("color: var(--operation-selected-text);");
+    expect(selected).toContain("background: var(--operation-selected-surface);");
+    expect(selected).not.toContain("linear-gradient");
+    expect(selected).not.toContain("color: #ffffff");
+    expect(
+      latestBlockFor(
+        '.redesign-operation-tabs .operation-button[aria-expanded="true"]:active:not(:disabled)',
+      ),
+    ).toContain("background: var(--operation-pressed-surface);");
+
+    const disabled = latestBlockFor(
+      '.redesign-operation-tabs .operation-button:disabled:not([aria-busy="true"])',
+    );
+    expect(disabled).toContain("opacity: 1;");
+    expect(disabled).toContain("background: #f8fafc;");
+    expect(
+      blockFor('.redesign-operation-tabs .operation-button[aria-busy="true"]::before'),
+    ).toContain("animation: detailOperationSpin 760ms linear infinite;");
+    expect(stylesheet).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.redesign-operation-tabs \.operation-button\[aria-busy="true"\]::before[\s\S]*animation:\s*none;/,
+    );
+    expect(stylesheet).not.toMatch(
+      /\.redesign-operation-tabs button\.active\s*\{[^}]*linear-gradient/,
+    );
+    expect(stylesheet).not.toMatch(
+      /\.detail-action-row\.redesign-operation-tabs button\.active\s*\{[^}]*linear-gradient/,
+    );
+  });
+
   test("maps the formal desktop UI onto the same redesign visual system as the preview", () => {
     expect(stylesheet).toMatch(
       /\.metis-window\.redesign-preview-shell\s*\{[\s\S]*padding:\s*0;/,
