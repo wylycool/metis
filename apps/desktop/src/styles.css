@@ -7390,8 +7390,10 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   --operation-marker-ring: rgba(49, 84, 223, 0.1);
   --operation-shadow: rgba(30, 48, 78, 0.1);
   --operation-pressed-shadow: rgba(30, 48, 78, 0.16);
+  --operation-rest-shadow: 0 1px 2px rgba(30, 48, 78, 0.04);
   min-width: 112px;
   min-height: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7403,7 +7405,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   padding: 0 14px;
   color: var(--operation-text);
   background: var(--operation-surface);
-  box-shadow: 0 1px 2px rgba(30, 48, 78, 0.04);
+  box-shadow: var(--operation-rest-shadow);
   font-size: 12px;
   font-weight: 850;
   transform: none;
@@ -7414,14 +7416,23 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
     box-shadow 180ms ease;
 }
 
+.redesign-operation-tabs .operation-button:not(.operation-button--update) {
+  width: 112px;
+  flex: 0 0 112px;
+}
+
 .redesign-operation-tabs .operation-button::before {
   content: "";
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
   border-radius: 999px;
-  background: var(--operation-accent);
-  box-shadow: 0 0 0 4px var(--operation-marker-ring);
+  background: radial-gradient(
+    circle,
+    var(--operation-accent) 0 3.5px,
+    var(--operation-marker-ring) 3.5px 7.5px
+  );
+  box-shadow: none;
   transition:
     background 180ms ease,
     box-shadow 180ms ease;
@@ -7517,12 +7528,12 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   border-color: var(--operation-selected-border);
   background: var(--operation-selected-surface);
   box-shadow:
-    0 5px 14px var(--operation-shadow),
+    var(--operation-rest-shadow),
     inset 0 0 0 1px rgba(255, 255, 255, 0.62);
 }
 
 .redesign-operation-tabs .operation-button[aria-expanded="true"]::before {
-  box-shadow: 0 0 0 5px var(--operation-marker-ring);
+  box-shadow: none;
 }
 
 .redesign-operation-tabs .operation-button[aria-expanded="true"]:hover:not(:disabled) {
@@ -7533,7 +7544,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 .redesign-operation-tabs .operation-button[aria-expanded="true"]:focus-visible {
   box-shadow:
     0 0 0 3px var(--operation-ring),
-    0 5px 14px var(--operation-shadow);
+    var(--operation-rest-shadow);
 }
 
 .redesign-operation-tabs .operation-button[aria-expanded="true"]:active:not(:disabled) {
@@ -7571,8 +7582,9 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .redesign-operation-tabs .operation-button[aria-busy="true"]::before {
-  width: 11px;
-  height: 11px;
+  width: 15px;
+  height: 15px;
+  box-sizing: border-box;
   border: 2px solid color-mix(in srgb, var(--operation-accent), transparent 72%);
   border-top-color: var(--operation-accent);
   background: transparent;
