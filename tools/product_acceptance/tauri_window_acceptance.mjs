@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -84,9 +84,74 @@ async function main() {
   step("view diff", "passed", "Real git diff appeared in the detail page");
 
   clickRelative(247, 468);
-  await delay(800);
-  screenshot("07-backups");
-  step("open backups", "passed", "Backup panel opened from the real window");
+  await waitForSqlNumber(
+    "select count(*) from backups where reason = 'pre-update';",
+    (count) => count >= 1,
+    30000,
+  );
+  await waitForSkillDescription(".codex/skills/e2e-skill", "Updated Tauri window acceptance skill");
+  screenshot("07-apply-update");
+  step("apply update", "passed", "Applied the real Git update from the Tauri window and created a pre-update backup");
+
+  clickRelative(880, 565);
+  await waitForSqlNumber(
+    "select count(*) from backups where reason = 'pre-rollback';",
+    (count) => count >= 1,
+    30000,
+  );
+  await waitForSkillDescription(".codex/skills/e2e-skill", "Initial Tauri window acceptance skill");
+  screenshot("08-rollback");
+  step("rollback", "passed", "Restored the pre-update backup from the real window");
+
+  clickRelative(65, 190);
+  await delay(500);
+  clickRelative(875, 245);
+  await delay(600);
+  screenshot("09-add-skill");
+  pasteRelative(250, 435, sourceRepo);
+  pasteRelative(630, 435, "skills/remote-p1-skill");
+  pasteRelative(845, 435, "main");
+  screenshot("09a-remote-filled");
+  clickRelative(865, 265);
+  await delay(4000);
+  screenshot("10-remote-preview");
+  step("preview remote source", "passed", "Previewed a remote source from the real Add Skill page");
+
+  scrollWindow(-650);
+  await delay(500);
+  screenshot("10a-matrix-scrolled");
+  clickRelative(70, 610);
+  await delay(200);
+  screenshot("10b-claude-target-selected");
+  clickRelative(850, 880);
+  await waitForSqlNumber(
+    "select count(*) from skills where agent_id = 'claude-code' and name = 'remote-p1-skill';",
+    (count) => count >= 1,
+    30000,
+  );
+  screenshot("11-install-remote-target");
+  step("install remote target", "passed", "Installed the previewed remote skill to Claude Code from the real window");
+
+  clickText("重新检查状态");
+  await waitForText("已绑定", 30000);
+  screenshot("12-matrix-refresh-after-install");
+  step("refresh target matrix", "passed", "Refreshed the cross-Agent target matrix after install");
+
+  clickRelative(65, 190);
+  await delay(500);
+  clickText("Codex");
+  await delay(300);
+  clickText("remote-p1-skill");
+  await waitForText("编辑来源", 30000);
+  await waitForText("跨 Agent 安装状态", 30000);
+  screenshot("13-reused-source-detail");
+  step("reuse source across agents", "passed", "Opened an unbound same-name Codex skill and reused the Claude-bound source in its detail page");
+
+  mutateLocalClaudeRemoteSkill();
+  clickText("重新检查状态");
+  await waitForText("本地已修改", 30000);
+  screenshot("14-local-modified-reclassified");
+  step("reclassify local modification", "passed", "After local modification, the refreshed matrix classified the target as locally modified");
 
   writeReport("passed", null);
   cleanup();
@@ -101,6 +166,7 @@ function prepareFixture() {
   );
 
   writeSkill(join(home, ".codex/skills/e2e-skill"), "e2e-skill", "Initial Tauri window acceptance skill");
+  writeSkill(join(home, ".codex/skills/remote-p1-skill"), "remote-p1-skill", "Local unbound P1 skill");
   writeSkill(join(home, ".claude/skills/same-name-skill"), "same-name-skill", "Same skill name across agents");
   writeSkill(
     join(home, ".agent-skills/long-content-skill-with-a-very-long-directory-name-for-layout"),
@@ -114,6 +180,7 @@ function prepareFixture() {
   );
 
   writeSkill(join(sourceRepo, "skills/e2e-skill"), "e2e-skill", "Initial Tauri window acceptance skill");
+  writeSkill(join(sourceRepo, "skills/remote-p1-skill"), "remote-p1-skill", "Remote P1 skill for cross-agent acceptance");
   git(["init"], sourceRepo);
   git(["checkout", "-b", "main"], sourceRepo);
   git(["add", "."], sourceRepo);
@@ -125,6 +192,10 @@ function updateSourceRepo() {
   writeFileSync(join(sourceRepo, "skills/e2e-skill/EXTRA.md"), "extra tauri acceptance fixture file\n");
   git(["add", "."], sourceRepo);
   git(["-c", "user.name=Metis Tauri Acceptance", "-c", "user.email=metis-tauri@example.invalid", "commit", "-m", "updated tauri skill"], sourceRepo);
+}
+
+function mutateLocalClaudeRemoteSkill() {
+  writeSkill(join(home, ".claude/skills/remote-p1-skill"), "remote-p1-skill", "Locally modified Claude P1 skill");
 }
 
 function launchTauriDev() {
@@ -165,7 +236,7 @@ async function waitForWindow(timeoutMs = 60000) {
 function setWindowBounds() {
   osa('tell application "System Events" to tell process "metis-desktop" to set frontmost to true');
   osa('tell application "System Events" to tell process "metis-desktop" to tell window "Metis" to set position to {120, 80}');
-  osa('tell application "System Events" to tell process "metis-desktop" to tell window "Metis" to set size to {960, 680}');
+  osa('tell application "System Events" to tell process "metis-desktop" to tell window "Metis" to set size to {960, 1000}');
 }
 
 function waitForText(text, timeoutMs = 12000) {
@@ -191,6 +262,23 @@ function waitForSqlNumber(sql, predicate, timeoutMs) {
     }
   }
   throw new Error(`Timed out waiting for SQL predicate: ${sql}`);
+}
+
+async function waitForSkillDescription(relativeDir, expectedDescription, timeoutMs = 12000) {
+  const skillPath = join(home, relativeDir, "SKILL.md");
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const contents = readFileSync(skillPath, "utf8");
+      if (contents.includes(`description: ${expectedDescription}`)) {
+        return;
+      }
+    } catch {
+      // The file may briefly disappear while an update or rollback replaces the directory.
+    }
+    await delay(250);
+  }
+  throw new Error(`Timed out waiting for ${skillPath} to contain description: ${expectedDescription}`);
 }
 
 function clickText(text) {
@@ -232,6 +320,11 @@ function pasteRelative(x, y, value) {
   osa(`set the clipboard to ${asText(value)}`);
   execFileSync(windowEventBinary, ["hotkey", "0"]);
   execFileSync(windowEventBinary, ["hotkey", "9"]);
+}
+
+function scrollWindow(dy) {
+  osa('tell application "System Events" to tell process "metis-desktop" to set frontmost to true');
+  execFileSync(windowEventBinary, ["scroll", String(dy)]);
 }
 
 function axNames() {
@@ -293,12 +386,13 @@ function writeReport(status, failure) {
     "## Coverage",
     "",
     "- Real Tauri dev window launched with isolated HOME.",
-    "- Clicked visible skill list row, detail page, source drawer, update check, diff, and backup panel.",
+    "- Clicked visible skill list row, detail page, source drawer, update check, diff, apply update, backup rollback, Add Skill, remote preview, target install, and matrix refresh.",
     "- Real local Git source repository was mutated while the app was running.",
+    "- Cross-Agent same-name source reuse and local modification reclassification were exercised in the real window.",
     "",
     "## Remaining Risk",
     "",
-    "- Rollback button is only clickable when a backup exists; the current detail UI exposes backup listing but not an apply-update button.",
+    "- Runner still depends partly on coordinate clicks for fields and matrix checkboxes; WebDriver or richer accessibility selectors would make it less fragile.",
     "",
     "## Source Rows",
     "",

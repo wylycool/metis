@@ -13,6 +13,7 @@ pub struct AuditQuery {
 pub enum AuditAction {
     SourceBound,
     SourceUnbound,
+    SkillCopied,
     UpdateChecked,
     UpdateApplied,
     UpdateFailed,
@@ -104,6 +105,7 @@ fn audit_action_to_storage(action: &AuditAction) -> String {
     match action {
         AuditAction::SourceBound => "source_bound",
         AuditAction::SourceUnbound => "source_unbound",
+        AuditAction::SkillCopied => "skill_copied",
         AuditAction::UpdateChecked => "update_checked",
         AuditAction::UpdateApplied => "update_applied",
         AuditAction::UpdateFailed => "update_failed",
@@ -121,6 +123,7 @@ fn audit_action_from_storage(action: &str) -> AuditAction {
     match action {
         "source_bound" => AuditAction::SourceBound,
         "source_unbound" => AuditAction::SourceUnbound,
+        "skill_copied" => AuditAction::SkillCopied,
         "update_checked" => AuditAction::UpdateChecked,
         "update_applied" => AuditAction::UpdateApplied,
         "update_failed" => AuditAction::UpdateFailed,
@@ -165,6 +168,7 @@ mod tests {
             local_fingerprint: None,
             local_modified: None,
             last_scanned_at: "2026-06-19T10:00:00Z".to_string(),
+            local_updated_at: None,
         }
     }
 
@@ -202,5 +206,50 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].action, AuditAction::SourceBound);
         assert_eq!(events[0].detail.as_deref(), Some("bound source"));
+    }
+
+    #[test]
+    fn skill_copied_action_round_trips_storage_value() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        store
+            .upsert_skill(&sample_skill("skill-1"))
+            .expect("skill should upsert");
+        write_audit_event(
+            &store,
+            AuditEventInput {
+                skill_id: "skill-1".to_string(),
+                action: AuditAction::SkillCopied,
+                detail: Some("copied from source-skill to claude".to_string()),
+                commit_before: None,
+                commit_after: None,
+                status: "success".to_string(),
+                risk_summary: None,
+            },
+        )
+        .expect("copy audit should write");
+
+        let stored = store
+            .list_audit_events(&AuditEventFilter {
+                skill_id: Some("skill-1".to_string()),
+                action: Some("skill_copied".to_string()),
+                limit: 10,
+                offset: 0,
+            })
+            .expect("stored copy audit should list");
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].action, "skill_copied");
+
+        let events = query_audit_log(
+            AuditQuery {
+                skill_id: Some("skill-1".to_string()),
+                action: Some(AuditAction::SkillCopied),
+                limit: 10,
+                offset: 0,
+            },
+            &store,
+        )
+        .expect("copy audit should query");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].action, AuditAction::SkillCopied);
     }
 }

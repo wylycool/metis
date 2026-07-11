@@ -23,7 +23,7 @@ metis/
     storage/               # SQLite、lock 文件、备份管理
     security/              # 静态安全检查
   apps/
-    desktop/               # Tauri 桌面应用 (Phase 2)
+    desktop/               # React 19 + Tauri 2 桌面应用
 ```
 
 ## 行为准则
@@ -63,22 +63,21 @@ metis/
    - SDD：任何新功能、行为改动、架构调整或较大修复前，先明确目标、边界、涉及文件、数据结构、验证方式，并更新相关设计文档或 [docs/progress.md](docs/progress.md)。
    - TDD：设计明确后，先写失败测试并运行确认红灯，再写最小实现，测试绿灯后再重构。
    - 项目级 agent 规则见 [AGENTS.md](AGENTS.md)。
-4. **先写开发计划**：
-   - 开始当天开发前，先阅读 [docs/progress.md](docs/progress.md) 最新记录。
-   - 在当天日期小节写出“今日开发任务计划”，明确任务顺序、涉及文件和验证方式。
-   - 任务应拆成可逐项完成、可验证的小步骤，不要一次性完成整批功能后再回填进度。
-5. **按计划逐项开发并保存进度**：
-   - 按任务顺序推进，每完成一个小任务就更新 [docs/progress.md](docs/progress.md)。
-   - 如果实际开发偏离计划，应先更新计划并说明原因。
-   - 每个小任务都应尽量保持项目处于可编译、可测试、可说明的中间状态。
+4. **记录轻量计划**：
+   - 开始开发前阅读 [docs/progress.md](docs/progress.md) 的当前状态，并在“当前任务”中记录目标、边界和验证级别。
+   - 较大功能使用专门设计或实施计划；不要把完整规格、逐步红灯和命令流水重复粘贴到进度主文件。
+5. **按风险验证并收口进度**：
+   - 开发过程中只更新关键状态；完成后将结果压缩为 1–3 行，并链接长期设计或 commit。
+   - 文案/纯样式、普通功能、Core/Git/安全/跨层功能使用不同验证范围，具体以 [AGENTS.md](AGENTS.md) 为准。
+   - 每个任务结束时独立 commit、push，避免多个已完成任务长期堆积在工作区。
 6. **遵循代码风格**：
    - Rust：`cargo fmt` + `cargo clippy`
-   - TypeScript：通过项目 ESLint + Prettier 配置
+   - TypeScript：遵循现有组件和类型风格，并通过 `pnpm build` 的 TypeScript 检查；当前没有独立 ESLint / Prettier 脚本
 7. **编写测试**：
    - Core Engine 的改动必须有单元测试
    - 新增 adapter 必须覆盖路径发现和元数据解析
-   - 桌面交互改动必须覆盖 `cd apps/desktop && pnpm test:e2e`
-8. **确保测试通过**：`cargo test`
+   - 桌面交互按实际风险运行聚焦测试、完整 E2E 或真实窗口验收
+8. **完成对应验证**：验证范围以 [AGENTS.md](AGENTS.md) 的 A/B/C 分级为准
 9. **提交 Pull Request**：
    - 清楚描述改动内容和原因
    - 关联相关 Issue
@@ -88,7 +87,7 @@ metis/
 
 Adapter 是最适合外部贡献的模块。新增 Agent 支持时：
 
-1. 实现 `Adapter` trait 的所有方法。
+1. 实现 `AgentAdapter` trait 的所有必需方法。
 2. 在 adapter 目录下创建独立模块。
 3. 提供该 Agent 的路径发现逻辑。
 4. 提供 `SKILL.md` 解析逻辑（如有差异）。
@@ -104,7 +103,7 @@ Adapter trait 接口定义见 [docs/design/adapter-interface.md](docs/design/ada
 - Rust (stable, 通过 rustup 安装)
 - Node.js 18+
 - pnpm (推荐)
-- Tauri CLI（桌面应用开发时）
+- Tauri 所需的平台构建依赖（CLI 已作为桌面项目 dev dependency）
 - Git
 
 ### 初始化
@@ -132,13 +131,9 @@ pnpm tauri dev
 - **集成测试**：Core Engine + Adapter + Storage 的集成测试。
 - **端到端测试**：模拟真实 skill 安装、更新、回滚流程（Phase 2+）。
 - **GUI Harness**：桌面主链路和错误路径通过 `apps/desktop/src/App.e2e.test.tsx` 覆盖。
-- **发布验证**：预览包和安装 smoke 参见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
+- **发布验证**：桌面发布包和安装 smoke 参见 [docs/release-checklist.md](docs/release-checklist.md)。
 
-CI 会对每个 PR 运行：
-- `cargo test`
-- `cargo fmt --check`
-- `cargo clippy -- -D warnings`
-- `cargo audit`
+提交前至少完成本次改动对应的验证。Core/Git/安全或跨层改动通常包括 `cargo fmt --check`、`cargo test`、`cargo clippy --all-targets --all-features`；桌面交互按风险补充前端 E2E 和构建。发布 workflow 会在对应 tag/触发条件下构建桌面产物。
 
 ## 文档贡献
 

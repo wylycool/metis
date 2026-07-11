@@ -8,25 +8,17 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 > 用户本机已经有很多 skills，如何让它们可见、可追踪、可更新、可回滚、可审计。
 
-## 下载 Beta
+## 下载
 
-最新 Beta：[`desktop-v0.1.0-beta.5`](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.5)
+下一正式版是 **Metis 1.5.0**，计划 tag 为 `desktop-v1.5.0`，目前正在进行发布准备。正式 Release 创建前不提供可能失效的 1.5.0 直接下载链接。
 
-| 系统 | 下载 |
-| --- | --- |
-| macOS | [`Metis_0.1.0_universal.dmg`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_universal.dmg) |
-| Windows | [`Metis_0.1.0_x64-setup.exe`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_x64-setup.exe) |
-| Linux deb | [`Metis_0.1.0_amd64.deb`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_amd64.deb) |
-| Linux AppImage | [`Metis_0.1.0_amd64.AppImage`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_amd64.AppImage) |
-| 校验文件 | [`SHA256SUMS`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/SHA256SUMS) |
-
-当前 Beta 包未做系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。完整发布页见 [GitHub Releases](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.5)。
+当前历史 Beta 安装包和全部发布记录可在 [GitHub Releases](https://github.com/wylycool/metis/releases) 查看。通过 GitHub Releases 分发的安装包尚未进行系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。
 
 ## 当前阶段
 
-项目处于 **Phase 6 UI 重构完成点 / Beta 5 已发布**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地企业治理能力、Phase 5 产品化收口和 Phase 6 前端体验重构均已完成。桌面应用已打通扫描、来源绑定、更新检查、diff、手动更新、备份回滚、设置面板、凭据引用入口、结构化错误提示、环境报告导出、团队清单合规、团队策略审计、企业网络配置、受控自动更新和跨 Agent Git skill 同步。
+Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地治理能力、Phase 5 产品化收口和 Phase 6 前端体验重构均已完成。项目当前正在准备 **Metis 1.5.0 正式版**。
 
-当前推荐下载版本是 `desktop-v0.1.0-beta.5`；该版本包含 Phase 6 UI 重设计、Skills 首页与详情页视觉收口、Command Sheet 操作面 polish、搜索去重、前端组件拆分、Git checkout cache 性能与容量优化，以及跨 Agent 安装矩阵。
+桌面应用当前提供 `Skills` 和 `Settings` 两个工作区：Skills 用于扫描、来源绑定、更新检查、diff、手动更新、备份回滚和安装；Settings 用于管理内置 Agent 路径、自定义路径、受控自动更新列表和本机 Git 检测。添加 Skill 页面支持预览远端 Git Skill 后安装到选中路径；已安装 Skill 的详情页支持把当前本地目录直接复制到其他未安装路径。
 
 ## 技术栈
 
@@ -72,51 +64,51 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 - 解析 `SKILL.md` 中的名称、描述和基础元数据。
 - 给 skill 绑定 Git 来源 URL、仓库内路径、ref 和当前 commit。
 - 检测远端是否有更新。
-- 显示当前版本、远端版本和本地修改状态。
+- 显示检查结果、文件差异和本地修改状态。
 - 支持手动确认更新。
 - 更新前自动备份。
 - 更新失败自动回滚。
 - 支持查看更新 diff。
-- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称作为引用名/备注名，真实认证由本机 Git、SSH agent 或 Git credential helper 完成，Metis 不读取 Keychain 或 token。
-- 支持导出和导入团队 skill 清单。
-- 支持导出本机环境报告；报告只包含 skill/source/agent 摘要，不包含 token 或 `credential_ref` 值。
+- 支持通过本机 Git、SSH agent 或 Git credential helper 访问私有仓库；Metis 不保存 Keychain、token 或私钥。Storage 仍兼容 `credential_ref` 备注字段，但当前正式 UI 不提供凭据输入入口。
 - 支持受控自动更新：只处理用户同时标记为 trusted 和 auto update、且本地未修改的 source。
-- 支持跨 Agent 同步：预览远端 Git skill 后，选择 Codex、Claude Code、OpenClaw、Hermes、opencode 目标进行安装或更新，并逐目标展示安装、更新、跳过或失败结果。
+- 支持添加远端 Skill：预览 Git 来源后，选择 Codex、Claude Code、OpenClaw、Hermes、opencode 或自定义路径进行安装或更新。
+- 支持详情页本地复制：展开安装位置后，把当前已安装 Skill 复制到其他尚未安装的 Agent 或自定义路径；此过程不检查远端更新，也不覆盖已有目录。
+- 支持在 Settings 编辑内置 Agent 路径、管理命名自定义路径和检测本机 Git 环境。
 
 ## 本地验证
 
 ```bash
 cargo test
 cargo clippy
-cd apps/desktop && pnpm build
-cd apps/desktop && pnpm tauri build
-cd apps/desktop && pnpm tauri:build:mac-universal
+(cd apps/desktop && pnpm build)
+(cd apps/desktop && pnpm tauri build)
+(cd apps/desktop && pnpm tauri:build:mac-universal)
 ```
 
-macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包的 GitHub Actions workflow `Desktop Preview Packages` 已在 run `27862207405` 成功构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
+macOS 面向发布的首选安装包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_<version>_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台桌面发布包由 GitHub Actions workflow `Desktop Release Packages` 构建 macOS universal、Windows 和 Linux artifact。发布检查清单见 [docs/release-checklist.md](docs/release-checklist.md)。
 
 ## 安装提示
 
-Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。当前推荐 Beta tag 为 `desktop-v0.1.0-beta.5`。
+Metis 桌面版通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。下一正式版 tag 为 `desktop-v1.5.0`，当前尚在准备中。
 
 - macOS：下载 universal `.dmg`，挂载后拖拽或启动 Metis。当前包未签名和公证，首次启动可能需要右键打开，或到系统设置中允许打开。
 - Windows：下载 Windows installer。当前包未做 Authenticode 签名，SmartScreen 可能提示未知发布者，需要选择继续运行。
 - Linux：下载 `.deb` 或 `.AppImage`；AppImage 如无执行权限，可先执行 `chmod +x <file>.AppImage`。
 - 校验：Release 中的 `SHA256SUMS` 可用于核对下载文件完整性，macOS/Linux 可运行 `shasum -a 256 -c SHA256SUMS`。
 
-签名、公证和 Windows Authenticode 属于后续可选信任增强，不阻塞开源 Beta 通过 GitHub Releases 分发。
+签名、公证和 Windows Authenticode 属于后续信任增强；当前未签名状态需要在发布说明和安装提示中持续明确。
 
 首次打开后的建议路径：
 
 1. 在 `Skills` 工作区点击重新扫描，确认本机已安装 skills。
-2. 对需要治理的 skill 绑定 Git source，并按需标记 trusted source。
-3. 在 `Skills` 工作区使用跨 Agent 同步面板预览远端 Git skill，并安装到选中的本机 Agent。
-4. 在 `Governance` 工作区导出环境报告，或粘贴团队清单检查合规状态。
-5. 在 `Settings` 工作区配置额外扫描路径、团队策略文件和企业代理/CA bundle。
+2. 对需要跟踪更新的 Skill 绑定 Git 来源，并按需加入受控自动更新列表。
+3. 点击“添加 Skill”，预览远端 Git Skill 后安装或更新到选中的 Agent 或自定义路径。
+4. 进入已安装 Skill 的详情页，展开安装位置，把当前本地 Skill 复制到其他尚未安装的路径；此操作不会检查远端更新。
+5. 在 `Settings` 工作区调整内置 Agent 路径、添加命名自定义路径或检测本机 Git 环境。
 
 ## 当前不做
 
-以下方向重要，但不进入当前 Beta 产品化收口：
+以下方向重要，但不进入当前 1.5.0 发布范围：
 
 - skill marketplace
 - 云同步
@@ -129,33 +121,14 @@ Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 
 - 插件市场
 - 多人协作平台
 
-## 初始技术方向
-
-当前推荐方向是：
-
-- Desktop App：Tauri
-- UI：TypeScript 前端
-- Core Engine：Rust core，保持独立可复用
-- Storage：SQLite、lock 文件、本地备份目录；当前不保存 token 或 secret
-- Git：支持公开仓库和私有仓库
-- Distribution：macOS、Windows、Linux，后续通过 GitHub Releases 发布
-
-架构上要求 Core Engine 不依赖具体 UI，未来可以被桌面应用和 CLI 共用。
-
 ## 文档索引
 
 - [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md)：项目愿景、边界、用户、MVP、非目标和成功标准。
-- [ARCHITECTURE.md](ARCHITECTURE.md)：高层架构、模块边界、数据流、更新流程、安全模型和跨平台策略。
-- [ROADMAP.md](ROADMAP.md)：Phase 0 → Phase 5 路线图，包含 MVP、Beta、企业增强和生态扩展。
+- [ARCHITECTURE.md](ARCHITECTURE.md)：当前高层架构、模块边界和关键数据流。
+- [ROADMAP.md](ROADMAP.md)：Phase 0 → Phase 6 演进记录、近期优先级和已知加固项。
 - [SECURITY.md](SECURITY.md)：安全策略、凭据模型、威胁模型和隐私承诺。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献指南，包含开发环境设置和 Adapter 贡献规范。
-- [docs/design/core-engine-api.md](docs/design/core-engine-api.md)：Core Engine API 接口规格。
-- [docs/design/adapter-interface.md](docs/design/adapter-interface.md)：Adapter trait 接口设计。
-- [docs/design/database-schema.md](docs/design/database-schema.md)：SQLite 数据库 Schema 设计。
-- [docs/design/desktop-command-api.md](docs/design/desktop-command-api.md)：Tauri 桌面 Command 和 DTO 设计。
-- [docs/design/git-provider.md](docs/design/git-provider.md)：Git source、更新检测、diff 和 checkout cache 设计。
-- [docs/design/cross-agent-skill-sync.md](docs/design/cross-agent-skill-sync.md)：跨 Agent Git skill 同步设计。
-- [docs/beta-release-checklist.md](docs/beta-release-checklist.md)：Beta 发布工程检查清单。
+- [docs/README.md](docs/README.md)：权威设计、进度历史、发布验收入口和文档维护规则。
 
 ## 项目原则
 

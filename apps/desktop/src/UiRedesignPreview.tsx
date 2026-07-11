@@ -1,7 +1,8 @@
-import { useMemo, useState, type CSSProperties } from "react";
-import { AgentBadgeStack } from "./AgentBadge";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { AgentBadge, AgentBadgeStack, normalizeAgentId, type AgentIdentity } from "./AgentBadge";
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { GitHubIcon } from "./GitHubIcon";
+import { textInputAssistanceProps } from "./inputAssistance";
 import { METIS_GITHUB_URL } from "./projectLinks";
 
 type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string } | { kind: "settings" };
@@ -156,6 +157,25 @@ const previewSkills: PreviewSkill[] = [
     accentStart: "#41bf80",
     accentEnd: "#1e9667",
   },
+  {
+    id: "agent-palette-lab",
+    name: "agent-palette-lab",
+    agent: "All Agents",
+    description:
+      "Preview-only card for checking the full overlapping badge palette across every supported agent.",
+    status: "latest",
+    localCommit: "9f2a011",
+    remoteCommit: "9f2a011",
+    diffSummary: "+0 -0 lines in 0 files",
+    sourceUrl: "git@github.com:acme/agent-skills.git",
+    sourcePath: "skills/agent-palette-lab",
+    sourceRef: "main",
+    trusted: true,
+    autoUpdate: false,
+    agents: ["codex", "claude-code", "cursor", "openclaw", "hermes", "opencode", "generic"],
+    accentStart: "#8fa8ff",
+    accentEnd: "#69cdbd",
+  },
 ];
 
 const agentPaths: AgentPath[] = [
@@ -259,21 +279,23 @@ function RedesignSidebar({
 }) {
   return (
     <aside className="redesign-sidebar">
-      <a
-        className="redesign-brand"
-        data-testid="redesign-brand-logo"
-        href={METIS_GITHUB_URL}
-        rel="noreferrer"
-        target="_blank"
-      >
-        <span className="redesign-logo-mark" aria-hidden="true">
-          <CrystalSkillLogo testId="redesign-brand-crystal-logo" />
-        </span>
-        <span>
-          <strong>Metis</strong>
-          <small>Skill Manager</small>
-        </span>
-      </a>
+      <div className="redesign-brand-row" data-testid="redesign-brand-row">
+        <a
+          className="redesign-brand"
+          data-testid="redesign-brand-logo"
+          href={METIS_GITHUB_URL}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <span className="redesign-logo-mark" aria-hidden="true">
+            <CrystalSkillLogo testId="redesign-brand-crystal-logo" />
+          </span>
+          <span>
+            <strong>Metis</strong>
+            <small>Skill Manager</small>
+          </span>
+        </a>
+      </div>
       <nav className="redesign-side-nav" aria-label="Preview navigation">
         <button className={route.kind !== "settings" ? "active" : ""} onClick={onHome}>
           <GridIcon /> Skills
@@ -289,17 +311,19 @@ function RedesignSidebar({
           <GearIcon /> Settings
         </button>
       </nav>
-      <a
-        className="redesign-github-link"
-        data-testid="redesign-github-link"
-        href={METIS_GITHUB_URL}
-        rel="noreferrer"
-        target="_blank"
-        aria-label="打开 Metis GitHub 仓库"
-        title="GitHub"
-      >
-        <GitHubIcon />
-      </a>
+      <div className="redesign-sidebar-footer" data-testid="redesign-sidebar-footer">
+        <a
+          className="redesign-github-link"
+          data-testid="redesign-github-link"
+          href={METIS_GITHUB_URL}
+          rel="noreferrer"
+          target="_blank"
+          aria-label="打开 Metis GitHub 仓库"
+          title="GitHub"
+        >
+          <GitHubIcon />
+        </a>
+      </div>
     </aside>
   );
 }
@@ -360,6 +384,7 @@ function RedesignHome({
         <label className="redesign-search-field">
           <SearchIcon />
           <input
+            {...textInputAssistanceProps}
             data-testid="redesign-search-input"
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="搜索 skill、agent 或来源"
@@ -482,6 +507,8 @@ function RedesignDetail({
         </div>
       </header>
 
+      <DetailAgentPaths skill={skill} />
+
       <section className="redesign-update-workbench" data-testid="redesign-update-workbench">
         <div className="redesign-operation-tabs">
           <button
@@ -509,31 +536,123 @@ function RedesignDetail({
             备份/回滚
           </button>
         </div>
-        {activeOperation === "check" && <CheckPanel skill={skill} />}
+        {activeOperation === "check" && <CheckPanel />}
         {activeOperation === "diff" && <DiffViewer />}
-        {activeOperation === "backups" && <BackupPanel onRollback={() => onToast("已回滚到 pre-update-2026-06-30")} />}
+        {activeOperation === "backups" && <BackupPanel onRollback={() => onToast("已回滚到备份版本，回滚前状态已自动备份")} />}
       </section>
     </section>
   );
 }
 
-function CheckPanel({ skill }: { skill: PreviewSkill }) {
+function CheckPanel() {
   return (
     <div className="redesign-check-panel" data-testid="redesign-check-panel">
       <div>
-        <span>Local</span>
-        <strong>{skill.localCommit}</strong>
+        <span>检查结果</span>
+        <strong>需要更新</strong>
       </div>
-      <div>
-        <span>Remote</span>
-        <strong>{skill.remoteCommit}</strong>
+      <div className="redesign-check-diff-summary">
+        <span>差异</span>
+        <DiffSummaryChips added={1} modified={2} />
       </div>
-      <div>
-        <span>Diff summary</span>
-        <strong>{skill.diffSummary}</strong>
-      </div>
-      <p>安全检查通过，建议先查看 diff；本地没有未提交修改。</p>
+      <section className="redesign-diff-summary-showcase" aria-label="差异排版示例">
+        <DiffSummaryExample title="只有修改" modified={2} />
+        <DiffSummaryExample title="新增 + 修改" added={1} modified={2} />
+        <DiffSummaryExample title="新增 + 修改 + 删除" added={2} modified={3} deleted={1} />
+        <DiffSummaryExample title="只有删除" deleted={1} />
+        <DiffSummaryExample title="无变化" empty />
+      </section>
     </div>
+  );
+}
+
+function DiffSummaryExample({
+  added = 0,
+  deleted = 0,
+  empty = false,
+  modified = 0,
+  title,
+}: {
+  added?: number;
+  deleted?: number;
+  empty?: boolean;
+  modified?: number;
+  title: string;
+}) {
+  return (
+    <article className="redesign-diff-summary-example">
+      <span>{title}</span>
+      <DiffSummaryChips added={added} deleted={deleted} empty={empty} modified={modified} />
+    </article>
+  );
+}
+
+function DiffSummaryChips({
+  added = 0,
+  deleted = 0,
+  empty = false,
+  modified = 0,
+}: {
+  added?: number;
+  deleted?: number;
+  empty?: boolean;
+  modified?: number;
+}) {
+  return (
+    <div className="redesign-diff-summary-chips">
+      {added > 0 && <b className="added">新增 {added} 个文件</b>}
+      {modified > 0 && <b className="modified">修改 {modified} 个文件</b>}
+      {deleted > 0 && <b className="deleted">删除 {deleted} 个文件</b>}
+      {empty && <b className="empty">无需查看 diff</b>}
+    </div>
+  );
+}
+
+function DetailAgentPaths({ skill }: { skill: PreviewSkill }) {
+  const installedAgents = skill.agents.map(previewAgentIdentity);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <section className="redesign-detail-agent-panel" data-testid={`redesign-detail-agent-panel-${skill.id}`}>
+      <button
+        aria-controls={`redesign-detail-agent-paths-${skill.id}`}
+        aria-expanded={isExpanded}
+        className="redesign-detail-agent-toggle"
+        data-testid={`redesign-detail-agent-toggle-${skill.id}`}
+        onClick={() => setIsExpanded((current) => !current)}
+      >
+        <span>
+          <small>安装位置</small>
+          <strong>{installedAgents.length} 个 Agent 已安装此 skill</strong>
+        </span>
+        <span className="redesign-detail-agent-toggle-action">
+          {isExpanded ? "收起" : "展开"}
+          <span aria-hidden="true">{isExpanded ? "↑" : "↓"}</span>
+        </span>
+      </button>
+      {isExpanded && (
+        <div
+          className="redesign-detail-agent-paths"
+          data-testid={`redesign-detail-agent-paths-${skill.id}`}
+          id={`redesign-detail-agent-paths-${skill.id}`}
+        >
+          {installedAgents.map((agent) => {
+            const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
+            return (
+              <div
+                className="redesign-detail-agent-path-row"
+                data-testid={`redesign-detail-agent-path-${skill.id}-${agentId}`}
+                key={agentId}
+              >
+                <AgentBadge agent={agent} />
+                <span>{agent.agent_name}</span>
+                <code>{previewAgentInstallPath(agent, skill.name)}</code>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -589,15 +708,15 @@ function SourceDrawer({
       </header>
       <label>
         Git URL
-        <input data-testid="redesign-source-url" defaultValue={skill.sourceUrl || "git@github.com:acme/agent-skills.git"} />
+        <input {...textInputAssistanceProps} data-testid="redesign-source-url" defaultValue={skill.sourceUrl || "git@github.com:acme/agent-skills.git"} />
       </label>
       <label>
         Repo path
-        <input data-testid="redesign-source-repo-path" defaultValue={skill.sourcePath || `skills/${skill.name}`} />
+        <input {...textInputAssistanceProps} data-testid="redesign-source-repo-path" defaultValue={skill.sourcePath || `skills/${skill.name}`} />
       </label>
       <label>
         Ref
-        <input data-testid="redesign-source-ref" defaultValue={skill.sourceRef || "main"} />
+        <input {...textInputAssistanceProps} data-testid="redesign-source-ref" defaultValue={skill.sourceRef || "main"} />
       </label>
       <label className="redesign-checkbox-row">
         <input data-testid="redesign-source-trusted" defaultChecked={skill.trusted} type="checkbox" />
@@ -622,6 +741,21 @@ function RedesignSettings({
   customPaths: string[];
   onAddPath: () => void;
 }) {
+  const [agentPathDrafts, setAgentPathDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(agentPaths.map((agent) => [agent.id, agent.path])),
+  );
+  const [editingAgentPathId, setEditingAgentPathId] = useState<string | null>(null);
+  const agentPathInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    if (!editingAgentPathId) {
+      return;
+    }
+    const input = agentPathInputRefs.current[editingAgentPathId];
+    input?.focus();
+    input?.select();
+  }, [editingAgentPathId]);
+
   return (
     <section className="redesign-settings-page" data-testid="redesign-settings-page">
       <header className="redesign-page-topbar">
@@ -630,22 +764,92 @@ function RedesignSettings({
           <h1>Agent 路径设置</h1>
         </div>
       </header>
-      <div className="redesign-agent-path-table">
-        {agentPaths.map((agent) => (
-          <label className="redesign-agent-path-row" data-testid={`redesign-agent-path-${agent.id}`} key={agent.id}>
-            <span className={agent.status}>{agent.name}</span>
-            <input defaultValue={agent.path} />
-            <small>{agent.status === "ready" ? "可读写" : "路径不存在"}</small>
-          </label>
-        ))}
-        {customPaths.map((path) => (
-          <label className="redesign-agent-path-row custom" key={path}>
-            <span>Custom</span>
-            <input defaultValue={path} />
-            <small>额外路径</small>
-          </label>
-        ))}
-      </div>
+      <section className="settings-section path-management-section">
+        <div className="path-management-heading">
+          <div>
+            <h3>内置 Agent 路径管理</h3>
+            <p>列出 Metis 当前用于扫描各 Agent skill 的目录，需要调整时点击修改。</p>
+          </div>
+          <div className="path-status-legend" aria-label="路径状态说明" role="note">
+            <span className="path-status-legend-item">
+              <span className="path-status-legend-dot ready" aria-hidden="true" />
+              可读写
+            </span>
+            <span className="path-status-legend-item">
+              <span className="path-status-legend-dot missing" aria-hidden="true" />
+              路径不存在
+            </span>
+          </div>
+        </div>
+        <div className="settings-agent-path-table redesign-agent-path-table">
+          {agentPaths.map((agent) => {
+            const currentPath = agentPathDrafts[agent.id] ?? agent.path;
+            const isEditing = editingAgentPathId === agent.id;
+            const isDirty = currentPath.trim() !== agent.path.trim();
+            const statusLabel = isDirty
+              ? "路径有待保存修改"
+              : agent.status === "ready"
+                ? "路径可读写"
+                : "路径不存在";
+            return (
+              <div
+                className={`settings-agent-path-row redesign-agent-path-row${
+                  !isDirty && agent.status === "missing" ? " missing" : ""
+                }${isDirty ? " is-dirty" : ""}`}
+                data-testid={`redesign-agent-path-${agent.id}`}
+                key={agent.id}
+              >
+                <span
+                  aria-label={`${agent.name}，${statusLabel}`}
+                  className={isDirty ? "pending" : agent.status}
+                >
+                  {agent.name}
+                </span>
+                <input
+                  {...textInputAssistanceProps}
+                  aria-label={`${agent.name} Skill 路径`}
+                  readOnly={!isEditing}
+                  ref={(input) => {
+                    agentPathInputRefs.current[agent.id] = input;
+                  }}
+                  value={currentPath}
+                  onChange={(event) =>
+                    setAgentPathDrafts((current) => ({
+                      ...current,
+                      [agent.id]: event.target.value,
+                    }))
+                  }
+                />
+                <div className="agent-path-row-actions">
+                  {isDirty && <small className="agent-path-pending-badge">待保存</small>}
+                  <button
+                    className="ghost-button compact agent-path-edit-button"
+                    data-testid={`redesign-agent-path-${isEditing ? "cancel" : "edit"}-${agent.id}`}
+                    onClick={() => {
+                      if (isEditing) {
+                        setAgentPathDrafts((current) => ({ ...current, [agent.id]: agent.path }));
+                        setEditingAgentPathId(null);
+                        return;
+                      }
+                      setEditingAgentPathId(agent.id);
+                    }}
+                    type="button"
+                  >
+                    {isEditing ? "取消" : "修改"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {customPaths.map((path) => (
+            <label className="settings-agent-path-row redesign-agent-path-row custom" key={path}>
+              <span>Custom</span>
+              <input {...textInputAssistanceProps} defaultValue={path} />
+              <small>额外路径</small>
+            </label>
+          ))}
+        </div>
+      </section>
       <button className="redesign-add-path" data-testid="redesign-add-custom-path" onClick={onAddPath}>
         添加指定路径
       </button>
@@ -657,16 +861,23 @@ function AgentStack({ skill }: { skill: PreviewSkill }) {
   return <AgentBadgeStack agents={skill.agents.map(previewAgentIdentity)} testId={`redesign-agent-stack-${skill.id}`} />;
 }
 
-function previewAgentIdentity(agentId: string) {
+function previewAgentIdentity(agentId: string): AgentIdentity {
   const names: Record<string, string> = {
     "claude-code": "Claude Code",
     codex: "Codex",
+    cursor: "Cursor",
     generic: "Generic Agent Skills",
     hermes: "Hermes",
     openclaw: "OpenClaw",
     opencode: "opencode",
   };
   return { agent_id: agentId, agent_name: names[agentId] ?? agentId };
+}
+
+function previewAgentInstallPath(agent: AgentIdentity, skillName: string) {
+  const agentId = normalizeAgentId(agent.agent_id || agent.agent_name);
+  const basePath = agentPaths.find((candidate) => candidate.id === agentId)?.path ?? "~/agent-skills";
+  return `${basePath}/${skillName}`;
 }
 
 function accentStyle(skill: PreviewSkill): CSSProperties {

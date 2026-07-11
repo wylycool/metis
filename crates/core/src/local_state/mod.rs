@@ -21,6 +21,44 @@ pub enum LocalStateError {
 
     #[error("storage error: {0}")]
     Storage(String),
+
+    #[error("baseline manifest not found for skill {skill_id}: {snapshot_ref}")]
+    BaselineNotFound {
+        skill_id: String,
+        snapshot_ref: String,
+    },
+}
+
+pub(crate) fn clone_baseline_manifest(
+    source_skill_id: &str,
+    target_skill_id: &str,
+    snapshot_ref: &str,
+    store: &mut SkillIndexStore,
+) -> Result<usize, LocalStateError> {
+    let source_records = store
+        .list_file_manifest(source_skill_id, "baseline", snapshot_ref)
+        .map_err(LocalStateError::from)?;
+    if source_records.is_empty() {
+        return Err(LocalStateError::BaselineNotFound {
+            skill_id: source_skill_id.to_string(),
+            snapshot_ref: snapshot_ref.to_string(),
+        });
+    }
+    let entries = source_records
+        .into_iter()
+        .map(|record| ManifestEntry {
+            relative_path: record.relative_path,
+            file_size: record.file_size,
+            modified_at: record.modified_at,
+            content_hash: record.content_hash,
+            is_executable: record.is_executable,
+        })
+        .collect::<Vec<_>>();
+    let target_records = manifest_records(target_skill_id, "baseline", snapshot_ref, &entries);
+    store
+        .replace_file_manifest(target_skill_id, "baseline", snapshot_ref, &target_records)
+        .map_err(LocalStateError::from)?;
+    Ok(target_records.len())
 }
 
 pub fn capture_local_baseline(
@@ -46,6 +84,9 @@ pub fn capture_local_baseline(
         .map_err(LocalStateError::from)?;
     store
         .update_skill_local_fingerprint(skill_id, &snapshot.fingerprint, false)
+        .map_err(LocalStateError::from)?;
+    store
+        .update_skill_local_updated_at(skill_id, latest_modified_at(&snapshot.entries))
         .map_err(LocalStateError::from)?;
 
     Ok(LocalStateResult {
@@ -85,6 +126,9 @@ pub fn check_local_modification(
     store
         .update_skill_local_modified(skill_id, local_modified)
         .map_err(LocalStateError::from)?;
+    store
+        .update_skill_local_updated_at(skill_id, latest_modified_at(&snapshot.entries))
+        .map_err(LocalStateError::from)?;
 
     Ok(LocalStateResult {
         skill_id: skill_id.to_string(),
@@ -119,6 +163,10 @@ pub(crate) fn manifest_records(
             is_executable: entry.is_executable,
         })
         .collect()
+}
+
+fn latest_modified_at(entries: &[ManifestEntry]) -> Option<&str> {
+    entries.iter().map(|entry| entry.modified_at.as_str()).max()
 }
 
 fn stable_manifest_entry_id(
@@ -200,6 +248,7 @@ mod tests {
             local_fingerprint: None,
             local_modified: None,
             last_scanned_at: "2026-06-19T10:00:00Z".to_string(),
+            local_updated_at: None,
         }
     }
 

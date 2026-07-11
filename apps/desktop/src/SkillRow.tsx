@@ -1,12 +1,17 @@
 import type {
   DesktopBackupSummary,
+  DesktopDiffSummary,
   DesktopDiffDetail,
   DesktopError,
+  DesktopFileDiff,
   DesktopSkill,
+  DesktopSourceConnectionTestResult,
   DesktopUpdateCheckResult,
 } from "./types";
-import type { CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { AgentBadgeStack } from "./AgentBadge";
+import { shortCommit } from "./commitDisplay";
+import { GitSourceFields } from "./GitSourceFields";
 
 export interface BindDraft {
   url: string;
@@ -72,21 +77,25 @@ export function SkillRow({
       </div>
 
       <span className="redesign-card-footer">
-        <span>{skill.source?.repo_path || "未绑定来源"}</span>
+        <span>{skill.source ? "已绑定来源" : "未绑定来源"}</span>
         <AgentBadgeStack agents={agentMemberships} testId={`skill-agent-stack-${skill.id}`} />
       </span>
 
       {updateResult?.diff_summary && (
-        <div className="update-summary">
-          <span>+{updateResult.diff_summary.files_added}</span>
-          <span>~{updateResult.diff_summary.files_modified}</span>
-          <span>-{updateResult.diff_summary.files_deleted}</span>
-          {updateResult.commits_behind !== null && updateResult.commits_behind !== undefined && (
-            <strong>{updateResult.commits_behind} commits behind</strong>
-          )}
-        </div>
+        <UpdateSummary summary={updateResult.diff_summary} />
       )}
     </article>
+  );
+}
+
+export function UpdateSummary({ summary }: { summary: DesktopDiffSummary }) {
+  return (
+    <div className="update-summary">
+      <strong>{summary.total_changes} 个文件有更新</strong>
+      <span>新增 {summary.files_added} 个文件</span>
+      <span>修改 {summary.files_modified} 个文件</span>
+      <span>删除 {summary.files_deleted} 个文件</span>
+    </div>
   );
 }
 
@@ -118,6 +127,16 @@ export function skillAccentStyle(skill: DesktopSkill): CSSProperties {
     ["#f0ad47", "#d98225"],
     ["#4c9fdb", "#2f75bf"],
     ["#41bf80", "#1e9667"],
+    ["#6f72e8", "#4f46c8"],
+    ["#e35d6a", "#b9465a"],
+    ["#21a6c8", "#167da0"],
+    ["#c47a2c", "#9a5f1f"],
+    ["#8f5bd8", "#6843b8"],
+    ["#22a66f", "#157a58"],
+    ["#d95f9f", "#a84b86"],
+    ["#5b8be8", "#3466c8"],
+    ["#7aa33a", "#587d2b"],
+    ["#5f6f86", "#405166"],
   ];
   const index = Math.abs(hashText(`${skill.agent_id}:${skill.name}`)) % palette.length;
   return {
@@ -146,11 +165,7 @@ export function BackupPanel({
   onRestoreBackup: (backupId: string) => void;
 }) {
   return (
-    <div className="backup-panel redesign-backup-panel">
-      <div className="backup-heading">
-        <strong>备份</strong>
-        <span>{backups.length} items</span>
-      </div>
+    <div className="backup-panel redesign-backup-panel" data-testid={`backup-panel-${skillId}`}>
       {backups.length === 0 ? (
         <p className="empty-backups">暂无备份。应用更新或手动备份后会出现在这里。</p>
       ) : (
@@ -159,15 +174,17 @@ export function BackupPanel({
             const restoring = busyKey === `restore:${backup.backup_id}`;
             return (
               <article className="backup-row" key={backup.backup_id}>
-                <div>
-                  <strong>{backup.reason}</strong>
-                  <span>{backup.created_at || "unknown time"}</span>
-                  <code>{backup.backup_id}</code>
-                </div>
-                <div className="backup-meta">
-                  {backup.source_commit && <span>{shortCommit(backup.source_commit)}</span>}
-                  <span>{backup.file_count} files</span>
-                  <span>{formatBytes(backup.total_size_bytes)}</span>
+                <div className="backup-main">
+                  <div className="backup-title-line">
+                    <strong>{backupReasonLabel(backup.reason)}</strong>
+                    <span className="backup-version">
+                      {backup.source_commit ? shortCommit(backup.source_commit) : "版本未知"}
+                    </span>
+                  </div>
+                  <div className="backup-details">
+                    <span>{formatBackupTime(backup.created_at)}</span>
+                    <span>{formatBytes(backup.total_size_bytes)}</span>
+                  </div>
                 </div>
                 <button
                   className="danger-button compact"
@@ -175,7 +192,7 @@ export function BackupPanel({
                   disabled={restoring}
                   onClick={() => onRestoreBackup(backup.backup_id)}
                 >
-                  {restoring ? "回滚中" : "回滚"}
+                  {restoring ? "回退中" : "回退"}
                 </button>
               </article>
             );
@@ -186,27 +203,70 @@ export function BackupPanel({
   );
 }
 
-export function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
-  const patches = detail.files.flatMap((file) =>
-    (file.patch || `${file.status}: ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}`)
-      .split("\n"),
+function backupReasonLabel(reason: string) {
+  const labels: Record<string, string> = {
+    "pre-update": "上一个版本",
+    "pre-rollback": "回退前版本",
+    "pre-sync": "同步前版本",
+    manual: "手动版本",
+  };
+  return labels[reason] ?? "可回退版本";
+}
+
+function formatBackupTime(value?: string | null) {
+  if (!value) {
+    return "时间未知";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  const formatter = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(parsed).map((part) => [part.type, part.value]),
   );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export function DiffPanel({ detail, repoPath }: { detail: DesktopDiffDetail; repoPath?: string }) {
+  const files = useMemo(
+    () => diffFilesWithDisplayPaths(detail.files, repoPath),
+    [detail.files, repoPath],
+  );
+  const [activePath, setActivePath] = useState(files[0]?.path ?? "");
+  const activeFile = files.find((file) => file.path === activePath) ?? files[0] ?? null;
+  const patchLines = activeFile ? sanitizedPatchLines(activeFile) : [];
 
   return (
-    <div className="diff-panel redesign-diff-viewer">
+    <div className="diff-panel redesign-diff-viewer" data-testid="redesign-diff-viewer">
       <div className="diff-heading redesign-diff-files">
-        {detail.files.map((file, index) => (
-          <button className={index === 0 ? "active" : ""} key={`${file.status}:${file.path}`}>
-            {file.path}
+        {files.map((file) => (
+          <button
+            className={file.path === activeFile?.path ? "active" : ""}
+            data-testid={`diff-file-${file.displayPath}`}
+            key={`${file.status}:${file.path}`}
+            onClick={() => setActivePath(file.path)}
+          >
+            {file.displayPath}
           </button>
         ))}
       </div>
       <div className="simple-diff redesign-diff-code">
         <div className="redesign-diff-line muted">
-          {shortCommit(detail.current_commit)} -&gt; {shortCommit(detail.target_commit)} · {detail.files.length} files
+          {shortCommit(detail.current_commit)} -&gt; {shortCommit(detail.target_commit)} ·{" "}
+          {activeFile?.displayPath ?? "无文件"}
         </div>
-        {patches.length > 0 ? (
-          patches.map((line, index) => (
+        {patchLines.length > 0 ? (
+          patchLines.map((line, index) => (
             <div className={`redesign-diff-line ${diffLineTone(line)}`} key={`${index}:${line}`}>
               {line || " "}
             </div>
@@ -216,6 +276,74 @@ export function DiffPanel({ detail }: { detail: DesktopDiffDetail }) {
         )}
       </div>
     </div>
+  );
+}
+
+type DisplayFileDiff = DesktopFileDiff & { displayPath: string };
+
+function diffFilesWithDisplayPaths(
+  files: DesktopFileDiff[],
+  repoPath?: string,
+): DisplayFileDiff[] {
+  const normalized = files.map((file) => normalizeDiffPath(file.path));
+  const sourcePrefix = repoPath ? normalizeDiffPath(repoPath) : "";
+  const commonPrefix =
+    sourcePrefix && normalized.some((path) => path === sourcePrefix || path.startsWith(`${sourcePrefix}/`))
+      ? sourcePrefix
+      : commonDirectoryPrefix(normalized);
+  return files.map((file, index) => {
+    const normalizedPath = normalized[index];
+    return {
+      ...file,
+      displayPath: trimDiffPrefix(normalizedPath, commonPrefix),
+    };
+  });
+}
+
+function normalizeDiffPath(path: string) {
+  return path.replace(/^\/+/, "");
+}
+
+function commonDirectoryPrefix(paths: string[]) {
+  if (paths.length < 2) {
+    return "";
+  }
+  const splitPaths = paths.map((path) => path.split("/").slice(0, -1));
+  const first = splitPaths[0] ?? [];
+  const prefix: string[] = [];
+  for (let index = 0; index < first.length; index += 1) {
+    const segment = first[index];
+    if (splitPaths.every((parts) => parts[index] === segment)) {
+      prefix.push(segment);
+    } else {
+      break;
+    }
+  }
+  return prefix.join("/");
+}
+
+function trimDiffPrefix(path: string, prefix: string) {
+  if (!prefix || !path.startsWith(`${prefix}/`)) {
+    return path;
+  }
+  return path.slice(prefix.length + 1);
+}
+
+function sanitizedPatchLines(file: DesktopFileDiff) {
+  const fallback = `${file.status}: ${file.old_path ? `${file.old_path} -> ` : ""}${file.path}`;
+  return (file.patch || fallback)
+    .split("\n")
+    .filter((line) => !isGitPatchHeaderLine(line));
+}
+
+function isGitPatchHeaderLine(line: string) {
+  return (
+    line.startsWith("diff --git ") ||
+    line.startsWith("index ") ||
+    line.startsWith("--- ") ||
+    line.startsWith("+++ ") ||
+    line.startsWith("new file mode ") ||
+    line.startsWith("deleted file mode ")
   );
 }
 
@@ -236,80 +364,107 @@ export function BindSourceForm({
   skillId,
   draft,
   busy,
+  testBusy,
+  testError,
+  testResult,
   onChange,
   onCancel,
   onSubmit,
+  onTestConnection,
 }: {
   skillId: string;
   draft: BindDraft;
   busy: boolean;
+  testBusy: boolean;
+  testError?: DesktopError;
+  testResult?: DesktopSourceConnectionTestResult;
   onChange: (draft: BindDraft) => void;
   onCancel: () => void;
   onSubmit: () => void;
+  onTestConnection: () => void;
 }) {
-  const disabled = busy || !draft.url.trim() || !draft.repo_path.trim();
+  const disabled = busy || !draft.url.trim();
+  const testDisabled = busy || testBusy || !draft.url.trim();
 
   return (
     <div className="source-form">
-      <label>
-        <span>Git URL</span>
-        <input
-          data-testid={`bind-url-${skillId}`}
-          value={draft.url}
-          placeholder="https://github.com/org/repo.git"
-          onChange={(event) => onChange({ ...draft, url: event.target.value })}
+      <div className="source-form-body" data-testid={`source-form-body-${skillId}`}>
+        <GitSourceFields
+          draft={draft}
+          fieldId={skillId}
+          testIds={{
+            url: `bind-url-${skillId}`,
+            repoPath: `bind-repo-path-${skillId}`,
+            ref: `bind-ref-${skillId}`,
+          }}
+          onChange={onChange}
         />
-      </label>
-      <label>
-        <span>Repo Path</span>
-        <input
-          data-testid={`bind-repo-path-${skillId}`}
-          value={draft.repo_path}
-          placeholder="skills/example"
-          onChange={(event) => onChange({ ...draft, repo_path: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>Ref</span>
-        <input
-          data-testid={`bind-ref-${skillId}`}
-          value={draft.ref_}
-          placeholder="main"
-          onChange={(event) => onChange({ ...draft, ref_: event.target.value })}
-        />
-      </label>
-      <label>
-        <span>Credential Ref</span>
-        <input
-          data-testid={`bind-credential-ref-${skillId}`}
-          value={draft.credential_ref}
-          placeholder="github-main"
-          onChange={(event) => onChange({ ...draft, credential_ref: event.target.value })}
-        />
-      </label>
-      <label className="check-label">
-        <input
-          data-testid={`bind-trusted-${skillId}`}
-          checked={draft.trusted}
-          type="checkbox"
-          onChange={(event) => onChange({ ...draft, trusted: event.target.checked })}
-        />
-        <span>Trusted</span>
-      </label>
-      <label className="check-label">
-        <input
-          data-testid={`bind-auto-update-${skillId}`}
-          checked={draft.auto_update}
-          type="checkbox"
-          onChange={(event) => onChange({ ...draft, auto_update: event.target.checked })}
-        />
-        <span>Auto update</span>
-      </label>
-      <div className="form-actions">
+
+        <div className="source-settings-grid" data-testid={`source-settings-grid-${skillId}`}>
+          <label className="source-setting-row check-label">
+            <input
+              data-testid={`bind-auto-update-${skillId}`}
+              checked={draft.trusted && draft.auto_update}
+              type="checkbox"
+              onChange={(event) =>
+                onChange({
+                  ...draft,
+                  trusted: event.target.checked,
+                  auto_update: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>信任此来源并加入自动更新列表</strong>
+            </span>
+          </label>
+        </div>
+
+        <div
+          className="source-verification-panel"
+          data-testid={`source-verification-panel-${skillId}`}
+        >
+          <div className="source-connection-check">
+            <button
+              className="source-test-button"
+              data-busy={testBusy ? "true" : "false"}
+              data-testid={`test-source-connection-${skillId}`}
+              disabled={testDisabled}
+              onClick={onTestConnection}
+            >
+              {testBusy ? "测试中" : "测试连接"}
+            </button>
+            <p>检测当前已填来源是否可访问。不会修改本地 Skill 或保存来源。</p>
+          </div>
+          {testResult && (
+            <div
+              className="source-connection-result success"
+              data-testid={`source-connection-result-${skillId}`}
+            >
+              <strong>{testResult.message}</strong>
+              <span>已找到 {testResult.skill_name}</span>
+            </div>
+          )}
+          {testError && (
+            <div
+              className="source-connection-result failure"
+              data-testid={`source-connection-error-${skillId}`}
+            >
+              <SourceConnectionError error={testError} />
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="form-actions" data-testid={`source-form-actions-${skillId}`}>
         <button className="ghost-button compact" onClick={onCancel}>
           取消
         </button>
-        <button className="compact" disabled={disabled} onClick={onSubmit}>
+        <button
+          className="compact source-save-button"
+          data-busy={busy ? "true" : "false"}
+          disabled={disabled}
+          onClick={onSubmit}
+        >
           <span data-testid={`submit-bind-source-${skillId}`}>
             {busy ? "保存中" : "保存来源"}
           </span>
@@ -333,18 +488,25 @@ export function StatusBadge({
 
 export function InlineError({ error }: { error: DesktopError }) {
   return (
-    <div className="inline-error" data-error-category={error.category}>
+    <div className="inline-error">
       <div className="error-heading">
         <strong>{error.title}</strong>
-        <span>{error.category}</span>
       </div>
       <p>{error.message}</p>
-      <p className="error-suggestion">{error.suggestion}</p>
-      {error.debug_detail && (
-        <details>
-          <summary>调试详情</summary>
-          <code>{error.debug_detail}</code>
-        </details>
+      {error.suggestion.trim().length > 0 && (
+        <p className="error-suggestion">{error.suggestion}</p>
+      )}
+    </div>
+  );
+}
+
+function SourceConnectionError({ error }: { error: DesktopError }) {
+  return (
+    <div className="source-connection-error-card">
+      <strong>{error.title}</strong>
+      <p>{error.message}</p>
+      {error.suggestion.trim().length > 0 && (
+        <p className="source-connection-error-suggestion">{error.suggestion}</p>
       )}
     </div>
   );
@@ -410,10 +572,6 @@ export function updateLabel(result: DesktopUpdateCheckResult | undefined, skill:
     return "未绑定来源";
   }
   return "未检查更新";
-}
-
-function shortCommit(commit: string) {
-  return commit.length > 10 ? commit.slice(0, 10) : commit;
 }
 
 function formatBytes(value: number) {

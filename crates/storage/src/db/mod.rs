@@ -4,6 +4,8 @@ use std::path::Path;
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
 const INITIAL_SCHEMA_NAME: &str = "initial_schema";
+const LOCAL_UPDATED_AT_SCHEMA_VERSION: i64 = 2;
+const LOCAL_UPDATED_AT_SCHEMA_NAME: &str = "add_skill_local_updated_at";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillRecord {
@@ -25,6 +27,7 @@ pub struct SkillRecord {
     pub local_fingerprint: Option<String>,
     pub local_modified: Option<bool>,
     pub last_scanned_at: String,
+    pub local_updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,10 +141,11 @@ impl SkillIndexStore {
                 local_fingerprint,
                 local_modified,
                 last_scanned_at,
+                local_updated_at,
                 updated_at
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
-                ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
+                ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19,
                 datetime('now')
             )
             ON CONFLICT(agent_id, install_path) DO UPDATE SET
@@ -161,6 +165,7 @@ impl SkillIndexStore {
                 local_fingerprint = COALESCE(excluded.local_fingerprint, local_fingerprint),
                 local_modified = COALESCE(excluded.local_modified, local_modified),
                 last_scanned_at = excluded.last_scanned_at,
+                local_updated_at = COALESCE(excluded.local_updated_at, local_updated_at),
                 updated_at = datetime('now')
             ",
             params![
@@ -182,6 +187,7 @@ impl SkillIndexStore {
                 skill.local_fingerprint,
                 local_modified,
                 skill.last_scanned_at,
+                skill.local_updated_at,
             ],
         )?;
 
@@ -209,7 +215,8 @@ impl SkillIndexStore {
                 source_id,
                 local_fingerprint,
                 local_modified,
-                last_scanned_at
+                last_scanned_at,
+                local_updated_at
             FROM skills
             ORDER BY agent_id, install_path
             ",
@@ -248,7 +255,8 @@ impl SkillIndexStore {
                     source_id,
                     local_fingerprint,
                     local_modified,
-                    last_scanned_at
+                    last_scanned_at,
+                    local_updated_at
                 FROM skills
                 WHERE agent_id = ?1 AND install_path = ?2
                 ",
@@ -281,7 +289,8 @@ impl SkillIndexStore {
                     source_id,
                     local_fingerprint,
                     local_modified,
-                    last_scanned_at
+                    last_scanned_at,
+                    local_updated_at
                 FROM skills
                 WHERE id = ?1
                 ",
@@ -324,9 +333,9 @@ impl SkillIndexStore {
                 datetime('now')
             )
             ON CONFLICT(url, repo_path, ref_) DO UPDATE SET
-                current_commit = excluded.current_commit,
-                remote_commit = excluded.remote_commit,
-                last_checked_at = excluded.last_checked_at,
+                current_commit = COALESCE(excluded.current_commit, current_commit),
+                remote_commit = COALESCE(excluded.remote_commit, remote_commit),
+                last_checked_at = COALESCE(excluded.last_checked_at, last_checked_at),
                 trusted = excluded.trusted,
                 auto_update = excluded.auto_update,
                 credential_ref = excluded.credential_ref,
@@ -550,6 +559,23 @@ impl SkillIndexStore {
             WHERE id = ?2
             ",
             params![i64::from(local_modified), skill_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_skill_local_updated_at(
+        &self,
+        skill_id: &str,
+        local_updated_at: Option<&str>,
+    ) -> Result<(), StorageError> {
+        self.connection.execute(
+            "
+            UPDATE skills
+            SET local_updated_at = ?2,
+                updated_at = datetime('now')
+            WHERE id = ?1
+            ",
+            params![skill_id, local_updated_at],
         )?;
         Ok(())
     }
@@ -785,7 +811,42 @@ impl SkillIndexStore {
             ",
             params![INITIAL_SCHEMA_VERSION, INITIAL_SCHEMA_NAME],
         )?;
+        if !self
+            .applied_migration_versions()?
+            .contains(&LOCAL_UPDATED_AT_SCHEMA_VERSION)
+        {
+            if !self.column_exists("skills", "local_updated_at")? {
+                self.connection
+                    .execute_batch("ALTER TABLE skills ADD COLUMN local_updated_at TEXT;")?;
+            }
+            self.connection.execute_batch(
+                "
+                CREATE INDEX IF NOT EXISTS idx_skills_local_updated_at
+                    ON skills(local_updated_at);
+                ",
+            )?;
+            self.connection.execute(
+                "
+                INSERT INTO _migrations (version, name)
+                VALUES (?1, ?2)
+                ",
+                params![
+                    LOCAL_UPDATED_AT_SCHEMA_VERSION,
+                    LOCAL_UPDATED_AT_SCHEMA_NAME
+                ],
+            )?;
+        }
         Ok(())
+    }
+
+    fn column_exists(&self, table: &str, column: &str) -> Result<bool, StorageError> {
+        let mut statement = self
+            .connection
+            .prepare(&format!("PRAGMA table_info({table})"))?;
+        let columns = statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(columns.iter().any(|candidate| candidate == column))
     }
 }
 
@@ -813,6 +874,7 @@ fn row_to_skill_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<SkillRecord>
         local_fingerprint: row.get(15)?,
         local_modified,
         last_scanned_at: row.get(17)?,
+        local_updated_at: row.get(18)?,
     })
 }
 
@@ -919,6 +981,7 @@ CREATE TABLE IF NOT EXISTS skills (
     local_fingerprint   TEXT,
     local_modified      INTEGER,
     last_scanned_at     TEXT NOT NULL,
+    local_updated_at    TEXT,
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
 
@@ -1022,6 +1085,7 @@ mod tests {
             local_fingerprint: None,
             local_modified: None,
             last_scanned_at: "2026-06-19T10:00:00Z".to_string(),
+            local_updated_at: Some("2026-06-19T10:00:00Z".to_string()),
         }
     }
 
@@ -1116,7 +1180,75 @@ mod tests {
             .applied_migration_versions()
             .expect("migration versions should be queryable");
 
-        assert_eq!(versions, vec![1]);
+        assert_eq!(versions, vec![1, 2]);
+    }
+
+    #[test]
+    fn open_migrates_legacy_skills_table_before_creating_local_updated_at_index(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = std::env::temp_dir().join(format!(
+            "metis-legacy-schema-{}.sqlite",
+            uuid::Uuid::new_v4()
+        ));
+        let connection = Connection::open(&db_path)?;
+        connection.execute_batch(
+            r#"
+            CREATE TABLE _migrations (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                version     INTEGER NOT NULL UNIQUE,
+                name        TEXT NOT NULL,
+                applied_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO _migrations (version, name)
+            VALUES (1, 'initial_schema');
+
+            CREATE TABLE skills (
+                id                  TEXT PRIMARY KEY,
+                agent_id            TEXT NOT NULL,
+                name                TEXT NOT NULL,
+                description         TEXT,
+                version             TEXT,
+                author              TEXT,
+                license             TEXT,
+                tags                TEXT NOT NULL DEFAULT '[]',
+                category            TEXT,
+                install_path        TEXT NOT NULL,
+                scope               TEXT NOT NULL,
+                metadata_path       TEXT,
+                metadata_status     TEXT NOT NULL DEFAULT 'found',
+                metadata_error      TEXT,
+                source_id           TEXT,
+                local_fingerprint   TEXT,
+                local_modified      INTEGER,
+                last_scanned_at     TEXT NOT NULL,
+                created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            "#,
+        )?;
+        drop(connection);
+
+        let store = SkillIndexStore::open(&db_path)?;
+
+        assert_eq!(store.applied_migration_versions()?, vec![1, 2]);
+        assert!(store.column_exists("skills", "local_updated_at")?);
+        let local_updated_at_index_count: i64 = store.connection.query_row(
+            "
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'index'
+                AND name = 'idx_skills_local_updated_at'
+            ",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(local_updated_at_index_count, 1);
+
+        drop(store);
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(db_path.with_extension("sqlite-wal"));
+        let _ = std::fs::remove_file(db_path.with_extension("sqlite-shm"));
+        Ok(())
     }
 
     #[test]
@@ -1150,6 +1282,37 @@ mod tests {
         let skills = store.list_skills().expect("skills should list");
 
         assert_eq!(skills, vec![updated]);
+    }
+
+    #[test]
+    fn upsert_skill_persists_cached_local_updated_at() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let mut first = sample_skill("skill-1", "Example Skill", Some("First description"));
+        first.local_updated_at = Some("2026-06-19T10:00:00Z".to_string());
+        let mut updated = sample_skill("skill-2", "Renamed Skill", Some("Updated description"));
+        updated.local_updated_at = Some("2026-06-21T12:34:56Z".to_string());
+
+        store
+            .upsert_skill(&first)
+            .expect("first skill should upsert");
+        store
+            .upsert_skill(&updated)
+            .expect("updated skill should upsert");
+
+        let stored = store
+            .get_skill_by_agent_and_path("codex", "/tmp/metis/skills/example")
+            .expect("skill lookup should succeed")
+            .expect("skill should exist");
+        let listed = store.list_skills().expect("skills should list");
+
+        assert_eq!(
+            stored.local_updated_at.as_deref(),
+            Some("2026-06-21T12:34:56Z")
+        );
+        assert_eq!(
+            listed[0].local_updated_at.as_deref(),
+            Some("2026-06-21T12:34:56Z")
+        );
     }
 
     #[test]
@@ -1474,6 +1637,37 @@ mod tests {
         assert!(stored.trusted);
         assert!(!stored.auto_update);
         assert_eq!(stored.credential_ref.as_deref(), Some("github-main"));
+    }
+
+    #[test]
+    fn upsert_source_preserves_existing_commits_when_rebinding_without_commits() {
+        let store = SkillIndexStore::open_in_memory().expect("store should open");
+        let source = sample_source("source-1", true, false);
+        store.upsert_source(&source).expect("source should upsert");
+
+        let mut rebound = sample_source("source-2", false, true);
+        rebound.current_commit = None;
+        rebound.remote_commit = None;
+        rebound.last_checked_at = None;
+        rebound.credential_ref = Some("new-token".to_string());
+        store
+            .upsert_source(&rebound)
+            .expect("rebinding same source should upsert");
+
+        let stored = store
+            .get_source("source-1")
+            .expect("source lookup should succeed")
+            .expect("source should still exist");
+
+        assert_eq!(stored.current_commit.as_deref(), Some("abc123"));
+        assert_eq!(stored.remote_commit.as_deref(), Some("def456"));
+        assert_eq!(
+            stored.last_checked_at.as_deref(),
+            Some("2026-06-19T11:00:00Z")
+        );
+        assert!(!stored.trusted);
+        assert!(stored.auto_update);
+        assert_eq!(stored.credential_ref.as_deref(), Some("new-token"));
     }
 
     #[test]

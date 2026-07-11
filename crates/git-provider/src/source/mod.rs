@@ -1,8 +1,10 @@
 use crate::fetch::{GitCliProvider, GitCommandRunner, GitProviderError};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::time::Instant;
 
 const CHECKOUT_CACHE_RETAIN_COUNT: usize = 20;
+const CHECKOUT_CACHE_METADATA_FILE: &str = ".metis-checkout-cache";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitCheckoutRequest {
@@ -24,6 +26,7 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
         &self,
         request: &GitCheckoutRequest,
     ) -> Result<GitCheckoutResult, GitProviderError> {
+        let total_start = Instant::now();
         validate_repo_path(&request.repo_path)?;
 
         fs::create_dir_all(&request.cache_dir).map_err(|error| {
@@ -35,8 +38,19 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
 
         let checkout_dir = cache_checkout_dir(request);
         let checkout_dir_text = checkout_dir.to_string_lossy().to_string();
+        let cache_exists = checkout_dir.exists();
+        perf_log(
+            "checkout",
+            &[
+                ("stage", "start".to_string()),
+                ("repo_path", request.repo_path.clone()),
+                ("ref", request.ref_.clone()),
+                ("cache_hit", cache_exists.to_string()),
+            ],
+        );
 
-        if checkout_dir.exists() {
+        if cache_exists {
+            let remote_start = Instant::now();
             self.runner().run_git(&[
                 "-C",
                 &checkout_dir_text,
@@ -45,16 +59,49 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
                 "origin",
                 &request.url,
             ])?;
+            perf_log(
+                "checkout",
+                &[
+                    ("stage", "remote_set_url".to_string()),
+                    ("elapsed_ms", elapsed_ms(remote_start)),
+                    ("cache_hit", "true".to_string()),
+                ],
+            );
         } else {
-            self.runner().run_git(&[
-                "clone",
-                "--filter=blob:none",
-                "--no-checkout",
-                &request.url,
-                &checkout_dir_text,
-            ])?;
+            let reference_checkout =
+                find_reference_checkout_dir(Path::new(&request.cache_dir), &checkout_dir, request)?;
+            let reference_checkout_text = reference_checkout
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_string());
+            let mut clone_args = vec![
+                "clone".to_string(),
+                "--filter=blob:none".to_string(),
+                "--no-checkout".to_string(),
+            ];
+            if let Some(reference) = &reference_checkout_text {
+                clone_args.push("--reference-if-able".to_string());
+                clone_args.push(reference.clone());
+            }
+            clone_args.push(request.url.clone());
+            clone_args.push(checkout_dir_text.clone());
+            let clone_arg_refs = clone_args.iter().map(String::as_str).collect::<Vec<_>>();
+            let clone_start = Instant::now();
+            self.runner().run_git(&clone_arg_refs)?;
+            perf_log(
+                "checkout",
+                &[
+                    ("stage", "clone".to_string()),
+                    ("elapsed_ms", elapsed_ms(clone_start)),
+                    ("cache_hit", "false".to_string()),
+                    (
+                        "reference_used",
+                        reference_checkout_text.is_some().to_string(),
+                    ),
+                ],
+            );
         }
         if should_use_sparse_checkout(&request.repo_path) {
+            let sparse_start = Instant::now();
             self.runner().run_git(&[
                 "-C",
                 &checkout_dir_text,
@@ -69,11 +116,75 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
                 "set",
                 &request.repo_path,
             ])?;
+            perf_log(
+                "checkout",
+                &[
+                    ("stage", "sparse_checkout".to_string()),
+                    ("elapsed_ms", elapsed_ms(sparse_start)),
+                    ("repo_path", request.repo_path.clone()),
+                ],
+            );
         }
-        self.runner()
-            .run_git(&["-C", &checkout_dir_text, "fetch", "origin", &request.ref_])?;
-        self.runner()
-            .run_git(&["-C", &checkout_dir_text, "checkout", &request.target_commit])?;
+        let local_checkout_start = Instant::now();
+        match self
+            .runner()
+            .run_git(&["-C", &checkout_dir_text, "checkout", &request.target_commit])
+        {
+            Ok(_) => {
+                perf_log(
+                    "checkout",
+                    &[
+                        ("stage", "checkout".to_string()),
+                        ("elapsed_ms", elapsed_ms(local_checkout_start)),
+                        ("cache_hit", cache_exists.to_string()),
+                        ("fetch_fallback", "false".to_string()),
+                    ],
+                );
+            }
+            Err(_) => {
+                perf_log(
+                    "checkout",
+                    &[
+                        ("stage", "checkout".to_string()),
+                        ("elapsed_ms", elapsed_ms(local_checkout_start)),
+                        ("cache_hit", cache_exists.to_string()),
+                        ("fetch_fallback", "true".to_string()),
+                    ],
+                );
+                let fetch_start = Instant::now();
+                self.runner().run_git(&[
+                    "-C",
+                    &checkout_dir_text,
+                    "fetch",
+                    "origin",
+                    &request.ref_,
+                ])?;
+                perf_log(
+                    "checkout",
+                    &[
+                        ("stage", "fetch".to_string()),
+                        ("elapsed_ms", elapsed_ms(fetch_start)),
+                        ("ref", request.ref_.clone()),
+                        ("fetch_fallback", "true".to_string()),
+                    ],
+                );
+                let retry_checkout_start = Instant::now();
+                self.runner().run_git(&[
+                    "-C",
+                    &checkout_dir_text,
+                    "checkout",
+                    &request.target_commit,
+                ])?;
+                perf_log(
+                    "checkout",
+                    &[
+                        ("stage", "checkout_retry".to_string()),
+                        ("elapsed_ms", elapsed_ms(retry_checkout_start)),
+                        ("fetch_fallback", "true".to_string()),
+                    ],
+                );
+            }
+        }
 
         let skill_dir = checkout_dir.join(&request.repo_path);
         if !skill_dir.is_dir() {
@@ -81,13 +192,159 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
                 path: skill_dir.to_string_lossy().to_string(),
             });
         }
+        write_checkout_metadata(&checkout_dir, request)?;
         prune_checkout_cache_dirs(Path::new(&request.cache_dir), &checkout_dir)?;
+        perf_log(
+            "checkout",
+            &[
+                ("stage", "total".to_string()),
+                ("elapsed_ms", elapsed_ms(total_start)),
+                ("repo_path", request.repo_path.clone()),
+                ("cache_hit", cache_exists.to_string()),
+            ],
+        );
 
         Ok(GitCheckoutResult {
             checkout_dir: checkout_dir_text,
             skill_dir: skill_dir.to_string_lossy().to_string(),
         })
     }
+}
+
+fn find_reference_checkout_dir(
+    cache_dir: &Path,
+    current_checkout_dir: &Path,
+    request: &GitCheckoutRequest,
+) -> Result<Option<PathBuf>, GitProviderError> {
+    let entries = match fs::read_dir(cache_dir) {
+        Ok(entries) => entries,
+        Err(error) => {
+            return Err(GitProviderError::CommandFailed {
+                command: format!("read cache dir {}", cache_dir.to_string_lossy()),
+                stderr: error.to_string(),
+            });
+        }
+    };
+    let reference_key = checkout_reference_key(request);
+    let mut candidates = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir() && path != current_checkout_dir)
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("checkout-"))
+        })
+        .filter(|path| path.join(".git").exists())
+        .filter(|path| {
+            checkout_metadata_reference_key(path).as_deref() == Some(&reference_key)
+                || legacy_checkout_matches_reference(path, request)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort();
+    Ok(candidates.into_iter().next())
+}
+
+fn legacy_checkout_matches_reference(checkout_dir: &Path, request: &GitCheckoutRequest) -> bool {
+    let expected_prefix = format!("checkout-{}-", sanitize_commit(&request.target_commit));
+    checkout_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with(&expected_prefix))
+        && checkout_origin_url(checkout_dir).as_deref() == Some(request.url.as_str())
+}
+
+fn checkout_origin_url(checkout_dir: &Path) -> Option<String> {
+    let contents = fs::read_to_string(checkout_dir.join(".git/config")).ok()?;
+    let mut in_origin = false;
+    for line in contents.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_origin = line == "[remote \"origin\"]";
+            continue;
+        }
+        if !in_origin {
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("url") {
+            let value = value.trim_start();
+            if let Some(url) = value.strip_prefix('=') {
+                let url = url.trim();
+                if !url.is_empty() {
+                    return Some(url.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn write_checkout_metadata(
+    checkout_dir: &Path,
+    request: &GitCheckoutRequest,
+) -> Result<(), GitProviderError> {
+    fs::write(
+        checkout_dir.join(CHECKOUT_CACHE_METADATA_FILE),
+        format!(
+            "version=1\nreference_key={}\n",
+            checkout_reference_key(request)
+        ),
+    )
+    .map_err(|error| GitProviderError::CommandFailed {
+        command: format!("write checkout metadata {}", checkout_dir.to_string_lossy()),
+        stderr: error.to_string(),
+    })
+}
+
+fn checkout_metadata_reference_key(checkout_dir: &Path) -> Option<String> {
+    let contents = fs::read_to_string(checkout_dir.join(CHECKOUT_CACHE_METADATA_FILE)).ok()?;
+    contents.lines().find_map(|line| {
+        line.strip_prefix("reference_key=")
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn checkout_reference_key(request: &GitCheckoutRequest) -> String {
+    format!(
+        "{:016x}",
+        stable_hash_values(&[
+            request.url.as_str(),
+            request.ref_.as_str(),
+            request.target_commit.as_str(),
+        ])
+    )
+}
+
+fn stable_hash_values(values: &[&str]) -> u64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for value in values {
+        for byte in value.as_bytes() {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+        hash ^= 0xff;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
+fn elapsed_ms(start: Instant) -> String {
+    start.elapsed().as_millis().to_string()
+}
+
+fn perf_log(scope: &str, fields: &[(&str, String)]) {
+    eprintln!("{}", perf_log_line(scope, fields));
+}
+
+fn perf_log_line(scope: &str, fields: &[(&str, String)]) -> String {
+    let mut line = format!("[metis perf] {scope}");
+    for (key, value) in fields {
+        line.push(' ');
+        line.push_str(key);
+        line.push('=');
+        line.push_str(value);
+    }
+    line
 }
 
 fn cache_checkout_dir(request: &GitCheckoutRequest) -> PathBuf {
@@ -222,8 +479,12 @@ mod tests {
                 .push(args.iter().map(|arg| arg.to_string()).collect());
             if args.first() == Some(&"clone") {
                 if let Some(checkout_dir) = args.last() {
+                    fs::create_dir_all(Path::new(checkout_dir).join(".git"))
+                        .expect("fake git directory should be created");
                     fs::create_dir_all(Path::new(checkout_dir).join("skills/example"))
                         .expect("fake checkout skill dir should be created");
+                    fs::create_dir_all(Path::new(checkout_dir).join("skills/other"))
+                        .expect("fake alternate skill dir should be created");
                 }
             }
             Ok(GitCommandOutput {
@@ -233,8 +494,32 @@ mod tests {
         }
     }
 
+    struct CheckoutFallbackRunner {
+        calls: RefCell<Vec<Vec<String>>>,
+        fail_next_checkout: RefCell<bool>,
+    }
+
+    impl GitCommandRunner for CheckoutFallbackRunner {
+        fn run_git(&self, args: &[&str]) -> Result<GitCommandOutput, GitProviderError> {
+            self.calls
+                .borrow_mut()
+                .push(args.iter().map(|arg| arg.to_string()).collect());
+            if args.contains(&"checkout") && *self.fail_next_checkout.borrow() {
+                *self.fail_next_checkout.borrow_mut() = false;
+                return Err(GitProviderError::CommandFailed {
+                    command: "git checkout".to_string(),
+                    stderr: "missing object".to_string(),
+                });
+            }
+            Ok(GitCommandOutput {
+                stdout: String::new(),
+                stderr: String::new(),
+            })
+        }
+    }
+
     #[test]
-    fn checkout_to_cache_clones_fetches_and_checks_out_target_commit() {
+    fn checkout_to_cache_clones_and_checks_out_target_commit_without_fetching_first() {
         let root = temp_dir("fake-checkout");
         let cache_root = root.join("cache");
         let runner = FakeRunner {
@@ -288,17 +573,123 @@ mod tests {
                 vec![
                     "-C".to_string(),
                     checkout_dir_text.clone(),
-                    "fetch".to_string(),
-                    "origin".to_string(),
-                    "main".to_string(),
-                ],
-                vec![
-                    "-C".to_string(),
-                    checkout_dir_text,
                     "checkout".to_string(),
                     "def456".to_string(),
                 ],
             ]
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn checkout_to_cache_uses_reference_clone_for_same_source_commit_and_ref() {
+        let root = temp_dir("reference-clone");
+        let cache_root = root.join("cache");
+        let runner = FakeRunner {
+            calls: RefCell::new(Vec::new()),
+        };
+        let provider = GitCliProvider::new(runner);
+        let first = provider
+            .checkout_to_cache(&GitCheckoutRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                ref_: "main".to_string(),
+                repo_path: "skills/example".to_string(),
+                target_commit: "def456".to_string(),
+                cache_dir: cache_root.to_string_lossy().to_string(),
+            })
+            .expect("first checkout should run");
+        provider.runner().calls.borrow_mut().clear();
+
+        let second = provider
+            .checkout_to_cache(&GitCheckoutRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                ref_: "main".to_string(),
+                repo_path: "skills/other".to_string(),
+                target_commit: "def456".to_string(),
+                cache_dir: cache_root.to_string_lossy().to_string(),
+            })
+            .expect("second checkout should reuse existing objects");
+
+        assert_ne!(first.checkout_dir, second.checkout_dir);
+        assert_eq!(
+            provider.runner().calls.borrow().as_slice(),
+            &[
+                vec![
+                    "clone".to_string(),
+                    "--filter=blob:none".to_string(),
+                    "--no-checkout".to_string(),
+                    "--reference-if-able".to_string(),
+                    first.checkout_dir.clone(),
+                    "https://github.com/example/metis-skills.git".to_string(),
+                    second.checkout_dir.clone(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    second.checkout_dir.clone(),
+                    "sparse-checkout".to_string(),
+                    "init".to_string(),
+                    "--cone".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    second.checkout_dir.clone(),
+                    "sparse-checkout".to_string(),
+                    "set".to_string(),
+                    "skills/other".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    second.checkout_dir,
+                    "checkout".to_string(),
+                    "def456".to_string(),
+                ],
+            ]
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn checkout_to_cache_uses_legacy_same_source_checkout_as_reference() {
+        let root = temp_dir("legacy-reference-clone");
+        let cache_root = root.join("cache");
+        let legacy_request = GitCheckoutRequest {
+            url: "https://github.com/example/metis-skills.git".to_string(),
+            ref_: "main".to_string(),
+            repo_path: "skills/example".to_string(),
+            target_commit: "def456".to_string(),
+            cache_dir: cache_root.to_string_lossy().to_string(),
+        };
+        let legacy_checkout_dir = cache_checkout_dir(&legacy_request);
+        write_file(
+            &legacy_checkout_dir.join(".git/config"),
+            "[remote \"origin\"]\n\turl = https://github.com/example/metis-skills.git\n",
+        );
+        let runner = FakeRunner {
+            calls: RefCell::new(Vec::new()),
+        };
+        let provider = GitCliProvider::new(runner);
+
+        let second = provider
+            .checkout_to_cache(&GitCheckoutRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                ref_: "main".to_string(),
+                repo_path: "skills/other".to_string(),
+                target_commit: "def456".to_string(),
+                cache_dir: cache_root.to_string_lossy().to_string(),
+            })
+            .expect("new checkout should reference legacy checkout objects");
+
+        assert_eq!(
+            provider.runner().calls.borrow().first(),
+            Some(&vec![
+                "clone".to_string(),
+                "--filter=blob:none".to_string(),
+                "--no-checkout".to_string(),
+                "--reference-if-able".to_string(),
+                legacy_checkout_dir.to_string_lossy().to_string(),
+                "https://github.com/example/metis-skills.git".to_string(),
+                second.checkout_dir,
+            ])
         );
         fs::remove_dir_all(&root).expect("temp directory should be removed");
     }
@@ -330,6 +721,141 @@ mod tests {
         assert_ne!(first.checkout_dir, second.checkout_dir);
         assert!(first.checkout_dir.contains("checkout-def456-"));
         assert!(second.checkout_dir.contains("checkout-def456-"));
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn checkout_to_cache_reuses_existing_cache_without_fetching_first() {
+        let root = temp_dir("existing-cache-no-fetch");
+        let cache_root = root.join("cache");
+        let runner = FakeRunner {
+            calls: RefCell::new(Vec::new()),
+        };
+        let provider = GitCliProvider::new(runner);
+        let request = GitCheckoutRequest {
+            url: "https://github.com/example/metis-skills.git".to_string(),
+            ref_: "main".to_string(),
+            repo_path: "skills/example".to_string(),
+            target_commit: "def456".to_string(),
+            cache_dir: cache_root.to_string_lossy().to_string(),
+        };
+        let first = provider
+            .checkout_to_cache(&request)
+            .expect("first checkout should create the cache");
+        provider.runner().calls.borrow_mut().clear();
+
+        let second = provider
+            .checkout_to_cache(&request)
+            .expect("second checkout should reuse cache");
+
+        assert_eq!(second.checkout_dir, first.checkout_dir);
+        assert_eq!(
+            provider.runner().calls.borrow().as_slice(),
+            &[
+                vec![
+                    "-C".to_string(),
+                    first.checkout_dir.clone(),
+                    "remote".to_string(),
+                    "set-url".to_string(),
+                    "origin".to_string(),
+                    "https://github.com/example/metis-skills.git".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    first.checkout_dir.clone(),
+                    "sparse-checkout".to_string(),
+                    "init".to_string(),
+                    "--cone".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    first.checkout_dir.clone(),
+                    "sparse-checkout".to_string(),
+                    "set".to_string(),
+                    "skills/example".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    first.checkout_dir,
+                    "checkout".to_string(),
+                    "def456".to_string(),
+                ],
+            ]
+        );
+        fs::remove_dir_all(&root).expect("temp directory should be removed");
+    }
+
+    #[test]
+    fn checkout_to_cache_fetches_when_existing_cache_checkout_misses_commit() {
+        let root = temp_dir("existing-cache-fetch-fallback");
+        let cache_root = root.join("cache");
+        let request = GitCheckoutRequest {
+            url: "https://github.com/example/metis-skills.git".to_string(),
+            ref_: "main".to_string(),
+            repo_path: "skills/example".to_string(),
+            target_commit: "def456".to_string(),
+            cache_dir: cache_root.to_string_lossy().to_string(),
+        };
+        let checkout_dir = cache_checkout_dir(&request);
+        fs::create_dir_all(checkout_dir.join("skills/example"))
+            .expect("existing checkout cache should be created");
+        let checkout_dir_text = checkout_dir.to_string_lossy().to_string();
+        let runner = CheckoutFallbackRunner {
+            calls: RefCell::new(Vec::new()),
+            fail_next_checkout: RefCell::new(true),
+        };
+        let provider = GitCliProvider::new(runner);
+
+        provider
+            .checkout_to_cache(&request)
+            .expect("checkout should fetch and retry when local object is missing");
+
+        assert_eq!(
+            provider.runner().calls.borrow().as_slice(),
+            &[
+                vec![
+                    "-C".to_string(),
+                    checkout_dir_text.clone(),
+                    "remote".to_string(),
+                    "set-url".to_string(),
+                    "origin".to_string(),
+                    "https://github.com/example/metis-skills.git".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    checkout_dir_text.clone(),
+                    "sparse-checkout".to_string(),
+                    "init".to_string(),
+                    "--cone".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    checkout_dir_text.clone(),
+                    "sparse-checkout".to_string(),
+                    "set".to_string(),
+                    "skills/example".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    checkout_dir_text.clone(),
+                    "checkout".to_string(),
+                    "def456".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    checkout_dir_text.clone(),
+                    "fetch".to_string(),
+                    "origin".to_string(),
+                    "main".to_string(),
+                ],
+                vec![
+                    "-C".to_string(),
+                    checkout_dir_text,
+                    "checkout".to_string(),
+                    "def456".to_string(),
+                ],
+            ]
+        );
         fs::remove_dir_all(&root).expect("temp directory should be removed");
     }
 

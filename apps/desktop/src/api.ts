@@ -1,14 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  DesktopAgentPath,
   DesktopAgentStatus,
   DesktopApplyUpdateResult,
+  DesktopAuditEvent,
   DesktopBackupSummary,
   DesktopBindSourceRequest,
+  DesktopCopyLocalSkillRequest,
+  DesktopCopyLocalSkillResult,
   DesktopDiffDetail,
   DesktopEnvironmentReport,
   DesktopFileExportResult,
   DesktopInstallRemoteSkillRequest,
   DesktopInstallRemoteSkillResult,
+  DesktopLocalSkillTarget,
+  DesktopGitEnvironmentTestResult,
   DesktopPreviewRemoteSkillSourceRequest,
   DesktopRemoteSkillPreview,
   DesktopRestoreBackupRequest,
@@ -16,9 +22,11 @@ import type {
   DesktopScanResponse,
   DesktopSettings,
   DesktopSkill,
+  DesktopSkillSize,
   DesktopSkillTarget,
   DesktopSkillTargetsRequest,
   DesktopSource,
+  DesktopSourceConnectionTestResult,
   DesktopAuditLogExportRequest,
   DesktopTeamComplianceReportExportRequest,
   DesktopTeamPolicyAuditReport,
@@ -37,6 +45,10 @@ export function listIndexedSkills(): Promise<DesktopSkill[]> {
   return invoke("list_indexed_skills");
 }
 
+export function getSkillSize(skillId: string): Promise<DesktopSkillSize> {
+  return invoke("get_skill_size", { skillId });
+}
+
 export function scanSkills(): Promise<DesktopScanResponse> {
   return invoke("scan_skills");
 }
@@ -47,6 +59,10 @@ export function getDesktopSettings(): Promise<DesktopSettings> {
 
 export function saveDesktopSettings(settings: DesktopSettings): Promise<DesktopSettings> {
   return invoke("save_desktop_settings", { settings });
+}
+
+export function checkPathStatus(path: string): Promise<DesktopAgentPath> {
+  return invoke("check_path_status", { path });
 }
 
 export function getTeamPolicySummary(): Promise<DesktopTeamPolicySummary | null> {
@@ -73,16 +89,40 @@ export function previewRemoteSkillSource(
   return invoke("preview_remote_skill_source", { request });
 }
 
+export function testSourceConnection(
+  request: DesktopPreviewRemoteSkillSourceRequest,
+): Promise<DesktopSourceConnectionTestResult> {
+  return invoke("test_source_connection", { request });
+}
+
+export function testGitEnvironment(): Promise<DesktopGitEnvironmentTestResult> {
+  return invoke("test_git_environment");
+}
+
 export function getSkillTargetsForSource(
   request: DesktopSkillTargetsRequest,
 ): Promise<DesktopSkillTarget[]> {
   return invoke("get_skill_targets_for_source", { request });
 }
 
+export function getLocalSkillInstallTargets(
+  sourceSkillId: string,
+): Promise<DesktopLocalSkillTarget[]> {
+  return invoke("get_local_skill_install_targets", {
+    request: { source_skill_id: sourceSkillId },
+  });
+}
+
 export function installRemoteSkillToTargets(
   request: DesktopInstallRemoteSkillRequest,
 ): Promise<DesktopInstallRemoteSkillResult> {
   return invoke("install_remote_skill_to_targets", { request });
+}
+
+export function copyLocalSkillToTargets(
+  request: DesktopCopyLocalSkillRequest,
+): Promise<DesktopCopyLocalSkillResult> {
+  return invoke("copy_local_skill_to_targets", { request });
 }
 
 export function checkSkillUpdates(
@@ -101,6 +141,10 @@ export function applySkillUpdate(skillId: string): Promise<DesktopApplyUpdateRes
 
 export function listSkillBackups(skillId: string): Promise<DesktopBackupSummary[]> {
   return invoke("list_skill_backups", { skillId });
+}
+
+export function listSkillAuditEvents(skillId: string, limit = 6): Promise<DesktopAuditEvent[]> {
+  return invoke("list_skill_audit_events", { skillId, limit });
 }
 
 export function restoreSkillBackup(

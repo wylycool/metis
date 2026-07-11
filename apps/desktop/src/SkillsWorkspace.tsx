@@ -1,15 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AddSkillPage, type RemoteSyncDraft } from "./AddSkillPage";
-import { remoteTargetId } from "./CrossAgentTargetMatrix";
-import { SkillDetailPage } from "./SkillDetailPage";
+import { isRemoteTargetSelectable, remoteTargetId } from "./CrossAgentTargetMatrix";
+import {
+  emptyDetailLocalInstallState,
+  SkillDetailPage,
+  type DetailLocalInstallState,
+} from "./SkillDetailPage";
 import { InlineError, SkillRow, type BindDraft } from "./SkillRow";
 import type {
   DesktopBackupSummary,
+  DesktopAuditEvent,
   DesktopDiffDetail,
   DesktopError,
   DesktopInstallRemoteSkillResult,
+  DesktopLocalSkillTarget,
   DesktopRemoteSkillPreview,
   DesktopSkill,
+  DesktopSkillSize,
+  DesktopSourceConnectionTestResult,
   DesktopSource,
   DesktopSkillTarget,
   DesktopUpdateCheckResult,
@@ -17,6 +25,7 @@ import type {
 } from "./types";
 
 type SkillsRoute = { kind: "list" } | { kind: "detail"; skillId: string } | { kind: "add" };
+type SkillSortMode = "name" | "source" | "recent";
 const HOME_SKILL_PREVIEW_LIMIT = 6;
 
 export function SkillsWorkspace({
@@ -26,19 +35,22 @@ export function SkillsWorkspace({
   backups,
   bindDraft,
   bindingSkillId,
-  detailInstallResults,
-  detailTargetErrors,
-  detailTargets,
+  detailLocalInstallStates,
   diffDetails,
   diffError,
   error,
   remoteInstallResult,
   remotePreview,
+  remotePreviewError,
   remoteSyncDraft,
   remoteTargets,
-  selectedDetailTargetIds,
   selectedRemoteTargetIds,
+  homeNavigationKey,
+  skillAuditEvents,
   skillSearchQuery,
+  skillSizes,
+  sourceConnectionErrors,
+  sourceConnectionResults,
   skills,
   state,
   updateResults,
@@ -53,17 +65,24 @@ export function SkillsWorkspace({
   onInstallDetailTargets,
   onInstallRemoteTargets,
   onLoadDetailTargets,
+  onLoadSkillAuditEvents,
+  onLoadSkillSize,
   onOpenBind,
   onOpenSettings,
   onPreviewRemoteSync,
+  onApplyNeededAgentUpdates,
+  onResetRemoteSync,
+  onSelectAllValidRemoteTargets,
+  onSelectAllDetailTargets,
   onRestoreBackup,
   onRouteKindChange,
   onScan,
   onSetRemoteSyncDraft,
-  onToggleDetailTarget,
   onToggleDetailDiff,
   onToggleDiff,
+  onToggleDetailTarget,
   onToggleRemoteTarget,
+  onTestSourceConnection,
   onUnbind,
 }: {
   actionBusy: string | null;
@@ -72,48 +91,60 @@ export function SkillsWorkspace({
   backups: Record<string, DesktopBackupSummary[]>;
   bindDraft: BindDraft;
   bindingSkillId: string | null;
-  detailInstallResults: Record<string, DesktopInstallRemoteSkillResult>;
-  detailTargetErrors: Record<string, DesktopError>;
-  detailTargets: Record<string, DesktopSkillTarget[]>;
+  detailLocalInstallStates: Record<string, DetailLocalInstallState>;
   diffDetails: Record<string, DesktopDiffDetail>;
   diffError: Record<string, DesktopError>;
   error: DesktopError | null;
   remoteInstallResult: DesktopInstallRemoteSkillResult | null;
   remotePreview: DesktopRemoteSkillPreview | null;
+  remotePreviewError: DesktopError | null;
   remoteSyncDraft: RemoteSyncDraft;
   remoteTargets: DesktopSkillTarget[];
-  selectedDetailTargetIds: Record<string, string[]>;
   selectedRemoteTargetIds: string[];
+  homeNavigationKey: number;
+  skillAuditEvents: Record<string, DesktopAuditEvent[]>;
   skillSearchQuery: string;
+  skillSizes: Record<string, DesktopSkillSize>;
+  sourceConnectionErrors: Record<string, DesktopError>;
+  sourceConnectionResults: Record<string, DesktopSourceConnectionTestResult>;
   skills: DesktopSkill[];
   state: LoadState;
   updateResults: Record<string, DesktopUpdateCheckResult>;
-  onApplyUpdate: (skillId: string) => void;
+  onApplyUpdate: (skillId: string, mode?: "overwrite-local") => void;
+  onApplyNeededAgentUpdates: (skillIds: string[]) => void;
   onBackupsDetailToggle: (skill: DesktopSkill) => void;
   onBackupsToggle: (skillId: string) => void;
   onBind: (skillId: string) => void;
   onCancelBind: () => void;
-  onCheckDetailUpdates: (skill: DesktopSkill) => void;
+  onCheckDetailUpdates: (skills: DesktopSkill[]) => void;
   onCheckUpdates: (skillIds: string[]) => void;
   onDraftChange: (draft: BindDraft) => void;
   onInstallDetailTargets: (skill: DesktopSkill) => void;
   onInstallRemoteTargets: () => void;
   onLoadDetailTargets: (skill: DesktopSkill) => void;
+  onLoadSkillAuditEvents: (skillId: string) => void;
+  onLoadSkillSize: (skillId: string) => void;
   onOpenBind: (skill: DesktopSkill) => void;
   onOpenSettings: () => void;
   onPreviewRemoteSync: () => void;
+  onResetRemoteSync: () => void;
+  onSelectAllValidRemoteTargets: () => void;
+  onSelectAllDetailTargets: (skillId: string) => void;
   onRestoreBackup: (skillId: string, backupId: string) => void;
   onRouteKindChange: (kind: SkillsRoute["kind"]) => void;
   onScan: () => void;
   onSetRemoteSyncDraft: (draft: RemoteSyncDraft) => void;
-  onToggleDetailTarget: (skillId: string, target: DesktopSkillTarget) => void;
-  onToggleDetailDiff: (skill: DesktopSkill) => void;
+  onToggleDetailDiff: (skill: DesktopSkill, updateResult?: DesktopUpdateCheckResult) => void;
   onToggleDiff: (skillId: string) => void;
+  onToggleDetailTarget: (skillId: string, target: DesktopLocalSkillTarget) => void;
   onToggleRemoteTarget: (target: DesktopSkillTarget) => void;
+  onTestSourceConnection: (skillId: string) => void;
   onUnbind: (skillId: string) => void;
 }) {
   const [route, setRoute] = useState<SkillsRoute>({ kind: "list" });
   const [showAllSkills, setShowAllSkills] = useState(false);
+  const [skillSortMode, setSkillSortMode] = useState<SkillSortMode>("recent");
+  const workspaceRef = useRef<HTMLElement | null>(null);
   const normalizedSearchQuery = skillSearchQuery.trim().toLocaleLowerCase();
   const searchMatchedSkills = useMemo(() => {
     if (!normalizedSearchQuery) {
@@ -122,15 +153,14 @@ export function SkillsWorkspace({
     return skills.filter((skill) => skillMatchesSearch(skill, normalizedSearchQuery));
   }, [normalizedSearchQuery, skills]);
   const baseVisibleSkills = useMemo(() => {
-    if (normalizedSearchQuery) {
-      return uniqueSkills(searchMatchedSkills);
-    }
-    return skills;
-  }, [normalizedSearchQuery, searchMatchedSkills, skills]);
+    return uniqueSkills(searchMatchedSkills);
+  }, [searchMatchedSkills]);
   const agentMembershipsByKey = useMemo(() => {
     return agentMembershipsBySkillKey(searchMatchedSkills);
   }, [searchMatchedSkills]);
-  const visibleSkills = baseVisibleSkills;
+  const visibleSkills = useMemo(() => {
+    return sortHomeSkills(baseVisibleSkills, skillSortMode, agentMembershipsByKey);
+  }, [agentMembershipsByKey, baseVisibleSkills, skillSortMode]);
   const displayedSkills = showAllSkills
     ? visibleSkills
     : visibleSkills.slice(0, HOME_SKILL_PREVIEW_LIMIT);
@@ -144,6 +174,13 @@ export function SkillsWorkspace({
     () => (routedSkill ? skillWithEffectiveSource(routedSkill, skills) : null),
     [routedSkill, skills],
   );
+  const routedDetailSkillWithSize = useMemo(
+    () =>
+      routedDetailSkill
+        ? skillWithLazySize(routedDetailSkill, skillSizes[routedDetailSkill.id])
+        : null,
+    [routedDetailSkill, skillSizes],
+  );
   const visibleModifiedCount = baseVisibleSkills.filter((skill) => skill.local_modified).length;
   const visibleUpdateAvailableCount = baseVisibleSkills.filter(
     (skill) => updateResults[skill.id]?.status === "UpdateAvailable",
@@ -151,73 +188,103 @@ export function SkillsWorkspace({
   const visibleUpToDateCount = baseVisibleSkills.filter(
     (skill) => updateResults[skill.id]?.status === "UpToDate",
   ).length;
-  const detailTargetsLoaded = routedDetailSkill ? Boolean(detailTargets[routedDetailSkill.id]) : false;
-  const detailTargetsFailed = routedDetailSkill
-    ? Boolean(detailTargetErrors[routedDetailSkill.id])
-    : false;
+  const routedAgentMemberships =
+    routedSkill && routedDetailSkill
+      ? relatedAgentMembershipsForSkill(routedSkill, skills)
+      : routedDetailSkill
+        ? [routedDetailSkill]
+        : [];
 
   useEffect(() => {
     onRouteKindChange(route.kind);
   }, [onRouteKindChange, route.kind]);
 
   useEffect(() => {
-    setShowAllSkills(false);
-  }, [normalizedSearchQuery, skills.length]);
+    setRoute({ kind: "list" });
+  }, [homeNavigationKey]);
 
   useEffect(() => {
-    if (route.kind !== "detail" || !routedDetailSkill?.source) {
+    setShowAllSkills(false);
+  }, [normalizedSearchQuery, skillSortMode, skills.length]);
+
+  useEffect(() => {
+    if (route.kind !== "detail" || !routedDetailSkill) {
       return;
     }
-    if (detailTargetsLoaded || detailTargetsFailed) {
+    onLoadSkillAuditEvents(routedDetailSkill.id);
+  }, [onLoadSkillAuditEvents, route.kind, routedDetailSkill?.id]);
+
+  useEffect(() => {
+    if (route.kind !== "detail" || !routedDetailSkill) {
       return;
     }
-    onLoadDetailTargets(routedDetailSkill);
-  }, [
-    detailTargetsFailed,
-    detailTargetsLoaded,
-    routedDetailSkill?.id,
-    routedDetailSkill?.source?.ref_,
-    routedDetailSkill?.source?.repo_path,
-    routedDetailSkill?.source?.url,
-    route.kind,
-  ]);
+    onLoadSkillSize(routedDetailSkill.id);
+  }, [onLoadSkillSize, route.kind, routedDetailSkill?.id]);
+
+  useEffect(() => {
+    try {
+      workspaceRef.current?.scrollTo?.({ top: 0, left: 0, behavior: "instant" });
+    } catch {
+      // Some test and webview environments do not implement element scrollTo options.
+    }
+    if (workspaceRef.current) {
+      workspaceRef.current.scrollTop = 0;
+    }
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    } catch {
+      // jsdom exposes scrollTo but may report it as not implemented.
+    }
+  }, [route.kind, routedDetailSkill?.id]);
 
   return (
     <main
+      ref={workspaceRef}
       className={`workspace workspace-pane phase6-workspace ${
         route.kind === "list" ? "redesign-home" : ""
       }`}
       data-testid="workspace-skills"
     >
-      {route.kind === "detail" && routedDetailSkill && (
+      {route.kind === "detail" && routedDetailSkill && routedDetailSkillWithSize && (
         <SkillDetailPage
           actionBusy={actionBusy}
           backupError={backupError[routedDetailSkill.id]}
           backupOpen={backupPanels[routedDetailSkill.id] ?? false}
           backups={backups[routedDetailSkill.id] ?? []}
           bindDraft={bindDraft}
-          detailInstallResult={detailInstallResults[routedDetailSkill.id]}
-          detailTargetError={detailTargetErrors[routedDetailSkill.id]}
-          detailTargets={detailTargets[routedDetailSkill.id] ?? []}
+          detailLocalInstallState={
+            detailLocalInstallStates[routedDetailSkill.id] ?? emptyDetailLocalInstallState()
+          }
           diffDetail={diffDetails[routedDetailSkill.id]}
           diffError={diffError[routedDetailSkill.id]}
           isBinding={bindingSkillId === routedDetailSkill.id}
-          selectedDetailTargetIds={selectedDetailTargetIds[routedDetailSkill.id] ?? []}
-          skill={routedDetailSkill}
+          sourceConnectionError={sourceConnectionErrors[routedDetailSkill.id]}
+          sourceConnectionResult={sourceConnectionResults[routedDetailSkill.id]}
+          agentMemberships={routedAgentMemberships}
+          skill={routedDetailSkillWithSize}
+          skillAuditEvents={skillAuditEvents[routedDetailSkill.id] ?? []}
           updateResult={updateResults[routedDetailSkill.id]}
+          updateResults={updateResults}
           onBack={() => setRoute({ kind: "list" })}
           onBind={() => onBind(routedDetailSkill.id)}
           onCancelBind={onCancelBind}
-          onCheck={() => onCheckDetailUpdates(routedDetailSkill)}
+          onCheck={() => onCheckDetailUpdates(uniqueSkillsById([...routedAgentMemberships, routedDetailSkill]))}
           onDraftChange={onDraftChange}
           onInstallDetailTargets={() => onInstallDetailTargets(routedDetailSkill)}
-          onApplyUpdate={() => onApplyUpdate(routedDetailSkill.id)}
+          onLoadDetailTargets={() => onLoadDetailTargets(routedDetailSkill)}
+          onSelectAllDetailTargets={() => onSelectAllDetailTargets(routedDetailSkill.id)}
+          onTestSourceConnection={() => onTestSourceConnection(routedDetailSkill.id)}
+          onToggleDetailTarget={(target) =>
+            onToggleDetailTarget(routedDetailSkill.id, target)
+          }
+          onApplyUpdate={onApplyUpdate}
+          onApplyNeededAgentUpdates={onApplyNeededAgentUpdates}
           onOpenBind={() => onOpenBind(routedDetailSkill)}
-          onRefreshDetailTargets={() => onLoadDetailTargets(routedDetailSkill)}
           onRestoreBackup={(backupId) => onRestoreBackup(routedDetailSkill.id, backupId)}
           onToggleBackups={() => onBackupsDetailToggle(routedDetailSkill)}
-          onToggleDetailTarget={(target) => onToggleDetailTarget(routedDetailSkill.id, target)}
-          onToggleDiff={() => onToggleDetailDiff(routedDetailSkill)}
+          onToggleDiff={() =>
+            onToggleDetailDiff(routedDetailSkill, updateResults[routedDetailSkill.id])
+          }
           onUnbind={() => onUnbind(routedDetailSkill.id)}
         />
       )}
@@ -228,12 +295,15 @@ export function SkillsWorkspace({
           draft={remoteSyncDraft}
           installResult={remoteInstallResult}
           preview={remotePreview}
+          previewError={remotePreviewError}
           selectedTargetIds={selectedRemoteTargetIds}
           targets={remoteTargets}
           onBack={() => setRoute({ kind: "list" })}
           onDraftChange={onSetRemoteSyncDraft}
           onInstallTargets={onInstallRemoteTargets}
           onPreview={onPreviewRemoteSync}
+          onReset={onResetRemoteSync}
+          onSelectAllValidTargets={onSelectAllValidRemoteTargets}
           onToggleTarget={onToggleRemoteTarget}
         />
       )}
@@ -259,13 +329,31 @@ export function SkillsWorkspace({
                 <p>Skill inventory</p>
                 <h2>跨 Agent 安装概览</h2>
               </div>
-              <button
-                className="compact add-skill-button"
-                data-testid="open-add-skill"
-                onClick={() => setRoute({ kind: "add" })}
-              >
-                + 添加 Skill
-              </button>
+              <div className="skill-list-actions" data-testid="skill-list-actions">
+                <label className="skill-sort-control" data-testid="skill-sort-control">
+                  <span>排序</span>
+                  <select
+                    aria-label="排序 Skill"
+                    data-testid="skill-sort-select"
+                    value={skillSortMode}
+                    onChange={(event) => setSkillSortMode(event.target.value as SkillSortMode)}
+                  >
+                    <option value="name">首字母</option>
+                    <option value="source">来源状态</option>
+                    <option value="recent">最近修改</option>
+                  </select>
+                </label>
+                <button
+                  className="compact add-skill-button"
+                  data-testid="open-add-skill"
+                  onClick={() => {
+                    onResetRemoteSync();
+                    setRoute({ kind: "add" });
+                  }}
+                >
+                  + 添加 Skill
+                </button>
+              </div>
             </div>
             <div className="skill-list redesign-skill-grid" data-testid="skill-card-grid">
               {displayedSkills.map((skill) => (
@@ -340,6 +428,60 @@ function DashboardStat({
   );
 }
 
+function sortHomeSkills(
+  skills: DesktopSkill[],
+  mode: SkillSortMode,
+  membershipsByKey: Map<string, DesktopSkill[]>,
+) {
+  return [...skills].sort((left, right) => {
+    if (mode === "source") {
+      const leftHasSource = skillHasSourceInMemberships(left, membershipsByKey);
+      const rightHasSource = skillHasSourceInMemberships(right, membershipsByKey);
+      if (leftHasSource !== rightHasSource) {
+        return leftHasSource ? -1 : 1;
+      }
+    }
+
+    if (mode === "recent") {
+      const recentCompare = skillRecentAtMs(right) - skillRecentAtMs(left);
+      if (recentCompare !== 0) {
+        return recentCompare;
+      }
+    }
+
+    return compareSkillName(left, right);
+  });
+}
+
+function compareSkillName(left: DesktopSkill, right: DesktopSkill) {
+  const nameCompare = left.name.localeCompare(right.name, "zh-Hans-CN", {
+    numeric: true,
+    sensitivity: "base",
+  });
+
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+
+  return left.id.localeCompare(right.id, "zh-Hans-CN", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function skillHasSourceInMemberships(
+  skill: DesktopSkill,
+  membershipsByKey: Map<string, DesktopSkill[]>,
+) {
+  const memberships = membershipsByKey.get(skillIdentityKey(skill)) ?? [skill];
+  return memberships.some((membership) => Boolean(membership.source_id || membership.source));
+}
+
+function skillRecentAtMs(skill: DesktopSkill) {
+  const recentAt = Date.parse(skill.local_updated_at ?? skill.last_scanned_at);
+  return Number.isNaN(recentAt) ? 0 : recentAt;
+}
+
 function LoadingState() {
   return (
     <div className="state-block">
@@ -369,7 +511,7 @@ function EmptyState({
   return (
     <div className="state-block empty-state" data-testid="skills-empty-state">
       <h3>还没有发现 skills</h3>
-      <p>默认目录中暂时没有可索引的 SKILL.md。可以重新扫描，或添加团队/个人的 Generic Agent Skills 根目录。</p>
+      <p>默认目录中暂时没有可索引的 SKILL.md。可以重新扫描，或到 Settings 添加自定义路径。</p>
       <div className="empty-actions">
         <button onClick={onScan}>重新扫描</button>
         <button className="ghost-button" onClick={onOpenSettings}>添加扫描路径</button>
@@ -406,6 +548,19 @@ function uniqueSkills(skills: DesktopSkill[]) {
   return unique;
 }
 
+function uniqueSkillsById(skills: DesktopSkill[]) {
+  const seen = new Set<string>();
+  const unique: DesktopSkill[] = [];
+  for (const skill of skills) {
+    if (seen.has(skill.id)) {
+      continue;
+    }
+    seen.add(skill.id);
+    unique.push(skill);
+  }
+  return unique;
+}
+
 function agentMembershipsBySkillKey(skills: DesktopSkill[]) {
   const memberships = new Map<string, DesktopSkill[]>();
   for (const skill of skills) {
@@ -417,15 +572,19 @@ function agentMembershipsBySkillKey(skills: DesktopSkill[]) {
   return memberships;
 }
 
+function relatedAgentMembershipsForSkill(skill: DesktopSkill, skills: DesktopSkill[]) {
+  const identityKey = skillIdentityKey(skill);
+  const nameKey = skill.name.trim().toLocaleLowerCase();
+  const memberships = skills.filter((candidate) => {
+    if (candidate.name.trim().toLocaleLowerCase() === nameKey) {
+      return true;
+    }
+    return skillIdentityKey(candidate) === identityKey;
+  });
+  return memberships.length > 0 ? memberships : [skill];
+}
+
 function skillIdentityKey(skill: DesktopSkill) {
-  if (skill.source) {
-    return [
-      "source",
-      skill.source.url,
-      skill.source.repo_path,
-      skill.source.ref_ || "main",
-    ].join("\u0000");
-  }
   return `name\u0000${skill.name.trim().toLocaleLowerCase()}`;
 }
 
@@ -438,6 +597,17 @@ function skillWithEffectiveSource(skill: DesktopSkill, skills: DesktopSkill[]): 
     ...skill,
     source_id: skill.source_id ?? source.id,
     source,
+  };
+}
+
+function skillWithLazySize(skill: DesktopSkill, size?: DesktopSkillSize): DesktopSkill {
+  if (!size) {
+    return skill;
+  }
+  return {
+    ...skill,
+    file_count: size.file_count,
+    total_size_bytes: size.total_size_bytes,
   };
 }
 
@@ -459,4 +629,4 @@ function reusableSourceForSkill(
   );
 }
 
-export { remoteTargetId };
+export { isRemoteTargetSelectable, remoteTargetId };

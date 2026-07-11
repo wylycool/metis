@@ -69,6 +69,39 @@ function exactBlockFor(selector: string): string {
   return match[2];
 }
 
+function mediaBlocksFor(query: string): string[] {
+  const marker = `@media ${query}`;
+  const blocks: string[] = [];
+  let cursor = 0;
+
+  while (cursor < stylesheet.length) {
+    const start = stylesheet.indexOf(marker, cursor);
+    if (start === -1) {
+      break;
+    }
+    const openingBrace = stylesheet.indexOf("{", start + marker.length);
+    let depth = 0;
+    let end = openingBrace;
+    for (; end < stylesheet.length; end += 1) {
+      if (stylesheet[end] === "{") {
+        depth += 1;
+      } else if (stylesheet[end] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          blocks.push(stylesheet.slice(start, end + 1));
+          cursor = end + 1;
+          break;
+        }
+      }
+    }
+    if (end >= stylesheet.length) {
+      break;
+    }
+  }
+
+  return blocks;
+}
+
 function declaredPx(block: string, property: string): number {
   const match = block.match(new RegExp(`${property}:\\s*(\\d+)px`));
 
@@ -215,6 +248,85 @@ describe("Phase 6 light workspace contrast", () => {
     expect(declaredPx(latestBlockFor(".status-filter-button"), "min-height")).toBeLessThanOrEqual(42);
   });
 
+  test("keeps Add Skill surfaces in the light command sheet system", () => {
+    expect(latestBlockFor(".add-skill-header")).toContain("background: var(--command-surface);");
+    expect(latestBlockFor(".add-skill-header")).toContain("color: var(--ink);");
+    expect(latestBlockFor(".add-skill-page .remote-sync-panel")).toContain(
+      "background: var(--command-surface);",
+    );
+    expect(latestBlockFor(".add-skill-page .target-matrix")).toContain(
+      "background: var(--command-surface);",
+    );
+    expect(latestBlockFor(".remote-target-loading")).toContain("position: relative;");
+    expect(latestBlockFor(".remote-target-loading")).toContain("overflow: hidden;");
+    expect(latestBlockFor(".remote-target-loading")).toContain("grid-template-columns: auto 1fr;");
+    expect(latestBlockFor(".remote-target-loading")).toContain("background: linear-gradient(135deg");
+    expect(latestBlockFor(".remote-target-loading::after")).toContain("content: \"\";");
+    expect(latestBlockFor(".remote-target-loading::after")).toContain(
+      "animation: remoteTargetLoadingSweep 1250ms ease-in-out infinite;",
+    );
+    expect(blockFor(".remote-target-loading-spinner")).toContain(
+      "animation: remoteTargetLoadingSpin 820ms linear infinite;",
+    );
+    expect(stylesheet).toContain("@keyframes remoteTargetLoadingSweep");
+    expect(stylesheet).toContain("@keyframes remoteTargetLoadingSpin");
+    expect(latestBlockFor(".add-skill-page .remote-target-row")).toContain(
+      "background: rgba(248, 250, 252, 0.72);",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed")).toContain(
+      "background: rgba(248, 250, 252, 0.72);",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed")).toContain(
+      "border-color: rgba(203, 213, 225, 0.86);",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed")).not.toContain(
+      "rgba(255, 247, 237",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed:hover")).toContain(
+      "background: rgba(241, 245, 249, 0.92);",
+    );
+    expect(latestBlockFor(".target-status-danger")).toContain("background: var(--danger-bg");
+    expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-start");
+    expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-end");
+    expect(latestBlockFor(".remote-preview-card")).toContain("position: relative;");
+    expect(latestBlockFor(".remote-preview-card")).toContain("overflow: hidden;");
+    expect(stylesheet).not.toContain(".remote-preview-version");
+    expect(stylesheet).not.toContain(".remote-preview-version-label");
+    expect(stylesheet).not.toContain(".remote-preview-card::before");
+    expect(stylesheet).not.toContain("remotePreviewSparkleBurst");
+    expect(blockFor(".remote-preview-card::after")).toContain("content: \"\";");
+    expect(blockFor(".remote-preview-card::after")).toContain("inset: -42% auto -42% -86%;");
+    expect(blockFor(".remote-preview-card::after")).toContain("width: 72%;");
+    expect(blockFor(".remote-preview-card::after")).toContain("linear-gradient(105deg");
+    expect(blockFor(".remote-preview-card::after")).toContain("rgba(255, 255, 255, 0.9) 50%");
+    expect(blockFor(".remote-preview-card::after")).toContain(
+      "animation: remotePreviewSunSweep 1450ms ease-in-out 180ms both;",
+    );
+    expect(stylesheet).toContain("@keyframes remotePreviewSunSweep");
+    expect(stylesheet).toContain("transform: translateX(315%) skewX(-16deg);");
+    expect(stylesheet).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(stylesheet).toContain(".remote-preview-card::after");
+    expect(stylesheet).toContain(".remote-target-loading::after");
+    expect(stylesheet).toContain(".remote-target-loading-spinner");
+    expect(latestBlockFor(".remote-preview-success-hint")).toContain("border: 0;");
+    expect(latestBlockFor(".remote-preview-success-hint")).toContain("background: transparent;");
+    expect(latestBlockFor(".remote-preview-success-hint")).not.toContain("linear-gradient");
+    expect(latestBlockFor(".remote-preview-success-hint span")).toContain("color: #0f766e;");
+    expect(latestBlockFor(".remote-preview-success-hint span")).toContain(
+      "background: rgba(20, 160, 118, 0.1);",
+    );
+    expect(latestBlockFor(".remote-preview-success-hint strong")).toContain("color: #0f766e;");
+    expect(latestBlockFor(".cross-agent-matrix .remote-target-checkbox")).toContain(
+      "accent-color: var(--command-accent);",
+    );
+    expect(latestBlockFor(".cross-agent-matrix .target-install-button")).not.toContain(
+      "background: var(--ink)",
+    );
+    expect(latestBlockFor(".cross-agent-matrix .target-install-button:hover:not(:disabled)")).toContain(
+      "background: #ddf7ee;",
+    );
+  });
+
   test("keeps agent category labels icon-first until the window is wide", () => {
     expect(stylesheet).toMatch(
       /@media\s*\(min-width:\s*1180px\)\s*\{[\s\S]*\.agent-filter-label[\s\S]*display:\s*inline;/,
@@ -238,6 +350,186 @@ describe("Phase 6 light workspace contrast", () => {
 
   test("defines source drawer and three-line intro copy constraints", () => {
     expect(latestBlockFor(".source-drawer")).toContain("position: fixed");
+    expect(latestBlockFor(".source-drawer.redesign-source-drawer")).toContain(
+      "grid-template-rows: auto minmax(0, 1fr);",
+    );
+    expect(latestBlockFor(".source-drawer.redesign-source-drawer")).toContain("overflow: hidden;");
+    expect(latestBlockFor(".source-form")).toContain("min-height: 0;");
+    expect(latestBlockFor(".source-form")).toContain("grid-template-rows: minmax(0, 1fr) auto;");
+    expect(latestBlockFor(".source-form-body")).toContain("overflow-y: auto;");
+    expect(latestBlockFor(".source-form-body")).toContain("gap: 18px;");
+    expect(latestBlockFor(".source-form-body")).toContain("user-select: text;");
+    expect(latestBlockFor(".source-field-label-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
+    expect(exactBlockFor(".source-help-popover")).toContain("user-select: text;");
+    expect(latestBlockFor(".source-help-button")).toContain(
+      "background: var(--source-help-button-bg);",
+    );
+    expect(latestBlockFor(".source-help-button[aria-expanded=\"true\"]")).toContain(
+      "background: var(--source-help-hover-bg);",
+    );
+    expect(latestBlockFor(".source-help-button:hover:not(:disabled)")).toContain(
+      "background: var(--source-help-hover-bg);",
+    );
+    expect(latestBlockFor(".source-help-button:hover:not(:disabled)")).not.toContain(
+      "var(--primary-hover)",
+    );
+    expect(latestBlockFor(".source-help-popover")).toContain("gap: 12px;");
+    expect(latestBlockFor(".source-help-popover")).toContain("border-radius: 16px;");
+    expect(latestBlockFor(".source-help-card")).toContain("display: grid;");
+    expect(latestBlockFor(".source-help-card code")).toContain("user-select: text;");
+    expect(exactBlockFor(".source-form-field input")).toContain("min-height: 48px;");
+    expect(latestBlockFor(".git-source-fields--compact .source-field-stack")).toContain("gap: 10px;");
+    expect(exactBlockFor(".git-source-fields--compact .source-secondary-fields")).toContain(
+      "grid-template-columns: minmax(0, 1fr) minmax(120px, 0.42fr);",
+    );
+    expect(stylesheet).toMatch(
+      /@media\s*\(max-width:\s*760px\)\s*\{[\s\S]*\.git-source-fields--compact \.source-secondary-fields\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    );
+    expect(latestBlockFor(".git-source-fields--compact .source-form-field input")).toContain(
+      "min-height: 40px;",
+    );
+    expect(latestBlockFor(".source-form-field input::placeholder")).toContain("font-weight: 600;");
+    expect(latestBlockFor(".source-settings-grid")).toContain("gap: 10px;");
+    expect(latestBlockFor(".source-setting-row")).toContain(
+      "grid-template-columns: 22px minmax(0, 1fr);",
+    );
+    expect(latestBlockFor(".source-verification-panel .source-connection-check")).toContain("display: flex;");
+    expect(latestBlockFor(".source-verification-panel .source-connection-check")).toContain("align-items: center;");
+    expect(latestBlockFor(".source-test-button")).toContain("display: inline-flex;");
+    expect(latestBlockFor(".source-test-button")).toContain("white-space: nowrap;");
+    expect(latestBlockFor(".source-test-button")).toContain("min-width: 104px;");
+    expect(latestBlockFor(".source-test-button")).toContain("background: #2563eb;");
+    expect(latestBlockFor(".source-test-button:hover:not(:disabled)")).toContain("background: #eff6ff;");
+    expect(latestBlockFor(".source-test-button:disabled")).toContain("background: #dbeafe;");
+    expect(latestBlockFor(".source-test-button:disabled")).toContain("cursor: default;");
+    expect(latestBlockFor(".source-test-button:disabled")).not.toContain("cursor: wait;");
+    expect(latestBlockFor(".source-test-button[data-busy=\"true\"]")).toContain("cursor: wait;");
+    expect(latestBlockFor(".source-save-button:disabled")).toContain("cursor: default;");
+    expect(latestBlockFor(".source-save-button[data-busy=\"true\"]")).toContain("cursor: wait;");
+    expect(exactBlockFor("button:disabled")).toContain("cursor: default;");
+    expect(exactBlockFor("button:disabled")).not.toContain("cursor: wait;");
+    const previewDisabledBlock = latestBlockFor(".add-skill-preview-button:disabled");
+    expect(previewDisabledBlock).toContain("cursor: default;");
+    expect(previewDisabledBlock).not.toContain("cursor: wait;");
+    expect(latestBlockFor(".settings-section.git-health-section")).toContain("min-height: auto;");
+    expect(latestBlockFor(".settings-section.git-health-section")).toContain("grid-template-rows: auto auto;");
+    expect(latestBlockFor(".settings-git-health-card")).toContain("display: flex;");
+    expect(latestBlockFor(".settings-git-health-card")).toContain("border: 0;");
+    expect(latestBlockFor(".settings-git-health-card")).toContain("padding: 0;");
+    expect(latestBlockFor(".settings-git-health-action")).toContain("gap: 16px;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain("min-height: 36px;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 76px;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain("padding: 0 14px;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain("font-size: 13px;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain(
+      "background: linear-gradient(135deg, #3154df, #4b7df0);",
+    );
+    expect(latestBlockFor(".settings-git-test-button")).toContain(
+      "box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);",
+    );
+    const gitTestHoverBlock = latestBlockFor(".settings-git-test-button:hover:not(:disabled)");
+    expect(gitTestHoverBlock).toContain("color: #ffffff;");
+    expect(gitTestHoverBlock).toContain("border-color: transparent;");
+    expect(gitTestHoverBlock).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
+    expect(gitTestHoverBlock).toContain("box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);");
+    expect(gitTestHoverBlock).toContain("transform: none;");
+    expect(gitTestHoverBlock).not.toContain("background: #eff6ff;");
+    const gitTestFocusBlock = latestBlockFor(".settings-git-test-button:focus-visible");
+    expect(gitTestFocusBlock).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
+    expect(gitTestFocusBlock).toContain("color: #ffffff;");
+    expect(gitTestFocusBlock).toContain("transform: none;");
+    expect(latestBlockFor(".settings-git-test-button:disabled")).toContain("color: #64708a;");
+    expect(latestBlockFor(".settings-git-test-button:disabled")).toContain("background: #f8fafc;");
+    expect(latestBlockFor(".settings-git-health-notice")).toContain("background: #fff7ed;");
+    expect(latestBlockFor(".settings-git-health-notice")).toContain("border: 1px solid #fed7aa;");
+    expect(latestBlockFor(".settings-git-health-notice")).not.toContain("danger");
+    expect(latestBlockFor(".settings-git-health-notice")).not.toContain("#dc2626");
+    expect(latestBlockFor(".custom-monitor-add")).toContain("justify-self: end;");
+    expect(latestBlockFor(".custom-monitor-add")).toContain("min-width: 78px;");
+    expect(latestBlockFor(".custom-monitor-add")).toContain("background: #ffffff;");
+    expect(exactBlockFor(".path-management-heading")).toContain("display: flex;");
+    expect(exactBlockFor(".path-status-legend")).toContain("display: inline-flex;");
+    expect(latestBlockFor(".path-status-legend-item")).toContain("white-space: nowrap;");
+    expect(
+      latestBlockFor(".settings-agent-path-row.redesign-agent-path-row input[readonly]"),
+    ).toContain("background: #eef2f6;");
+    expect(exactBlockFor(".agent-path-row-actions")).toContain("justify-self: end;");
+    expect(latestBlockFor(".agent-path-pending-badge")).toContain("white-space: nowrap;");
+    expect(latestBlockFor(".redesign-agent-path-row span.pending::before")).toContain(
+      "background: #64748b;",
+    );
+    expect(
+      mediaBlocksFor("(max-width: 760px)").some((block) =>
+        /\.settings-agent-path-row\.redesign-agent-path-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/.test(
+          block,
+        ),
+      ),
+    ).toBe(true);
+    expect(latestBlockFor(".settings-save-button")).toContain(
+      "background: linear-gradient(135deg, #3154df, #4b7df0);",
+    );
+    expect(latestBlockFor(".settings-save-button")).toContain(
+      "box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);",
+    );
+    expect(latestBlockFor(".settings-save-button:hover:not(:disabled)")).toContain(
+      "background: linear-gradient(135deg, #2749cf, #416fed);",
+    );
+    expect(latestBlockFor(".settings-save-button:hover:not(:disabled)")).toContain(
+      "transform: none;",
+    );
+    expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
+    expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("gap: 16px 28px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("align-items: start;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border: 1px solid #d9e1ee;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border-radius: 22px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("padding: 28px 30px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
+      "background: rgba(255, 255, 255, 0.9);",
+    );
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
+      "box-shadow: 0 18px 46px rgba(23, 32, 51, 0.12);",
+    );
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("min-height: 42px;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("border-radius: 12px;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("color: #142033;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("background: #ffffff;");
+    expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");
+    expect(latestBlockFor(".auto-update-source-list")).toContain("grid-column: 1 / -1;");
+    expect(latestBlockFor(".auto-update-source-list")).toContain("gap: 10px;");
+    expect(latestBlockFor(".auto-update-source-row")).toContain(
+      "grid-template-columns: minmax(0, 1fr) auto;",
+    );
+    expect(exactBlockFor(".auto-update-source-row")).toContain("gap: 10px 16px;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain("border: 1px solid #dde6f2;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain("border-radius: 18px;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain("padding: 13px 14px;");
+    expect(exactBlockFor(".auto-update-source-row")).toContain(
+      "background: linear-gradient(180deg, #fbfdff, #f8fafc);",
+    );
+    expect(exactBlockFor(".auto-update-source-row.is-open")).toContain("border-color: #c9d9ec;");
+    expect(exactBlockFor(".auto-update-trusted-chip")).toContain("color: #0f766e;");
+    expect(exactBlockFor(".auto-update-trusted-chip")).toContain("background: #e8faf5;");
+    expect(exactBlockFor(".auto-update-empty-state")).toContain("border: 1px dashed #cdd8e7;");
+    expect(exactBlockFor(".auto-update-empty-state")).toContain("background: #f8fbff;");
+    expect(exactBlockFor(".auto-update-remove-actions")).toContain("display: inline-flex;");
+    expect(exactBlockFor(".auto-update-remove-actions")).toContain("justify-self: end;");
+    expect(exactBlockFor(".auto-update-remove-actions")).not.toContain("grid-column: 1 / -1;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("min-width: 78px;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("min-height: 38px;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("background: #ffffff;");
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("grid-column: 1 / -1;");
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain(
+      "linear-gradient(90deg, rgba(245, 158, 11, 0.1), transparent 42%),",
+    );
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("#fff8eb;");
+    expect(exactBlockFor(".auto-update-remove-confirm")).toContain("border: 1px solid #f3d59b;");
+    expect(exactBlockFor(".auto-update-remove-confirm-actions")).toContain("display: inline-flex;");
+    expect(exactBlockFor(".auto-update-cancel")).toContain("background: #ffffff;");
+    expect(exactBlockFor(".auto-update-cancel")).toContain("border: 1px solid #c8d5e4;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("color: #b42318;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("background: #fff1ed;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("border: 1px solid #ffc7bd;");
     expect(latestBlockFor(".skill-intro-copy")).toContain("-webkit-line-clamp: 3");
   });
 
@@ -299,6 +591,19 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".scan-button")).toContain("background: var(--command-purple-soft);");
     expect(latestBlockFor(".scan-button")).not.toContain("var(--command-accent-soft)");
     expect(latestBlockFor(".add-skill-button")).toContain("background: var(--command-surface);");
+    expect(latestBlockFor(".skill-sort-control")).toContain("background: var(--command-surface);");
+    expect(latestBlockFor(".skill-sort-control")).toContain("border-radius: 8px;");
+    expect(latestBlockFor(".skill-sort-control")).toContain("font-weight: 500;");
+    expect(latestBlockFor(".skill-sort-control span")).toContain("font-weight: 500;");
+    expect(latestBlockFor(".skill-sort-control select")).toContain("appearance: none;");
+    expect(latestBlockFor(".skill-sort-control select")).toContain("font-weight: 500;");
+    expect(latestBlockFor(".skill-sort-control select:focus")).toContain("outline: none;");
+    expect(latestBlockFor(".skill-sort-control:hover")).toContain(
+      "background: var(--command-selected);",
+    );
+    expect(latestBlockFor(".skill-sort-control:hover")).not.toContain(
+      "background: var(--ink-hover);",
+    );
     expect(latestBlockFor(".status-filter-button.active")).toContain(
       "background: var(--command-selected);",
     );
@@ -328,15 +633,22 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(/\.skill-row-marker,\s*\.skill-row:nth-child\(n\) \.skill-row-marker\s*\{[\s\S]*background:\s*linear-gradient\(180deg,\s*#6fd8ff,\s*#3e7bfa 48%,\s*#9857ff\);/);
   });
 
-  test("renders cross-agent target statuses as colored badges with a spinner affordance", () => {
+  test("renders cross-agent target statuses as colored badges", () => {
     expect(stylesheet).toContain(".target-status-badge");
     expect(stylesheet).toContain(".target-status-good");
     expect(stylesheet).toContain(".target-status-warning");
     expect(stylesheet).toContain(".target-status-danger");
     expect(stylesheet).toContain(".target-status-muted");
-    expect(stylesheet).toContain(".target-matrix-spinner");
-    expect(latestBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
-    expect(latestBlockFor(".target-matrix-spinner")).toContain("animation:");
+    expect(exactBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
+    expect(latestBlockFor(".cross-agent-matrix .target-matrix-select-all")).not.toContain(
+      "background: var(--ink)",
+    );
+    expect(latestBlockFor(".cross-agent-matrix .target-matrix-select-all")).toContain(
+      "background: var(--command-surface);",
+    );
+    expect(
+      latestBlockFor(".cross-agent-matrix .target-matrix-select-all:hover:not(:disabled)"),
+    ).toContain("background: var(--command-selected);");
   });
 
   test("defines the static UI redesign preview shell, orb, rows, and detail panels", () => {
@@ -368,6 +680,29 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".redesign-detail-hero")).toContain(
       "grid-template-columns: minmax(0, 1fr) auto;",
+    );
+    expect(exactBlockFor(".redesign-detail-agent-header")).toContain(
+      "grid-template-columns: minmax(0, 1fr);",
+    );
+    expect(stylesheet).not.toContain(".redesign-detail-agent-install-action");
+    expect(latestBlockFor(".detail-install-targets")).toContain("display: grid;");
+    expect(exactBlockFor(".detail-install-targets .remote-target-row.redesign-detail-agent-path-row")).toContain(
+      "grid-template-columns: auto auto minmax(112px, max-content) minmax(0, 1fr) auto;",
+    );
+    expect(exactBlockFor(".detail-install-targets .remote-target-agent-name")).toContain(
+      "min-width: 0;",
+    );
+    expect(exactBlockFor(".detail-install-targets .remote-target-agent-name")).toContain(
+      "width: 100%;",
+    );
+    expect(exactBlockFor(".detail-install-targets .remote-target-row code")).toContain(
+      "min-width: 0;",
+    );
+    expect(mediaBlocksFor("(max-width: 760px)").join("\n")).toMatch(
+      /\.detail-install-targets \.remote-target-row\.redesign-detail-agent-path-row\s*\{[\s\S]*grid-template-columns:\s*auto auto minmax\(0, 1fr\) auto;/,
+    );
+    expect(mediaBlocksFor("(max-width: 760px)").join("\n")).toMatch(
+      /\.detail-install-targets \.remote-target-row code\s*\{[\s\S]*grid-column:\s*3 \/ -1;[\s\S]*grid-row:\s*2;/,
     );
   });
 
@@ -422,16 +757,84 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(/\.redesign-diff-viewer\s*\{[\s\S]*font-family:/);
     expect(latestBlockFor(".redesign-diff-line.added")).toContain("background:");
     expect(stylesheet).toMatch(/\.redesign-agent-path-table\s*\{[\s\S]*display:\s*grid;/);
+    expect(latestBlockFor(".redesign-detail-agent-panel")).toContain("display: grid;");
+    expect(latestBlockFor(".redesign-detail-agent-panel")).toContain("background: rgba(255, 255, 255, 0.82);");
+    expect(latestBlockFor(".redesign-detail-agent-toggle")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
+    expect(latestBlockFor(".redesign-detail-agent-toggle")).toContain("min-height: 56px;");
+    expect(latestBlockFor("button.redesign-detail-agent-toggle:hover:not(:disabled)")).toContain("color: #172033;");
+    expect(latestBlockFor("button.redesign-detail-agent-toggle:hover:not(:disabled)")).toContain("background:");
+    expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("display: grid;");
+    expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("gap: 8px;");
+    expect(exactBlockFor(".redesign-detail-agent-path-row")).toContain("background: rgba(248, 250, 252, 0.72);");
+    expect(exactBlockFor(".redesign-detail-agent-path-row")).toContain("grid-template-columns: auto minmax(96px, 0.24fr) minmax(0, 1fr) auto auto;");
+    expect(latestBlockFor(".redesign-detail-agent-path-row.update")).toContain("background: rgba(239, 246, 255, 0.88);");
+    expect(latestBlockFor(".redesign-detail-agent-path-row.latest small")).toContain("color: #157a58;");
+    expect(latestBlockFor(".redesign-detail-agent-path-row .agent-badge")).toContain("margin-left: 0;");
+    expect(exactBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
+    expect(latestBlockFor(".redesign-detail-agent-row-action")).toContain("white-space: nowrap;");
+    expect(latestBlockFor(".redesign-backup-panel .backup-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
+    expect(exactBlockFor(".redesign-side-nav button")).toContain("color: #526174;");
+    expect(exactBlockFor(".redesign-side-nav button:hover:not(:disabled)")).toContain("background: #eef4ff;");
+    expect(exactBlockFor(".redesign-side-nav button:hover:not(:disabled)")).toContain("box-shadow: none;");
+    expect(latestBlockFor(".redesign-skill-card:hover:not(:disabled)")).toContain("transform: translateY(-2px);");
+    expect(latestBlockFor(".redesign-skill-card:hover:not(:disabled)")).toContain(
+      "box-shadow: 0 14px 28px rgba(30, 48, 78, 0.1);",
+    );
+    expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("background: #f8fafc;");
+    expect(latestBlockFor(".redesign-top-actions button:hover:not(:disabled)")).toContain("color: #2f4b77;");
+    expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
+    expect(latestBlockFor(".redesign-source-summary button:hover:not(:disabled)")).toContain("color: #ffffff;");
     expect(latestBlockFor(".redesign-toast")).toContain("position: fixed");
+    expect(latestBlockFor(".redesign-toast.success-toast")).toContain("background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 72%);");
+    expect(latestBlockFor(".redesign-toast.info-toast")).toContain("background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);");
+    expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
+    expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("border-color: rgba(214, 139, 38, 0.28);");
+    expect(latestBlockFor(".source-required-toast")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
+    expect(latestBlockFor(".source-required-toast")).not.toContain("background:");
+    expect(latestBlockFor(".source-required-toast")).not.toContain("box-shadow:");
+    expect(latestBlockFor(".source-required-toast-icon")).toContain("background: #f5b84b;");
+    expect(latestBlockFor(".source-required-toast-action")).toContain("background: #fff7ed;");
+    expect(latestBlockFor(".source-required-toast-action")).not.toContain("background: var(--ink)");
+    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("background: #ffedd5;");
+    expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #8a4b0f;");
   });
 
   test("brands overlapping agent letter badges by agent identity", () => {
-    expect(latestBlockFor(".agent-badge-codex")).toContain(
-      "background: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 100%);",
+    expect(latestBlockFor(".skill-agent-stack > .agent-badge")).toContain(
+      "background: var(--agent-badge-background, linear-gradient(135deg, #3e7bfa, #2dd4bf));",
     );
-    expect(latestBlockFor(".agent-badge-claude-code")).toContain("background: #d97757;");
-    expect(latestBlockFor(".agent-badge-cursor")).toContain("background: #111827;");
-    expect(latestBlockFor(".agent-badge-opencode")).toContain("background: #00a88f;");
+    expect(latestBlockFor(".redesign-agent-stack > .agent-badge")).toContain(
+      "background: var(--agent-badge-background, linear-gradient(135deg, #3154df, #46bfa4));",
+    );
+    expect(latestBlockFor(".agent-badge-logo")).toContain("width: 16px;");
+    expect(latestBlockFor(".agent-badge-logo")).toContain("stroke: currentColor;");
+    expect(latestBlockFor(".agent-badge")).toContain("color: var(--agent-badge-foreground, #ffffff);");
+    expect(latestBlockFor(".agent-logo-fill")).toContain("fill: currentColor;");
+    expect(latestBlockFor(".agent-logo-codex-cloud")).toContain("fill: var(--agent-logo-surface, currentColor);");
+    expect(latestBlockFor(".agent-logo-codex-terminal")).toContain("stroke: var(--agent-logo-primary, currentColor);");
+    expect(latestBlockFor(".agent-badge-letter")).toContain("font-weight: 850;");
+    expect(latestBlockFor(".agent-badge-codex")).toContain(
+      "--agent-badge-background: linear-gradient(135deg, #6f8df2 0%, #8b7cf2 100%);",
+    );
+    expect(latestBlockFor(".agent-badge-codex")).toContain("--agent-badge-foreground: #ffffff;");
+    expect(latestBlockFor(".agent-badge-codex")).toContain("--agent-logo-surface: #ffffff;");
+    expect(latestBlockFor(".agent-badge-codex")).toContain("--agent-logo-primary: #3867f4;");
+    expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-background: #f4d7ca;");
+    expect(latestBlockFor(".agent-badge-claude-code")).toContain("--agent-badge-foreground: #a9664d;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-background: #e7eaf0;");
+    expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-foreground: #343a46;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #e3e8ef;");
+    expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-foreground: #334155;");
+    expect(latestBlockFor(".agent-badge-openclaw")).toContain(
+      "--agent-badge-background: #f7cccc;",
+    );
+    expect(latestBlockFor(".agent-badge-openclaw")).toContain("--agent-badge-foreground: #b94a4a;");
+    expect(latestBlockFor(".agent-badge-hermes")).toContain(
+      "--agent-badge-background: #f8fafc;",
+    );
+    expect(latestBlockFor(".agent-badge-hermes")).toContain("--agent-badge-foreground: #334155;");
+    expect(latestBlockFor(".agent-badge-generic,\n.agent-badge-default")).toContain("--agent-badge-background: #eef2f7;");
+    expect(latestBlockFor(".agent-badge-generic,\n.agent-badge-default")).toContain("--agent-badge-foreground: #64748b;");
   });
 
   test("defines the formal reference dashboard shell, skill cards, detail drawer, and settings table", () => {
@@ -473,11 +876,18 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.metis-sidebar\.redesign-sidebar\s*\{[\s\S]*padding:\s*28px 16px;/,
     );
+    expect(latestBlockFor(".metis-sidebar-brand-row")).toContain(
+      "grid-template-columns: minmax(0, 1fr);",
+    );
+    expect(latestBlockFor(".metis-sidebar-footer")).toContain("align-self: end;");
+    expect(latestBlockFor(".metis-sidebar-footer")).toContain("display: flex;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 42px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 42px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border-radius: 14px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border: 0;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("box-shadow: none;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("align-self: center;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("justify-self: start;");
     expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
@@ -523,7 +933,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.topbar-search\.redesign-search-field input:focus\s*\{[\s\S]*border-color:\s*transparent;[\s\S]*box-shadow:\s*none;/,
     );
     expect(stylesheet).toMatch(
-      /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*22px;/,
+      /\.skill-panel\.redesign-home\s*\{[\s\S]*gap:\s*12px;/,
     );
     expect(stylesheet).toMatch(
       /\.skill-dashboard-stats\.redesign-home-stats\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/,
@@ -532,7 +942,7 @@ describe("Phase 6 light workspace contrast", () => {
       /\.skill-list\.redesign-skill-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
     );
     expect(stylesheet).toMatch(
-      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*104px;/,
+      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*88px;/,
     );
     expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
       "font-weight: 720;",
@@ -541,10 +951,10 @@ describe("Phase 6 light workspace contrast", () => {
       "font-weight: 620;",
     );
     expect(stylesheet).toMatch(
-      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*168px;/,
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*min-height:\s*144px;/,
     );
     expect(stylesheet).toMatch(
-      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*grid-template-rows:\s*auto auto minmax\(36px,\s*1fr\) auto;/,
+      /\.skill-row\.redesign-skill-card\s*\{[\s\S]*grid-template-rows:\s*auto auto minmax\(30px,\s*1fr\) auto;/,
     );
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card\s*\{[\s\S]*transition:[\s\S]*transform 220ms cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\);/,
@@ -562,6 +972,16 @@ describe("Phase 6 light workspace contrast", () => {
       "font-weight: 680;",
     );
     expect(latestBlockFor(".redesign-show-more")).toContain("font-weight: 680;");
+    expect(latestBlockFor(".redesign-show-more:hover:not(:disabled)")).toContain(
+      "background: #e6f0ff;",
+    );
+    expect(latestBlockFor(".redesign-show-more:hover:not(:disabled)")).toContain(
+      "color: #2749cf;",
+    );
+    expect(latestBlockFor(".redesign-show-more:focus-visible")).toContain(
+      "background: #e6f0ff;",
+    );
+    expect(latestBlockFor(".redesign-show-more:active")).toContain("background: #dce9ff;");
     expect(stylesheet).toMatch(
       /\.skill-row\.redesign-skill-card > small\s*\{[\s\S]*display:\s*none;/,
     );
@@ -577,11 +997,18 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.local-operations-card\.redesign-update-workbench\s*\{[\s\S]*padding:\s*20px;/,
     );
+    expect(latestBlockFor(".skill-detail-page .redesign-detail-agent-panel")).toContain(
+      "margin-top: -4px;",
+    );
     expect(stylesheet).toMatch(
       /\.source-drawer\.redesign-source-drawer\s*\{[\s\S]*width:\s*min\(440px,\s*100vw\);/,
     );
+    expect(latestBlockFor(".source-drawer.redesign-source-drawer.is-closing")).toContain(
+      "animation: redesignDrawerOut 140ms ease-in forwards;",
+    );
+    expect(stylesheet).toContain("@keyframes redesignDrawerOut");
     expect(stylesheet).toMatch(
-      /\.settings-agent-path-table\.redesign-agent-path-table\s*\{[\s\S]*border-radius:\s*20px;/,
+      /\.settings-agent-path-table\.redesign-agent-path-table\s*\{[\s\S]*border-radius:\s*14px;/,
     );
   });
 
@@ -610,5 +1037,25 @@ describe("Phase 6 light workspace contrast", () => {
     expect(sourceButtonBlock).toContain("padding: 0 18px;");
     expect(sourceButtonBlock).toContain("background: linear-gradient(135deg, #3154df, #4b7df0);");
     expect(sourceButtonBlock).toContain("color: #ffffff;");
+  });
+
+  test("gives source help popovers distinct low-saturation field tones", () => {
+    expect(blockFor(".source-help--url")).toContain("--source-help-accent:");
+    expect(blockFor(".source-help--path")).toContain("--source-help-accent:");
+    expect(blockFor(".source-help--ref")).toContain("--source-help-accent:");
+
+    const urlAccent = latestVariableValue("--source-help-url-accent");
+    const pathAccent = latestVariableValue("--source-help-path-accent");
+    const refAccent = latestVariableValue("--source-help-ref-accent");
+
+    expect(urlAccent).not.toBe(pathAccent);
+    expect(urlAccent).not.toBe(refAccent);
+    expect(pathAccent).not.toBe(refAccent);
+    expect(latestBlockFor(".source-help-popover::before")).toContain(
+      "background: var(--source-help-accent);",
+    );
+    expect(latestBlockFor(".source-help-card code")).toContain(
+      "background: var(--source-help-code-bg);",
+    );
   });
 });

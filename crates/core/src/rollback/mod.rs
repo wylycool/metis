@@ -87,7 +87,6 @@ fn create_backup_snapshot(
     };
     let backup_id = format!("backup_{}", Uuid::new_v4().simple());
     let backup_path = PathBuf::from(&options.backup_root)
-        .join("backups")
         .join(&skill.id)
         .join(&backup_id);
     let copy_result =
@@ -306,6 +305,7 @@ mod tests {
             local_fingerprint: None,
             local_modified: None,
             last_scanned_at: "2026-06-19T10:00:00Z".to_string(),
+            local_updated_at: None,
         }
     }
 
@@ -357,6 +357,10 @@ mod tests {
         assert_eq!(backup.reason, "manual");
         assert_eq!(backup.source_commit.as_deref(), Some("abc123"));
         assert_eq!(backup.file_count, 2);
+        assert_eq!(
+            Path::new(&backup.backup_path),
+            backup_root.join("skill-1").join(&backup.backup_id)
+        );
         assert_eq!(
             backup.total_size_bytes,
             "# Example\n".len() as u64 + "tool".len() as u64

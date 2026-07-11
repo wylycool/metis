@@ -25,10 +25,19 @@ export interface DesktopSkill {
   metadata_path?: string | null;
   metadata_status: string;
   metadata_error?: string | null;
+  file_count?: number | null;
+  total_size_bytes?: number | null;
   source_id?: string | null;
   source?: DesktopSource | null;
   local_modified?: boolean | null;
   last_scanned_at: string;
+  local_updated_at?: string | null;
+}
+
+export interface DesktopSkillSize {
+  skill_id: string;
+  file_count: number;
+  total_size_bytes: number;
 }
 
 export interface DesktopSource {
@@ -47,8 +56,21 @@ export interface DesktopSource {
 
 export interface DesktopSettings {
   custom_scan_paths: string[];
+  agent_path_overrides?: DesktopAgentPathOverride[];
+  custom_monitored_paths?: DesktopCustomMonitoredPath[];
   team_policy_path?: string | null;
   enterprise_network?: DesktopEnterpriseNetworkSettings | null;
+}
+
+export interface DesktopAgentPathOverride {
+  agent_id: string;
+  path: string;
+}
+
+export interface DesktopCustomMonitoredPath {
+  id: string;
+  name: string;
+  path: string;
 }
 
 export interface DesktopEnterpriseNetworkSettings {
@@ -73,12 +95,30 @@ export interface DesktopPreviewRemoteSkillSourceRequest {
   ref_: string;
 }
 
+export interface DesktopSourceConnectionTestResult {
+  ok: boolean;
+  message: string;
+  skill_name: string;
+  description?: string | null;
+  commit: string;
+  repo_path: string;
+  ref_: string;
+}
+
+export interface DesktopGitEnvironmentTestResult {
+  ok: boolean;
+  message: string;
+  version: string;
+  clone_ok: boolean;
+}
+
 export interface DesktopRemoteSkillPreview {
   name: string;
   description?: string | null;
   install_name: string;
   commit: string;
   repo_path: string;
+  ref_: string;
 }
 
 export interface DesktopSkillTargetsRequest {
@@ -102,6 +142,16 @@ export interface DesktopSkillTarget {
   root_status: string;
 }
 
+export interface DesktopLocalSkillTarget {
+  agent_id: string;
+  agent_name: string;
+  root_path: string;
+  install_path: string;
+  status: string;
+  root_available: boolean;
+  root_status: string;
+}
+
 export interface DesktopInstallRemoteSkillRequest {
   url: string;
   repo_path: string;
@@ -115,6 +165,24 @@ export interface DesktopInstallSkillTarget {
   agent_id: string;
   agent_name: string;
   install_path: string;
+}
+
+export interface DesktopCopyLocalSkillRequest {
+  source_skill_id: string;
+  targets: DesktopInstallSkillTarget[];
+}
+
+export interface DesktopCopyLocalSkillResult {
+  targets: DesktopCopyLocalSkillTargetResult[];
+}
+
+export interface DesktopCopyLocalSkillTargetResult {
+  agent_id: string;
+  install_path: string;
+  status: string;
+  reason?: string | null;
+  debug_detail?: string | null;
+  skill_id?: string | null;
 }
 
 export interface DesktopInstallRemoteSkillResult {
@@ -333,6 +401,18 @@ export interface DesktopAuditLogExportRequest {
   output_path: string;
   limit: number;
   offset: number;
+}
+
+export interface DesktopAuditEvent {
+  id: string;
+  skill_id: string;
+  action: string;
+  detail?: string | null;
+  commit_before?: string | null;
+  commit_after?: string | null;
+  status: string;
+  risk_summary?: string | null;
+  created_at?: string | null;
 }
 
 export interface DesktopError {
