@@ -316,13 +316,13 @@ describe("Phase 6 light workspace contrast", () => {
       "background: rgba(20, 160, 118, 0.1);",
     );
     expect(latestBlockFor(".remote-preview-success-hint strong")).toContain("color: #0f766e;");
-    expect(latestBlockFor(".add-skill-page .remote-target-row .remote-target-checkbox")).toContain(
+    expect(latestBlockFor(".cross-agent-matrix .remote-target-checkbox")).toContain(
       "accent-color: var(--command-accent);",
     );
-    expect(latestBlockFor(".add-skill-page .target-install-button")).not.toContain(
+    expect(latestBlockFor(".cross-agent-matrix .target-install-button")).not.toContain(
       "background: var(--ink)",
     );
-    expect(latestBlockFor(".add-skill-page .target-install-button:hover:not(:disabled)")).toContain(
+    expect(latestBlockFor(".cross-agent-matrix .target-install-button:hover:not(:disabled)")).toContain(
       "background: #ddf7ee;",
     );
   });
@@ -640,9 +640,15 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toContain(".target-status-danger");
     expect(stylesheet).toContain(".target-status-muted");
     expect(exactBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
-    expect(latestBlockFor(".add-skill-page .target-matrix-select-all")).not.toContain(
+    expect(latestBlockFor(".cross-agent-matrix .target-matrix-select-all")).not.toContain(
       "background: var(--ink)",
     );
+    expect(latestBlockFor(".cross-agent-matrix .target-matrix-select-all")).toContain(
+      "background: var(--command-surface);",
+    );
+    expect(
+      latestBlockFor(".cross-agent-matrix .target-matrix-select-all:hover:not(:disabled)"),
+    ).toContain("background: var(--command-selected);");
   });
 
   test("defines the static UI redesign preview shell, orb, rows, and detail panels", () => {

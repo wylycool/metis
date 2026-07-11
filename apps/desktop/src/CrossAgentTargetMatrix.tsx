@@ -49,6 +49,7 @@ export function CrossAgentTargetMatrix<T extends TargetMatrixTarget>({
   const [installedHelpOpen, setInstalledHelpOpen] = useState(false);
   const installedHelpRef = useRef<HTMLDetailsElement | null>(null);
   const installResultRef = useRef<HTMLDivElement | null>(null);
+  const previousInstallResultRef = useRef<TargetMatrixResult | undefined>(installResult);
   const copy =
     mode === "local-copy"
       ? {
@@ -98,10 +99,18 @@ export function CrossAgentTargetMatrix<T extends TargetMatrixTarget>({
   }, [installedHelpOpen]);
 
   useEffect(() => {
-    if (mode === "local-copy" && installResult) {
+    const previousInstallResult = previousInstallResultRef.current;
+    previousInstallResultRef.current = installResult;
+
+    if (
+      mode === "local-copy" &&
+      installResult &&
+      installResult !== previousInstallResult &&
+      targets.length === 0
+    ) {
       installResultRef.current?.focus();
     }
-  }, [installResult, mode]);
+  }, [installResult, mode, targets.length]);
 
   if (loading && targets.length === 0) {
     return (

@@ -2420,19 +2420,19 @@ textarea:disabled {
   color: var(--muted);
 }
 
-.add-skill-page .target-matrix-select-all {
+.cross-agent-matrix .target-matrix-select-all {
   border-color: var(--command-border);
   color: var(--ink);
   background: var(--command-surface);
 }
 
-.add-skill-page .target-matrix-select-all:hover:not(:disabled) {
+.cross-agent-matrix .target-matrix-select-all:hover:not(:disabled) {
   color: var(--ink);
   border-color: var(--command-selected-border);
   background: var(--command-selected);
 }
 
-.add-skill-page .target-matrix-select-all:focus-visible {
+.cross-agent-matrix .target-matrix-select-all:focus-visible {
   color: var(--ink);
   border-color: var(--command-selected-border);
   background: var(--command-selected);
@@ -2460,7 +2460,7 @@ textarea:disabled {
   background: rgba(241, 245, 249, 0.92);
 }
 
-.add-skill-page .remote-target-row .remote-target-checkbox {
+.cross-agent-matrix .remote-target-checkbox {
   width: 15px;
   height: 15px;
   margin: 0;
@@ -2535,13 +2535,13 @@ textarea:disabled {
   cursor: default;
 }
 
-.add-skill-page .target-install-button {
+.cross-agent-matrix .target-install-button {
   border-color: var(--command-accent-border);
   color: var(--command-accent);
   background: var(--command-accent-soft);
 }
 
-.add-skill-page .target-install-button:hover:not(:disabled) {
+.cross-agent-matrix .target-install-button:hover:not(:disabled) {
   color: var(--command-accent);
   border-color: #8bd8bf;
   background: #ddf7ee;

@@ -2253,7 +2253,7 @@ describe("Metis desktop GUI main flow", () => {
     expectNoDetailRemoteCommands(scenario);
   });
 
-  test("detail local copy moves focus to an announced result after the last target installs", async () => {
+  test("detail local copy focuses a new final result once and keeps focus on the toggle when reopened", async () => {
     const user = userEvent.setup();
     const scenario = createAgentDetailScenario({ unboundCodex: true });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -2262,7 +2262,8 @@ describe("Metis desktop GUI main flow", () => {
     render(<App />);
 
     await user.click(await screen.findByTestId("skill-row-codex-planner"));
-    await user.click(screen.getByTestId("skill-detail-agent-toggle-codex-planner"));
+    const toggle = screen.getByTestId("skill-detail-agent-toggle-codex-planner");
+    await user.click(toggle);
     await user.click(await screen.findByTestId("target-checkbox-claude-code"));
     const installButton = screen.getByTestId("install-selected-targets");
     installButton.focus();
@@ -2273,6 +2274,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(result.getAttribute("aria-live")).toBe("polite");
     await waitFor(() => expect(document.activeElement).toBe(result));
     expect(screen.queryByTestId("install-selected-targets")).toBeNull();
+
+    await user.click(toggle);
+    expect(screen.queryByTestId("target-install-result")).toBeNull();
+    await user.click(toggle);
+    expect(await screen.findByTestId("target-install-result")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(toggle));
   });
 
   test("detail local copy refreshes successful paths and keeps failed targets", async () => {
