@@ -860,10 +860,24 @@ describe("Phase 6 light workspace contrast", () => {
   test("keeps detail operation buttons semantic and light across interaction states", () => {
     const base = latestBlockFor(".redesign-operation-tabs .operation-button");
     expect(base).toContain("display: inline-flex;");
+    expect(base).toContain("height: 40px;");
     expect(base).toContain("background: var(--operation-surface);");
     expect(base).toContain("border-color: var(--operation-border);");
     expect(base).toContain("transition:");
     expect(base).toContain("transform: none;");
+
+    const fixedShortButton = latestBlockFor(
+      ".redesign-operation-tabs .operation-button:not(.operation-button--update)",
+    );
+    expect(fixedShortButton).toContain("width: 112px;");
+    expect(fixedShortButton).toContain("flex: 0 0 112px;");
+
+    const marker = latestBlockFor(".redesign-operation-tabs .operation-button::before");
+    expect(marker).toContain("width: 15px;");
+    expect(marker).toContain("height: 15px;");
+    expect(marker).toContain("flex: 0 0 15px;");
+    expect(marker).toContain("background: radial-gradient(");
+    expect(marker).toContain("box-shadow: none;");
 
     expect(latestBlockFor(".redesign-operation-tabs .operation-button--check")).toContain(
       "--operation-accent: #2f6fd6;",
@@ -893,8 +907,14 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(selected).toContain("color: var(--operation-selected-text);");
     expect(selected).toContain("background: var(--operation-selected-surface);");
+    expect(selected).toContain("box-shadow:");
+    expect(selected).toContain("var(--operation-rest-shadow)");
+    expect(selected).not.toContain("0 5px 14px");
     expect(selected).not.toContain("linear-gradient");
     expect(selected).not.toContain("color: #ffffff");
+    expect(
+      latestBlockFor('.redesign-operation-tabs .operation-button[aria-expanded="true"]::before'),
+    ).toContain("box-shadow: none;");
     expect(
       latestBlockFor(
         '.redesign-operation-tabs .operation-button[aria-expanded="true"]:active:not(:disabled)',
@@ -906,9 +926,13 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(disabled).toContain("opacity: 1;");
     expect(disabled).toContain("background: #f8fafc;");
-    expect(
-      blockFor('.redesign-operation-tabs .operation-button[aria-busy="true"]::before'),
-    ).toContain("animation: detailOperationSpin 760ms linear infinite;");
+    const busyMarker = blockFor(
+      '.redesign-operation-tabs .operation-button[aria-busy="true"]::before',
+    );
+    expect(busyMarker).toContain("width: 15px;");
+    expect(busyMarker).toContain("height: 15px;");
+    expect(busyMarker).toContain("box-sizing: border-box;");
+    expect(busyMarker).toContain("animation: detailOperationSpin 760ms linear infinite;");
     expect(stylesheet).toMatch(
       /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.redesign-operation-tabs \.operation-button\[aria-busy="true"\]::before[\s\S]*animation:\s*none;/,
     );
