@@ -18,6 +18,15 @@ use metis_core::install::{
     InstallSkillTarget, InstallTargetResult as CoreInstallTargetResult,
     InstallTargetStatus as CoreInstallTargetStatus,
 };
+use metis_core::local_install::{
+    copy_local_skill_to_targets as core_copy_local_skill_to_targets,
+    get_local_skill_install_targets as core_get_local_skill_install_targets, CopyLocalSkillOptions,
+    CopyLocalSkillResult as CoreCopyLocalSkillResult,
+    CopyLocalSkillTargetResult as CoreCopyLocalSkillTargetResult,
+    CopyLocalSkillTargetStatus as CoreCopyLocalSkillTargetStatus,
+    LocalSkillTarget as CoreLocalSkillTarget, LocalSkillTargetOptions,
+    LocalSkillTargetStatus as CoreLocalSkillTargetStatus,
+};
 use metis_core::lockfile::{
     check_team_manifest_compliance_from_str as core_check_team_manifest_compliance_from_str,
     TeamManifestComplianceItem as CoreTeamManifestComplianceItem,
@@ -37,9 +46,8 @@ use metis_core::source::{
     SourceType,
 };
 use metis_core::sync::{
-    classify_target_path, get_skill_targets_for_source as core_get_skill_targets_for_source,
-    IndexedTargetState, SkillTarget as CoreSkillTarget, SkillTargetSource,
-    SkillTargetStatus as CoreSkillTargetStatus, TargetPathEvaluation,
+    get_skill_targets_for_roots_with_checker, SkillTarget as CoreSkillTarget, SkillTargetRoot,
+    SkillTargetSource, SkillTargetStatus as CoreSkillTargetStatus,
 };
 use metis_core::update::{
     apply_update as core_apply_update, check_updates as core_check_updates,
@@ -54,7 +62,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub struct DesktopAppState {
@@ -250,6 +258,7 @@ pub struct DesktopRemoteSkillPreview {
     pub install_name: String,
     pub commit: String,
     pub repo_path: String,
+    pub ref_: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -260,6 +269,7 @@ pub struct DesktopSourceConnectionTestResult {
     pub description: Option<String>,
     pub commit: String,
     pub repo_path: String,
+    pub ref_: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -291,6 +301,43 @@ pub struct DesktopSkillTarget {
     pub source_id: Option<String>,
     pub root_available: bool,
     pub root_status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopLocalSkillTargetsRequest {
+    pub source_skill_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopLocalSkillTarget {
+    pub agent_id: String,
+    pub agent_name: String,
+    pub root_path: String,
+    pub install_path: String,
+    pub status: String,
+    pub root_available: bool,
+    pub root_status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopCopyLocalSkillRequest {
+    pub source_skill_id: String,
+    pub targets: Vec<DesktopInstallSkillTarget>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopCopyLocalSkillResult {
+    pub targets: Vec<DesktopCopyLocalSkillTargetResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopCopyLocalSkillTargetResult {
+    pub agent_id: String,
+    pub install_path: String,
+    pub status: String,
+    pub reason: Option<String>,
+    pub debug_detail: Option<String>,
+    pub skill_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -601,6 +648,25 @@ pub fn list_agents_for_state(state: &DesktopAppState) -> Result<Vec<DesktopAgent
     .into_iter()
     .map(desktop_agent_status)
     .collect())
+}
+
+pub fn check_path_status_for_path(path: &str) -> DesktopAgentPath {
+    let trimmed = path.trim();
+    let expanded = expand_desktop_path_template(trimmed);
+    let exists = expanded.exists();
+    let readable = exists && fs::read_dir(&expanded).is_ok();
+    let writable = readable
+        && expanded
+            .metadata()
+            .map(|metadata| !metadata.permissions().readonly())
+            .unwrap_or(false);
+    DesktopAgentPath {
+        path: trimmed.to_string(),
+        scope: "custom".to_string(),
+        exists,
+        readable,
+        writable,
+    }
 }
 
 pub fn scan_skills_for_state(
@@ -961,12 +1027,53 @@ fn git_output_result(output: std::process::Output, label: &str) -> Result<(), St
     Err(format!("git unavailable: {detail}"))
 }
 
+fn elapsed_ms(start: Instant) -> String {
+    start.elapsed().as_millis().to_string()
+}
+
+fn perf_log(scope: &str, fields: &[(&str, String)]) {
+    eprintln!("{}", perf_log_line(scope, fields));
+}
+
+fn perf_log_line(scope: &str, fields: &[(&str, String)]) -> String {
+    let mut line = format!("[metis perf] {scope}");
+    for (key, value) in fields {
+        line.push(' ');
+        line.push_str(key);
+        line.push('=');
+        line.push_str(value);
+    }
+    line
+}
+
 pub fn get_skill_targets_for_source_for_state(
     state: &DesktopAppState,
     request: DesktopSkillTargetsRequest,
 ) -> Result<Vec<DesktopSkillTarget>, String> {
+    let total_start = Instant::now();
+    let open_store_start = Instant::now();
     let mut store = state.open_store()?;
+    perf_log(
+        "targets",
+        &[
+            ("stage", "open_store".to_string()),
+            ("elapsed_ms", elapsed_ms(open_store_start)),
+        ],
+    );
+    let settings_start = Instant::now();
     let settings = get_desktop_settings_for_state(state)?;
+    perf_log(
+        "targets",
+        &[
+            ("stage", "settings".to_string()),
+            ("elapsed_ms", elapsed_ms(settings_start)),
+            (
+                "custom_paths",
+                settings.custom_monitored_paths.len().to_string(),
+            ),
+        ],
+    );
+
     let source = SkillTargetSource {
         url: request.url,
         repo_path: request.repo_path,
@@ -974,22 +1081,81 @@ pub fn get_skill_targets_for_source_for_state(
         commit: request.commit,
         install_name: request.install_name,
     };
-    let mut targets: Vec<DesktopSkillTarget> =
-        core_get_skill_targets_for_source(source.clone(), &mut store)
+    let roots = skill_target_roots_for_settings(&settings);
+    let checker = system_git_checker_for_state(state)?;
+    let core_targets_start = Instant::now();
+    let targets: Vec<DesktopSkillTarget> =
+        get_skill_targets_for_roots_with_checker(source, roots, &mut store, &checker)
             .map(|targets| targets.into_iter().map(desktop_skill_target).collect())
             .map_err(|error| friendly_desktop_error(&error).wire_string())?;
-    let sources = store.list_sources().map_err(|error| error.to_string())?;
-
-    for custom_path in &settings.custom_monitored_paths {
-        targets.push(custom_skill_target(
-            custom_path,
-            &source,
-            &mut store,
-            &sources,
-        )?);
-    }
+    perf_log(
+        "targets",
+        &[
+            ("stage", "core_targets".to_string()),
+            ("elapsed_ms", elapsed_ms(core_targets_start)),
+            ("count", targets.len().to_string()),
+        ],
+    );
+    perf_log(
+        "targets",
+        &[
+            ("stage", "total".to_string()),
+            ("elapsed_ms", elapsed_ms(total_start)),
+            ("count", targets.len().to_string()),
+        ],
+    );
 
     Ok(targets)
+}
+
+pub fn get_local_skill_install_targets_for_state(
+    state: &DesktopAppState,
+    request: DesktopLocalSkillTargetsRequest,
+) -> Result<Vec<DesktopLocalSkillTarget>, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    let allowed_roots = skill_target_roots_for_settings(&settings);
+    let store = state.open_store()?;
+    core_get_local_skill_install_targets(
+        LocalSkillTargetOptions {
+            source_skill_id: request.source_skill_id,
+            allowed_roots,
+        },
+        &store,
+    )
+    .map(|targets| {
+        targets
+            .into_iter()
+            .map(desktop_local_skill_target)
+            .collect()
+    })
+    .map_err(|error| friendly_desktop_error(&error).wire_string())
+}
+
+pub fn copy_local_skill_to_targets_for_state(
+    state: &DesktopAppState,
+    request: DesktopCopyLocalSkillRequest,
+) -> Result<DesktopCopyLocalSkillResult, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    let allowed_roots = skill_target_roots_for_settings(&settings);
+    let mut store = state.open_store()?;
+    core_copy_local_skill_to_targets(
+        CopyLocalSkillOptions {
+            source_skill_id: request.source_skill_id,
+            targets: request
+                .targets
+                .into_iter()
+                .map(|target| InstallSkillTarget {
+                    agent_id: target.agent_id,
+                    agent_name: target.agent_name,
+                    install_path: target.install_path,
+                })
+                .collect(),
+            allowed_roots,
+        },
+        &mut store,
+    )
+    .map(desktop_copy_local_skill_result)
+    .map_err(|error| friendly_desktop_error(&error).wire_string())
 }
 
 pub fn install_remote_skill_to_targets_for_state_with_checker<C: RemoteCommitChecker>(
@@ -997,6 +1163,8 @@ pub fn install_remote_skill_to_targets_for_state_with_checker<C: RemoteCommitChe
     request: DesktopInstallRemoteSkillRequest,
     checker: &C,
 ) -> Result<DesktopInstallRemoteSkillResult, String> {
+    let settings = get_desktop_settings_for_state(state)?;
+    let allowed_roots = skill_target_roots_for_settings(&settings);
     let mut store = state.open_store()?;
     core_install_remote_skill_to_targets(
         InstallRemoteSkillOptions {
@@ -1016,6 +1184,7 @@ pub fn install_remote_skill_to_targets_for_state_with_checker<C: RemoteCommitChe
                     install_path: target.install_path,
                 })
                 .collect(),
+            allowed_roots,
             backup_root: state.backup_root().to_string_lossy().to_string(),
             cache_dir: state.cache_root().to_string_lossy().to_string(),
         },
@@ -1277,6 +1446,11 @@ fn list_agents(
 }
 
 #[tauri::command]
+fn check_path_status(path: String) -> DesktopAgentPath {
+    check_path_status_for_path(&path)
+}
+
+#[tauri::command]
 fn scan_skills(state: tauri::State<'_, DesktopAppState>) -> Result<DesktopScanResponse, String> {
     scan_skills_for_state(&state, DesktopScanRequest::default())
 }
@@ -1387,6 +1561,32 @@ async fn get_skill_targets_for_source(
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         get_skill_targets_for_source_for_state(&state, request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn get_local_skill_install_targets(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopLocalSkillTargetsRequest,
+) -> Result<Vec<DesktopLocalSkillTarget>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        get_local_skill_install_targets_for_state(&state, request)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn copy_local_skill_to_targets(
+    state: tauri::State<'_, DesktopAppState>,
+    request: DesktopCopyLocalSkillRequest,
+) -> Result<DesktopCopyLocalSkillResult, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        copy_local_skill_to_targets_for_state(&state, request)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -1580,6 +1780,52 @@ fn normalize_paths(paths: Vec<String>) -> Vec<String> {
     normalized
 }
 
+fn expand_desktop_path_template(template: &str) -> PathBuf {
+    let home = dirs::home_dir()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let xdg_config_home = std::env::var("XDG_CONFIG_HOME")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| {
+            if home.is_empty() {
+                String::new()
+            } else {
+                format!("{}/.config", home)
+            }
+        });
+    let xdg_data_home = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| {
+            if home.is_empty() {
+                String::new()
+            } else {
+                format!("{}/.local/share", home)
+            }
+        });
+
+    let expanded = template
+        .replace("$HOME", &home)
+        .replace("$XDG_CONFIG_HOME", &xdg_config_home)
+        .replace("$XDG_DATA_HOME", &xdg_data_home)
+        .replace("$APPDATA", &std::env::var("APPDATA").unwrap_or_default())
+        .replace(
+            "$LOCALAPPDATA",
+            &std::env::var("LOCALAPPDATA").unwrap_or_default(),
+        );
+
+    if expanded == "~" {
+        return PathBuf::from(home);
+    }
+    if let Some(rest) = expanded.strip_prefix("~/") {
+        if !home.is_empty() {
+            return PathBuf::from(home).join(rest);
+        }
+    }
+    PathBuf::from(expanded)
+}
+
 fn normalize_agent_path_overrides(
     overrides: Vec<DesktopAgentPathOverride>,
 ) -> Vec<DesktopAgentPathOverride> {
@@ -1650,6 +1896,38 @@ fn core_custom_monitored_paths(settings: &DesktopSettings) -> Vec<CoreCustomMoni
             path: path.path.clone(),
         })
         .collect()
+}
+
+fn skill_target_roots_for_settings(settings: &DesktopSettings) -> Vec<SkillTargetRoot> {
+    core_list_agents(ListAgentsOptions {
+        enabled_agent_ids: None,
+        custom_paths: settings.custom_scan_paths.clone(),
+        agent_path_overrides: core_agent_path_overrides(settings),
+        custom_monitored_paths: core_custom_monitored_paths(settings),
+    })
+    .into_iter()
+    .filter(|agent| agent.agent_id != "generic")
+    .filter_map(|agent| {
+        let path = agent.paths.into_iter().next()?;
+        let root_available = path.exists && path.readable && path.writable;
+        let root_status = if !path.exists {
+            "missing"
+        } else if !path.readable {
+            "not_readable"
+        } else if !path.writable {
+            "not_writable"
+        } else {
+            "available"
+        };
+        Some(SkillTargetRoot {
+            agent_id: agent.agent_id,
+            agent_name: agent.agent_name,
+            root_path: path.path,
+            root_available,
+            root_status: root_status.to_string(),
+        })
+    })
+    .collect()
 }
 
 fn desktop_agent_name(agent_id: &str, settings: &DesktopSettings) -> String {
@@ -1838,6 +2116,7 @@ fn desktop_remote_skill_preview(preview: CoreRemoteSkillPreview) -> DesktopRemot
         install_name: preview.install_name,
         commit: preview.commit,
         repo_path: preview.repo_path,
+        ref_: preview.ref_,
     }
 }
 
@@ -1851,6 +2130,7 @@ fn desktop_source_connection_test_result(
         description: preview.description,
         commit: preview.commit,
         repo_path: preview.repo_path,
+        ref_: preview.ref_,
     }
 }
 
@@ -1869,80 +2149,6 @@ fn desktop_skill_target(target: CoreSkillTarget) -> DesktopSkillTarget {
     }
 }
 
-fn custom_skill_target(
-    custom_path: &DesktopCustomMonitoredPath,
-    source: &SkillTargetSource,
-    store: &mut SkillIndexStore,
-    sources: &[SourceRecord],
-) -> Result<DesktopSkillTarget, String> {
-    let agent_id = custom_agent_id(&custom_path.id);
-    let root_path = custom_path.path.clone();
-    let install_path = Path::new(&root_path)
-        .join(&source.install_name)
-        .to_string_lossy()
-        .to_string();
-    let stored_skill = store
-        .get_skill_by_agent_and_path(&agent_id, &install_path)
-        .map_err(|error| error.to_string())?;
-    let stored_source = stored_skill
-        .as_ref()
-        .and_then(|skill| skill.source_id.as_deref())
-        .and_then(|source_id| sources.iter().find(|record| record.id == source_id));
-    let source_matches = stored_source
-        .map(|record| desktop_source_record_matches(record, source))
-        .unwrap_or(false);
-    let root_status = desktop_custom_root_status(Path::new(&root_path));
-    let root_available = root_status == "available";
-    let install_path_ref = Path::new(&install_path);
-    let indexed = stored_skill.as_ref().map(|skill| IndexedTargetState {
-        source_id: skill.source_id.clone(),
-        current_commit: stored_source.and_then(|record| record.current_commit.clone()),
-        local_modified: skill.local_modified.unwrap_or(false),
-    });
-    let classification = classify_target_path(TargetPathEvaluation {
-        root_available,
-        path_exists: install_path_ref.exists(),
-        has_skill_md: install_path_ref.join("SKILL.md").is_file(),
-        indexed,
-        expected_commit: source.commit.clone(),
-        source_matches,
-    });
-
-    Ok(DesktopSkillTarget {
-        agent_id,
-        agent_name: custom_path.name.clone(),
-        root_path,
-        install_path,
-        status: desktop_skill_target_status(classification.status),
-        local_modified: classification.local_modified,
-        skill_id: stored_skill.as_ref().map(|skill| skill.id.clone()),
-        source_id: stored_skill.and_then(|skill| skill.source_id),
-        root_available,
-        root_status: root_status.to_string(),
-    })
-}
-
-fn desktop_custom_root_status(path: &Path) -> &'static str {
-    if !path.exists() {
-        return "missing";
-    }
-    if fs::read_dir(path).is_err() {
-        return "not_readable";
-    }
-    if path
-        .metadata()
-        .map(|metadata| metadata.permissions().readonly())
-        .unwrap_or(true)
-    {
-        return "not_writable";
-    }
-    "available"
-}
-
-fn desktop_source_record_matches(record: &SourceRecord, source: &SkillTargetSource) -> bool {
-    record.url == source.url && record.repo_path == source.repo_path && record.ref_ == source.ref_
-}
-
 fn desktop_skill_target_status(status: CoreSkillTargetStatus) -> String {
     match status {
         CoreSkillTargetStatus::NotInstalled => "NotInstalled",
@@ -1952,6 +2158,96 @@ fn desktop_skill_target_status(status: CoreSkillTargetStatus) -> String {
         CoreSkillTargetStatus::UpdateAvailable => "UpdateAvailable",
         CoreSkillTargetStatus::ConflictNonSkill => "ConflictNonSkill",
         CoreSkillTargetStatus::AgentRootUnavailable => "AgentRootUnavailable",
+    }
+    .to_string()
+}
+
+fn desktop_local_skill_target(target: CoreLocalSkillTarget) -> DesktopLocalSkillTarget {
+    DesktopLocalSkillTarget {
+        agent_id: target.agent_id,
+        agent_name: target.agent_name,
+        root_path: target.root_path,
+        install_path: target.install_path,
+        status: desktop_local_skill_target_status(target.status),
+        root_available: target.root_available,
+        root_status: target.root_status,
+    }
+}
+
+fn desktop_local_skill_target_status(status: CoreLocalSkillTargetStatus) -> String {
+    match status {
+        CoreLocalSkillTargetStatus::NotInstalled => "NotInstalled",
+        CoreLocalSkillTargetStatus::Installed => "Installed",
+        CoreLocalSkillTargetStatus::ConflictNonSkill => "ConflictNonSkill",
+        CoreLocalSkillTargetStatus::AgentRootUnavailable => "AgentRootUnavailable",
+    }
+    .to_string()
+}
+
+fn desktop_copy_local_skill_result(
+    result: CoreCopyLocalSkillResult,
+) -> DesktopCopyLocalSkillResult {
+    DesktopCopyLocalSkillResult {
+        targets: result
+            .targets
+            .into_iter()
+            .map(desktop_copy_local_skill_target_result)
+            .collect(),
+    }
+}
+
+fn desktop_copy_local_skill_target_result(
+    result: CoreCopyLocalSkillTargetResult,
+) -> DesktopCopyLocalSkillTargetResult {
+    let (reason, debug_detail) = desktop_copy_local_skill_target_reason(result.reason);
+    DesktopCopyLocalSkillTargetResult {
+        agent_id: result.agent_id,
+        install_path: result.install_path,
+        status: desktop_copy_local_skill_target_status(result.status),
+        reason,
+        debug_detail,
+        skill_id: result.skill_id,
+    }
+}
+
+fn desktop_copy_local_skill_target_reason(
+    detail: Option<String>,
+) -> (Option<String>, Option<String>) {
+    let Some(detail) = detail else {
+        return (None, None);
+    };
+    let friendly = if detail == "target_exists" {
+        "目标位置已被占用，请重新读取可安装位置。"
+    } else if detail == "target_already_indexed" {
+        "该位置仍在本地索引中，请重新扫描后再试。"
+    } else if detail.contains("target became occupied before install") {
+        "目标位置刚刚被其他操作占用，请重新读取可安装位置。"
+    } else if detail.contains("target root is unavailable") {
+        "目标路径当前不可用，请在 Settings 检查路径后重试。"
+    } else if detail.contains("cleanup failed")
+        || detail.contains("storage error")
+        || detail.contains("database")
+        || detail.contains("sqlite")
+        || detail.contains("baseline manifest")
+    {
+        "本地索引或清理失败，请检查目标目录并重新扫描后再试。"
+    } else if detail.contains("copied SKILL.md is invalid") {
+        "当前 Skill 的 SKILL.md 无法解析，请检查源目录后重试。"
+    } else if detail.contains("local copy failed") {
+        "复制本地 Skill 失败，请检查源目录和目标路径权限。"
+    } else if detail.contains("failed to finalize local copy") {
+        "无法写入目标位置，请检查路径权限后重试。"
+    } else {
+        "本地复制失败，请检查源 Skill 和目标路径后重试。"
+    };
+    (Some(friendly.to_string()), Some(detail))
+}
+
+fn desktop_copy_local_skill_target_status(status: CoreCopyLocalSkillTargetStatus) -> String {
+    match status {
+        CoreCopyLocalSkillTargetStatus::Installed => "Installed",
+        CoreCopyLocalSkillTargetStatus::Skipped => "Skipped",
+        CoreCopyLocalSkillTargetStatus::Failed => "Failed",
     }
     .to_string()
 }
@@ -2257,19 +2553,47 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         );
     }
 
+    if lower.contains("source skill not found") {
+        return desktop_error(
+            "local_skill_missing",
+            "当前 Skill 已不存在",
+            "Metis 在本地索引中找不到这个 Skill。",
+            "请重新扫描后再试。",
+            message,
+        );
+    }
+
+    if lower.contains("source skill directory is unavailable")
+        || lower.contains("source skill directory is not readable")
+        || lower.contains("source skill must contain a readable skill.md")
+        || lower.contains("source skill.md is not readable")
+    {
+        return desktop_error(
+            "local_skill_path",
+            "当前本地 Skill 无法复制",
+            "Metis 无法读取当前 Skill 目录或其中的 SKILL.md。",
+            "请重新扫描或检查目录后再试。",
+            message,
+        );
+    }
+
+    if lower.contains("invalid install target") || lower.contains("invalid install name") {
+        return desktop_error(
+            "install_target",
+            "可安装位置已失效",
+            "当前 Skill 的安装信息或所选位置已不再有效。",
+            "请重新加载可安装位置，重新选择目标后再试。",
+            message,
+        );
+    }
+
     if lower.contains("repository not found")
         || lower.contains("could not resolve host")
         || lower.contains("could not resolve hostname")
         || lower.contains("does not appear to be a git repository")
         || lower.contains("not appear to be a git repository")
     {
-        return desktop_error(
-            "git_url",
-            "仓库地址不可访问",
-            "Metis 没有找到或无法访问这个 Git 仓库。",
-            "请检查 Git 地址是否正确；如果是私有仓库，请确认你有访问权限。",
-            message,
-        );
+        return desktop_error("git_url", "仓库可能无效", "请检查链接的有效性", "", message);
     }
 
     if lower.contains("auth")
@@ -2303,9 +2627,9 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
     {
         return desktop_error(
             "ssh_host_key",
-            "SSH 主机未确认",
-            "Metis 不能直接确认这个 Git 主机的 SSH 指纹。",
-            "请先在终端用系统 Git 连接一次该主机并确认指纹，或改用 HTTPS 仓库地址。",
+            "仓库可能无效",
+            "请检查链接的有效性",
+            "",
             message,
         );
     }
@@ -2343,8 +2667,8 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
     if lower.contains("not a skill directory") {
         return desktop_error(
             "repo_path",
-            "没有找到 SKILL.md",
-            "仓库能访问，但这个路径下没有找到 SKILL.md。",
+            "Skill 路径不存在",
+            "仓库能访问，但这个路径不存在。",
             "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。",
             message,
         );
@@ -2356,7 +2680,7 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
     {
         return desktop_error(
             "repo_path",
-            "仓库路径不存在",
+            "Skill 路径不存在",
             "仓库能访问，但这个路径不存在。",
             "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。",
             message,
@@ -2367,8 +2691,8 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         return desktop_error(
             "git_ref",
             "分支不存在",
-            "Metis 能访问仓库，但找不到这个主分支名。",
-            "请检查“主分支名”是否填写正确，一般为 main 或者 master。",
+            "仓库能访问，但分支不存在。",
+            "请检查分支名，或者可以手动修改为正确的分支名",
             message,
         );
     }
@@ -2400,9 +2724,9 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
     {
         return desktop_error(
             "git_source",
-            "Git source 错误",
-            "Metis 无法根据当前来源信息完成 Git 检查或 checkout。",
-            "检查 Git URL、ref、repo path 和本机 Git 是否可正常访问该仓库。",
+            "Git地址可能无效",
+            "请重新确认Git地址，或手动填写Git URL、Skill 路径",
+            "",
             message,
         );
     }
@@ -2453,6 +2777,7 @@ pub fn run() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             list_agents,
+            check_path_status,
             scan_skills,
             list_indexed_skills,
             get_skill_size,
@@ -2466,6 +2791,8 @@ pub fn run() {
             test_source_connection,
             test_git_environment,
             get_skill_targets_for_source,
+            get_local_skill_install_targets,
+            copy_local_skill_to_targets,
             install_remote_skill_to_targets,
             check_skill_updates,
             get_skill_diff,
@@ -2551,9 +2878,10 @@ mod tests {
             _target_commit: &str,
             _cache_dir: &str,
         ) -> Result<CheckoutResult, String> {
-            self.checkout
+            Ok(self
+                .checkout
                 .clone()
-                .ok_or_else(|| "missing fake checkout".to_string())
+                .expect("checkout should not be called"))
         }
     }
 
@@ -2748,11 +3076,17 @@ mod tests {
     fn get_skill_targets_for_source_for_state_returns_desktop_dtos() {
         let workspace = temp_dir("sync-targets");
         let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let codex_root = workspace.join("codex-override");
         let custom_root = workspace.join("team-memory-skills");
+        fs::create_dir_all(&codex_root).expect("codex root should exist");
         fs::create_dir_all(&custom_root).expect("custom root should exist");
         save_desktop_settings_for_state(
             &state,
             DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: codex_root.to_string_lossy().to_string(),
+                }],
                 custom_monitored_paths: vec![DesktopCustomMonitoredPath {
                     id: "team-memory".to_string(),
                     name: "团队记忆".to_string(),
@@ -2776,19 +3110,33 @@ mod tests {
         .expect("targets should load");
 
         assert_eq!(targets.len(), 6);
-        assert_eq!(targets[0].agent_id, "codex");
-        assert_eq!(targets[0].status, "AgentRootUnavailable");
-        assert!(!targets[0].install_path.contains("{name}"));
         assert!(targets.iter().all(|target| target.agent_id != "generic"));
+        let codex_target = targets
+            .iter()
+            .find(|target| target.agent_id == "codex")
+            .expect("codex target should exist");
+        assert_eq!(
+            codex_target.root_path,
+            codex_root.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            codex_target.install_path,
+            codex_root.join("example").to_string_lossy().to_string()
+        );
+        assert_eq!(codex_target.status, "NotInstalled");
+
         let custom_target = targets
             .iter()
             .find(|target| target.agent_id == "custom-team-memory")
             .expect("custom monitored path should be an install target");
         assert_eq!(custom_target.agent_name, "团队记忆");
-        assert_eq!(custom_target.root_path, custom_root.to_string_lossy());
+        assert_eq!(
+            custom_target.root_path,
+            custom_root.to_string_lossy().to_string()
+        );
         assert_eq!(
             custom_target.install_path,
-            custom_root.join("example").to_string_lossy()
+            custom_root.join("example").to_string_lossy().to_string()
         );
         assert_eq!(custom_target.status, "NotInstalled");
         fs::remove_dir_all(workspace).expect("workspace should be removed");
@@ -2804,7 +3152,20 @@ mod tests {
             "Remote Skill",
             "Install me",
         );
-        let install_path = workspace.join("codex-skills").join("remote");
+        let install_root = workspace.join("codex-skills");
+        let install_path = install_root.join("remote");
+        fs::create_dir_all(&install_root).expect("install root should exist");
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: install_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
         let checker = FakeUpdateChecker {
             commits: HashMap::new(),
             behind: 0,
@@ -2843,6 +3204,664 @@ mod tests {
         assert_eq!(result.targets[0].status, "Installed");
         assert!(result.targets[0].skill_id.is_some());
         assert!(install_path.join("SKILL.md").is_file());
+
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn install_remote_skill_to_targets_for_state_rejects_unauthorized_batch_before_writing() {
+        let workspace = temp_dir("desktop-install-unauthorized");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let allowed_root = workspace.join("codex-skills");
+        let allowed_path = allowed_root.join("remote");
+        let outside_path = workspace.join("outside").join("remote");
+        fs::create_dir_all(&allowed_root).expect("allowed root should exist");
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: allowed_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
+        let checker = FakeUpdateChecker {
+            commits: HashMap::new(),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: None,
+        };
+
+        let error = install_remote_skill_to_targets_for_state_with_checker(
+            &state,
+            DesktopInstallRemoteSkillRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/remote".to_string(),
+                ref_: "main".to_string(),
+                commit: "abc123".to_string(),
+                install_name: "remote".to_string(),
+                targets: vec![
+                    DesktopInstallSkillTarget {
+                        agent_id: "codex".to_string(),
+                        agent_name: "Codex".to_string(),
+                        install_path: allowed_path.to_string_lossy().to_string(),
+                    },
+                    DesktopInstallSkillTarget {
+                        agent_id: "codex".to_string(),
+                        agent_name: "Forged Name".to_string(),
+                        install_path: outside_path.to_string_lossy().to_string(),
+                    },
+                ],
+            },
+            &checker,
+        )
+        .expect_err("unauthorized target should reject the whole batch");
+
+        let desktop_error: DesktopError =
+            serde_json::from_str(&error).expect("desktop error should be JSON");
+        assert_eq!(desktop_error.category, "install_target");
+        assert_eq!(desktop_error.title, "可安装位置已失效");
+        assert_eq!(
+            desktop_error.message,
+            "当前 Skill 的安装信息或所选位置已不再有效。"
+        );
+        assert_eq!(
+            desktop_error.suggestion,
+            "请重新加载可安装位置，重新选择目标后再试。"
+        );
+        assert!(desktop_error
+            .debug_detail
+            .as_deref()
+            .expect("debug detail should retain the core error")
+            .contains("invalid install target"));
+        assert!(!allowed_path.exists());
+        assert!(!outside_path.exists());
+        let store = state.open_store().expect("store should open");
+        assert!(store.list_skills().expect("skills should list").is_empty());
+        drop(store);
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn install_remote_skill_to_targets_for_state_maps_invalid_install_name_for_users() {
+        let workspace = temp_dir("desktop-install-invalid-name");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let allowed_root = workspace.join("codex-skills");
+        let install_path = allowed_root.join("remote");
+        fs::create_dir_all(&allowed_root).expect("allowed root should exist");
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: allowed_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
+        let checker = FakeUpdateChecker {
+            commits: HashMap::new(),
+            behind: 0,
+            summary: DiffSummary {
+                files_added: 0,
+                files_modified: 0,
+                files_deleted: 0,
+                total_changes: 0,
+            },
+            details: HashMap::new(),
+            checkout: None,
+        };
+
+        let error = install_remote_skill_to_targets_for_state_with_checker(
+            &state,
+            DesktopInstallRemoteSkillRequest {
+                url: "https://github.com/example/metis-skills.git".to_string(),
+                repo_path: "skills/remote".to_string(),
+                ref_: "main".to_string(),
+                commit: "abc123".to_string(),
+                install_name: "../remote".to_string(),
+                targets: vec![DesktopInstallSkillTarget {
+                    agent_id: "codex".to_string(),
+                    agent_name: "Codex".to_string(),
+                    install_path: install_path.to_string_lossy().to_string(),
+                }],
+            },
+            &checker,
+        )
+        .expect_err("unsafe install name should reject the request");
+
+        let desktop_error: DesktopError =
+            serde_json::from_str(&error).expect("desktop error should be JSON");
+        assert_eq!(desktop_error.category, "install_target");
+        assert_eq!(desktop_error.title, "可安装位置已失效");
+        assert_eq!(
+            desktop_error.message,
+            "当前 Skill 的安装信息或所选位置已不再有效。"
+        );
+        assert_eq!(
+            desktop_error.suggestion,
+            "请重新加载可安装位置，重新选择目标后再试。"
+        );
+        assert!(desktop_error
+            .debug_detail
+            .as_deref()
+            .expect("debug detail should retain the core error")
+            .contains("invalid install name"));
+        assert!(!install_path.exists());
+        let store = state.open_store().expect("store should open");
+        assert!(store.list_skills().expect("skills should list").is_empty());
+        drop(store);
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn local_skill_target_command_uses_overrides_and_named_custom_paths() {
+        let workspace = temp_dir("local-skill-targets");
+        let source_root = workspace.join("source-skills");
+        let codex_root = workspace.join("codex-override");
+        let custom_root = workspace.join("team-memory-skills");
+        fs::create_dir_all(&codex_root).expect("codex root should exist");
+        fs::create_dir_all(&custom_root).expect("custom root should exist");
+        write_skill(
+            &source_root,
+            "replicable",
+            "Replicable",
+            "Copy this local skill",
+        );
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![source_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("source skill should scan");
+        let source_skill_id = scanned.skills[0].id.clone();
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: codex_root.to_string_lossy().to_string(),
+                }],
+                custom_monitored_paths: vec![DesktopCustomMonitoredPath {
+                    id: "team-memory".to_string(),
+                    name: "团队记忆".to_string(),
+                    path: custom_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
+
+        let targets = get_local_skill_install_targets_for_state(
+            &state,
+            DesktopLocalSkillTargetsRequest { source_skill_id },
+        )
+        .expect("local targets should load");
+
+        let codex_target = targets
+            .iter()
+            .find(|target| target.agent_id == "codex")
+            .expect("codex target should exist");
+        assert_eq!(codex_target.agent_name, "Codex");
+        assert_eq!(
+            codex_target.root_path,
+            codex_root.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            codex_target.install_path,
+            codex_root.join("replicable").to_string_lossy().to_string()
+        );
+        assert_eq!(codex_target.status, "NotInstalled");
+
+        let custom_target = targets
+            .iter()
+            .find(|target| target.agent_id == "custom-team-memory")
+            .expect("custom target should exist");
+        assert_eq!(custom_target.agent_name, "团队记忆");
+        assert_eq!(
+            custom_target.root_path,
+            custom_root.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            custom_target.install_path,
+            custom_root.join("replicable").to_string_lossy().to_string()
+        );
+        assert_eq!(custom_target.status, "NotInstalled");
+
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn local_skill_target_command_maps_missing_and_unavailable_source_errors() {
+        let workspace = temp_dir("local-skill-source-errors");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+
+        let missing_error = get_local_skill_install_targets_for_state(
+            &state,
+            DesktopLocalSkillTargetsRequest {
+                source_skill_id: "missing-skill".to_string(),
+            },
+        )
+        .expect_err("missing source should fail");
+        let missing: DesktopError =
+            serde_json::from_str(&missing_error).expect("missing error should be JSON");
+        assert_eq!(missing.category, "local_skill_missing");
+        assert_eq!(missing.title, "当前 Skill 已不存在");
+        assert_eq!(missing.message, "Metis 在本地索引中找不到这个 Skill。");
+        assert_eq!(missing.suggestion, "请重新扫描后再试。");
+
+        let source_root = workspace.join("source-skills");
+        let source_dir = write_skill(
+            &source_root,
+            "unavailable-skill",
+            "Unavailable Skill",
+            "Source directory disappears",
+        );
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![source_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("source skill should scan");
+        fs::remove_dir_all(&source_dir).expect("source directory should be removed");
+
+        let unavailable_error = get_local_skill_install_targets_for_state(
+            &state,
+            DesktopLocalSkillTargetsRequest {
+                source_skill_id: scanned.skills[0].id.clone(),
+            },
+        )
+        .expect_err("unavailable source should fail");
+        let unavailable: DesktopError =
+            serde_json::from_str(&unavailable_error).expect("path error should be JSON");
+        assert_eq!(unavailable.category, "local_skill_path");
+        assert_eq!(unavailable.title, "当前本地 Skill 无法复制");
+        assert_eq!(
+            unavailable.message,
+            "Metis 无法读取当前 Skill 目录或其中的 SKILL.md。"
+        );
+        assert_eq!(unavailable.suggestion, "请重新扫描或检查目录后再试。");
+
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn local_skill_commands_work_without_source_or_git_checker() {
+        let workspace = temp_dir("local-skill-no-source");
+        let source_root = workspace.join("source-skills");
+        let install_root = workspace.join("codex-skills");
+        fs::create_dir_all(&install_root).expect("install root should exist");
+        write_skill(
+            &source_root,
+            "offline-skill",
+            "Offline Skill",
+            "No git source required",
+        );
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![source_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("source skill should scan");
+        let source_skill_id = scanned.skills[0].id.clone();
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: install_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
+
+        let targets_request = DesktopLocalSkillTargetsRequest {
+            source_skill_id: source_skill_id.clone(),
+        };
+        let targets_json =
+            serde_json::to_value(&targets_request).expect("request should serialize");
+        assert!(targets_json.get("url").is_none());
+        assert!(targets_json.get("repo_path").is_none());
+        assert!(targets_json.get("ref_").is_none());
+        assert!(targets_json.get("commit").is_none());
+        let targets = get_local_skill_install_targets_for_state(&state, targets_request)
+            .expect("target query should not require a checker");
+        let codex_target = targets
+            .iter()
+            .find(|target| target.agent_id == "codex")
+            .expect("codex target should exist");
+        let install_path = codex_target.install_path.clone();
+        let copy_request = DesktopCopyLocalSkillRequest {
+            source_skill_id,
+            targets: vec![DesktopInstallSkillTarget {
+                agent_id: codex_target.agent_id.clone(),
+                agent_name: codex_target.agent_name.clone(),
+                install_path: install_path.clone(),
+            }],
+        };
+        let copy_json = serde_json::to_value(&copy_request).expect("request should serialize");
+        assert!(copy_json.get("url").is_none());
+        assert!(copy_json.get("repo_path").is_none());
+        assert!(copy_json.get("ref_").is_none());
+        assert!(copy_json.get("commit").is_none());
+
+        let result = copy_local_skill_to_targets_for_state(&state, copy_request)
+            .expect("local copy should not require a checker or source");
+
+        assert_eq!(result.targets.len(), 1);
+        assert_eq!(result.targets[0].status, "Installed");
+        assert!(Path::new(&install_path).join("SKILL.md").is_file());
+        let store = state.open_store().expect("store should open");
+        let copied = store
+            .get_skill(
+                result.targets[0]
+                    .skill_id
+                    .as_deref()
+                    .expect("copied skill id should be returned"),
+            )
+            .expect("copied skill should load")
+            .expect("copied skill should exist");
+        assert_eq!(copied.source_id, None);
+        drop(store);
+
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn local_skill_copy_command_inherits_source_and_local_modified_state() {
+        let workspace = temp_dir("local-skill-inheritance");
+        let source_root = workspace.join("source-skills");
+        let install_root = workspace.join("codex-skills");
+        fs::create_dir_all(&install_root).expect("install root should exist");
+        write_skill(
+            &source_root,
+            "modified-skill",
+            "Modified Skill",
+            "Preserve local state",
+        );
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![source_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("source skill should scan");
+        let source_skill_id = scanned.skills[0].id.clone();
+        let source = SourceRecord {
+            id: "source-local-copy".to_string(),
+            source_type: "git".to_string(),
+            url: "https://github.com/example/team-skills.git".to_string(),
+            repo_path: "skills/modified-skill".to_string(),
+            ref_: "main".to_string(),
+            current_commit: Some("abc123".to_string()),
+            remote_commit: Some("def456".to_string()),
+            last_checked_at: Some("2026-07-11T10:00:00Z".to_string()),
+            trusted: true,
+            auto_update: true,
+            credential_ref: Some("credential-team".to_string()),
+            created_at: Some("2026-07-11T09:00:00Z".to_string()),
+            updated_at: Some("2026-07-11T10:00:00Z".to_string()),
+        };
+        let store = state.open_store().expect("store should open");
+        store.upsert_source(&source).expect("source should insert");
+        let mut source_skill = store
+            .get_skill(&source_skill_id)
+            .expect("source skill should load")
+            .expect("source skill should exist");
+        source_skill.source_id = Some(source.id.clone());
+        source_skill.local_modified = Some(true);
+        store
+            .upsert_skill(&source_skill)
+            .expect("source skill should update");
+        drop(store);
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: install_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
+
+        let result = copy_local_skill_to_targets_for_state(
+            &state,
+            DesktopCopyLocalSkillRequest {
+                source_skill_id,
+                targets: vec![DesktopInstallSkillTarget {
+                    agent_id: "codex".to_string(),
+                    agent_name: "Codex".to_string(),
+                    install_path: install_root
+                        .join("modified-skill")
+                        .to_string_lossy()
+                        .to_string(),
+                }],
+            },
+        )
+        .expect("local copy should succeed");
+
+        let store = state.open_store().expect("store should reopen");
+        let copied = store
+            .get_skill(
+                result.targets[0]
+                    .skill_id
+                    .as_deref()
+                    .expect("copied skill id should be returned"),
+            )
+            .expect("copied skill should load")
+            .expect("copied skill should exist");
+        let stored_source = store
+            .get_source(&source.id)
+            .expect("source should load")
+            .expect("source should exist");
+        assert_eq!(copied.source_id.as_deref(), Some(source.id.as_str()));
+        assert_eq!(copied.local_modified, Some(true));
+        assert_eq!(stored_source.current_commit, source.current_commit);
+        assert_eq!(stored_source.remote_commit, source.remote_commit);
+        assert_eq!(stored_source.last_checked_at, source.last_checked_at);
+        assert_eq!(stored_source.trusted, source.trusted);
+        assert_eq!(stored_source.auto_update, source.auto_update);
+        assert_eq!(stored_source.credential_ref, source.credential_ref);
+        drop(store);
+
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn local_skill_copy_command_rejects_renderer_path_forgery_before_copy() {
+        let workspace = temp_dir("local-skill-forgery");
+        let source_root = workspace.join("source-skills");
+        let allowed_root = workspace.join("codex-skills");
+        let allowed_path = allowed_root.join("forgery-source");
+        let forged_path = workspace.join("outside").join("forgery-source");
+        fs::create_dir_all(&allowed_root).expect("allowed root should exist");
+        write_skill(
+            &source_root,
+            "forgery-source",
+            "Forgery Source",
+            "Reject forged targets",
+        );
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![source_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("source skill should scan");
+        let source_skill_id = scanned.skills[0].id.clone();
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: allowed_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
+
+        let error = copy_local_skill_to_targets_for_state(
+            &state,
+            DesktopCopyLocalSkillRequest {
+                source_skill_id,
+                targets: vec![
+                    DesktopInstallSkillTarget {
+                        agent_id: "codex".to_string(),
+                        agent_name: "Codex".to_string(),
+                        install_path: allowed_path.to_string_lossy().to_string(),
+                    },
+                    DesktopInstallSkillTarget {
+                        agent_id: "codex".to_string(),
+                        agent_name: "Forged Name".to_string(),
+                        install_path: forged_path.to_string_lossy().to_string(),
+                    },
+                ],
+            },
+        )
+        .expect_err("forged target should reject the whole batch");
+
+        let desktop_error: DesktopError =
+            serde_json::from_str(&error).expect("desktop error should be JSON");
+        assert_eq!(desktop_error.category, "install_target");
+        assert_eq!(desktop_error.title, "可安装位置已失效");
+        assert!(!allowed_path.exists());
+        assert!(!forged_path.exists());
+        let store = state.open_store().expect("store should open");
+        assert_eq!(store.list_skills().expect("skills should list").len(), 1);
+        drop(store);
+
+        fs::remove_dir_all(workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn local_skill_copy_target_reasons_are_user_friendly_and_keep_debug_detail() {
+        let occupied = desktop_copy_local_skill_target_result(CoreCopyLocalSkillTargetResult {
+            agent_id: "claude".to_string(),
+            install_path: "/tmp/claude/example".to_string(),
+            status: CoreCopyLocalSkillTargetStatus::Skipped,
+            reason: Some("target_exists".to_string()),
+            skill_id: None,
+        });
+        assert_eq!(
+            occupied.reason.as_deref(),
+            Some("目标位置已被占用，请重新读取可安装位置。")
+        );
+        assert_eq!(occupied.debug_detail.as_deref(), Some("target_exists"));
+
+        let cleanup_failed =
+            desktop_copy_local_skill_target_result(CoreCopyLocalSkillTargetResult {
+                agent_id: "claude".to_string(),
+                install_path: "/tmp/claude/example".to_string(),
+                status: CoreCopyLocalSkillTargetStatus::Failed,
+                reason: Some(
+                    "storage error: insert failed; cleanup failed: permission denied".to_string(),
+                ),
+                skill_id: None,
+            });
+        assert_eq!(
+            cleanup_failed.reason.as_deref(),
+            Some("本地索引或清理失败，请检查目标目录并重新扫描后再试。")
+        );
+        assert!(cleanup_failed
+            .debug_detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("cleanup failed")));
+    }
+
+    #[test]
+    fn local_skill_copy_command_maps_a_racing_occupied_target_without_overwriting_it() {
+        let workspace = temp_dir("local-skill-racing-target");
+        let source_root = workspace.join("source-skills");
+        let install_root = workspace.join("codex-skills");
+        fs::create_dir_all(&install_root).expect("install root should exist");
+        write_skill(
+            &source_root,
+            "racing-skill",
+            "Racing Skill",
+            "Preserve a newly occupied target",
+        );
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let scanned = scan_skills_for_state(
+            &state,
+            DesktopScanRequest {
+                agent_ids: Some(vec!["generic".to_string()]),
+                custom_paths: vec![source_root.to_string_lossy().to_string()],
+            },
+        )
+        .expect("source skill should scan");
+        save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                agent_path_overrides: vec![DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: install_root.to_string_lossy().to_string(),
+                }],
+                ..DesktopSettings::default()
+            },
+        )
+        .expect("settings should save");
+        let target_path = install_root.join("racing-skill");
+        fs::create_dir_all(&target_path).expect("racing target should be created");
+        fs::write(
+            target_path.join("README.md"),
+            "created by another operation",
+        )
+        .expect("racing target should be writable");
+
+        let result = copy_local_skill_to_targets_for_state(
+            &state,
+            DesktopCopyLocalSkillRequest {
+                source_skill_id: scanned.skills[0].id.clone(),
+                targets: vec![DesktopInstallSkillTarget {
+                    agent_id: "codex".to_string(),
+                    agent_name: "Codex".to_string(),
+                    install_path: target_path.to_string_lossy().to_string(),
+                }],
+            },
+        )
+        .expect("occupied target should return a per-target result");
+
+        assert_eq!(result.targets.len(), 1);
+        assert_eq!(result.targets[0].status, "Skipped");
+        assert_eq!(
+            result.targets[0].reason.as_deref(),
+            Some("目标位置已被占用，请重新读取可安装位置。")
+        );
+        assert_eq!(
+            result.targets[0].debug_detail.as_deref(),
+            Some("target_exists")
+        );
+        assert_eq!(
+            fs::read_to_string(target_path.join("README.md"))
+                .expect("racing target should remain readable"),
+            "created by another operation"
+        );
+        assert!(!target_path.join("SKILL.md").exists());
 
         fs::remove_dir_all(workspace).expect("workspace should be removed");
     }
@@ -3029,6 +4048,27 @@ description: {description}
             vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
         );
         assert!(agents.iter().all(|agent| !agent.paths.is_empty()));
+    }
+
+    #[test]
+    fn check_path_status_reports_existing_and_missing_directories() {
+        let workspace = temp_dir("path-status");
+        let existing = workspace.join("existing-skills");
+        fs::create_dir_all(&existing).expect("existing path should be created");
+
+        let existing_status = check_path_status_for_path(&existing.to_string_lossy());
+        let missing_status =
+            check_path_status_for_path(&workspace.join("missing-skills").to_string_lossy());
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert_eq!(existing_status.scope, "custom");
+        assert!(existing_status.exists);
+        assert!(existing_status.readable);
+        assert!(existing_status.writable);
+        assert!(!missing_status.exists);
+        assert!(!missing_status.readable);
+        assert!(!missing_status.writable);
     }
 
     #[test]
@@ -3771,12 +4811,9 @@ description: {description}
         let error = friendly_desktop_error(raw);
 
         assert_eq!(error.category, "git_url");
-        assert_eq!(error.title, "仓库地址不可访问");
-        assert_eq!(error.message, "Metis 没有找到或无法访问这个 Git 仓库。");
-        assert_eq!(
-            error.suggestion,
-            "请检查 Git 地址是否正确；如果是私有仓库，请确认你有访问权限。"
-        );
+        assert_eq!(error.title, "仓库可能无效");
+        assert_eq!(error.message, "请检查链接的有效性");
+        assert_eq!(error.suggestion, "");
         assert_eq!(error.debug_detail.as_deref(), Some(raw));
     }
 
@@ -3789,6 +4826,8 @@ description: {description}
             let error = friendly_desktop_error(raw);
 
             assert_eq!(error.category, "repo_path");
+            assert_eq!(error.title, "Skill 路径不存在");
+            assert_eq!(error.message, "仓库能访问，但这个路径不存在。");
             assert_eq!(
                 error.suggestion,
                 "请检查“Skill 在仓库内的路径”；如果 SKILL.md 在仓库根目录，可以留空。"
@@ -3802,15 +4841,9 @@ description: {description}
         let error = friendly_desktop_error(raw);
 
         assert_eq!(error.category, "ssh_host_key");
-        assert_eq!(error.title, "SSH 主机未确认");
-        assert_eq!(
-            error.message,
-            "Metis 不能直接确认这个 Git 主机的 SSH 指纹。"
-        );
-        assert_eq!(
-            error.suggestion,
-            "请先在终端用系统 Git 连接一次该主机并确认指纹，或改用 HTTPS 仓库地址。"
-        );
+        assert_eq!(error.title, "仓库可能无效");
+        assert_eq!(error.message, "请检查链接的有效性");
+        assert_eq!(error.suggestion, "");
         assert_eq!(error.debug_detail.as_deref(), Some(raw));
     }
 
@@ -3821,10 +4854,10 @@ description: {description}
 
         assert_eq!(error.category, "git_ref");
         assert_eq!(error.title, "分支不存在");
-        assert_eq!(error.message, "Metis 能访问仓库，但找不到这个主分支名。");
+        assert_eq!(error.message, "仓库能访问，但分支不存在。");
         assert_eq!(
             error.suggestion,
-            "请检查“主分支名”是否填写正确，一般为 main 或者 master。"
+            "请检查分支名，或者可以手动修改为正确的分支名"
         );
         assert_eq!(error.debug_detail.as_deref(), Some(raw));
     }
@@ -3865,14 +4898,14 @@ description: {description}
             (
                 "checkout failed: missing remote commit",
                 "git_source",
-                "Git source 错误",
-                "Metis 无法根据当前来源信息完成 Git 检查或 checkout。",
+                "Git地址可能无效",
+                "请重新确认Git地址，或手动填写Git URL、Skill 路径",
             ),
             (
                 "git operation failed: git command failed: git -C /tmp/cache checkout abc123: fatal: could not fetch deadbeef from promisor remote",
                 "git_source",
-                "Git source 错误",
-                "Metis 无法根据当前来源信息完成 Git 检查或 checkout。",
+                "Git地址可能无效",
+                "请重新确认Git地址，或手动填写Git URL、Skill 路径",
             ),
         ];
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AgentBadge, normalizeAgentId, type AgentIdentity } from "./AgentBadge";
-import { shortCommit } from "./commitDisplay";
+import { CrossAgentTargetMatrix } from "./CrossAgentTargetMatrix";
 import {
   BackupPanel,
   BindSourceForm,
@@ -14,12 +14,40 @@ import {
 import type {
   DesktopAuditEvent,
   DesktopBackupSummary,
+  DesktopCopyLocalSkillResult,
   DesktopDiffDetail,
   DesktopError,
+  DesktopLocalSkillTarget,
   DesktopSkill,
   DesktopSourceConnectionTestResult,
   DesktopUpdateCheckResult,
 } from "./types";
+
+export interface DetailLocalInstallState {
+  targets: DesktopLocalSkillTarget[];
+  selectedTargetIds: string[];
+  targetError: DesktopError | null;
+  refreshError: DesktopError | null;
+  installError: DesktopError | null;
+  installResult: DesktopCopyLocalSkillResult | null;
+  loaded: boolean;
+  targetLoading: boolean;
+  installing: boolean;
+}
+
+export function emptyDetailLocalInstallState(): DetailLocalInstallState {
+  return {
+    targets: [],
+    selectedTargetIds: [],
+    targetError: null,
+    refreshError: null,
+    installError: null,
+    installResult: null,
+    loaded: false,
+    targetLoading: false,
+    installing: false,
+  };
+}
 
 export function SkillDetailPage({
   actionBusy,
@@ -27,6 +55,7 @@ export function SkillDetailPage({
   backupOpen,
   backups,
   bindDraft,
+  detailLocalInstallState,
   diffDetail,
   diffError,
   isBinding,
@@ -42,7 +71,11 @@ export function SkillDetailPage({
   onCancelBind,
   onCheck,
   onDraftChange,
+  onInstallDetailTargets,
+  onLoadDetailTargets,
+  onSelectAllDetailTargets,
   onTestSourceConnection,
+  onToggleDetailTarget,
   onApplyUpdate,
   onApplyNeededAgentUpdates,
   onOpenBind,
@@ -56,6 +89,7 @@ export function SkillDetailPage({
   backupOpen: boolean;
   backups: DesktopBackupSummary[];
   bindDraft: BindDraft;
+  detailLocalInstallState: DetailLocalInstallState;
   diffDetail?: DesktopDiffDetail;
   diffError?: DesktopError;
   isBinding: boolean;
@@ -75,7 +109,11 @@ export function SkillDetailPage({
   onCancelBind: () => void;
   onCheck: () => void;
   onDraftChange: (draft: BindDraft) => void;
+  onInstallDetailTargets: () => void;
+  onLoadDetailTargets: () => void;
+  onSelectAllDetailTargets: () => void;
   onTestSourceConnection: () => void;
+  onToggleDetailTarget: (target: DesktopLocalSkillTarget) => void;
   onApplyUpdate: (skillId: string, mode?: "overwrite-local") => void;
   onApplyNeededAgentUpdates: (skillIds: string[]) => void;
   onOpenBind: () => void;
@@ -172,7 +210,12 @@ export function SkillDetailPage({
 
       <FormalDetailAgentPaths
         actionBusy={actionBusy}
+        detailLocalInstallState={detailLocalInstallState}
         onApplyUpdate={onApplyUpdate}
+        onInstallTargets={onInstallDetailTargets}
+        onLoadTargets={onLoadDetailTargets}
+        onSelectAllTargets={onSelectAllDetailTargets}
+        onToggleTarget={onToggleDetailTarget}
         skill={skill}
         rows={installedAgentRows}
       />
@@ -224,7 +267,7 @@ export function SkillDetailPage({
 
           {diffError && <InlineError error={diffError} />}
           {!diffDetail && !backupOpen && (
-            <FormalCheckPanel skill={skill} source={source} updateResult={updateResult} />
+            <FormalCheckPanel skill={skill} updateResult={updateResult} />
           )}
           {diffDetail && <DiffPanel detail={diffDetail} repoPath={source?.repo_path} />}
 
@@ -315,7 +358,7 @@ function SkillHistoryPanel({
                 <strong>{auditActionLabel(event.action)}</strong>
                 <span>{event.created_at ? compactDateTime(event.created_at) : "时间未知"}</span>
               </div>
-              <p>{auditCommitSummary(event)}</p>
+              <p>{auditEventSummary(event)}</p>
               {securityRiskCount(event.risk_summary) > 0 && (
                 <small>包含需要留意的脚本或配置字段</small>
               )}
@@ -329,38 +372,75 @@ function SkillHistoryPanel({
 
 function FormalDetailAgentPaths({
   actionBusy,
+  detailLocalInstallState,
   onApplyUpdate,
+  onInstallTargets,
+  onLoadTargets,
+  onSelectAllTargets,
+  onToggleTarget,
   rows,
   skill,
 }: {
   actionBusy: string | null;
+  detailLocalInstallState: DetailLocalInstallState;
   onApplyUpdate: (skillId: string, mode?: "overwrite-local") => void;
+  onInstallTargets: () => void;
+  onLoadTargets: () => void;
+  onSelectAllTargets: () => void;
+  onToggleTarget: (target: DesktopLocalSkillTarget) => void;
   rows: DetailAgentInstallRow[];
   skill: DesktopSkill;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const targetLoading = detailLocalInstallState.targetLoading;
+  const installing = detailLocalInstallState.installing;
+  const notInstalledTargets = detailLocalInstallState.targets.filter(
+    (target) => target.status === "NotInstalled" && target.root_available,
+  );
+  const unavailableCount = detailLocalInstallState.targets.filter(
+    (target) => target.status === "AgentRootUnavailable",
+  ).length;
+  const showInstallTargets =
+    targetLoading ||
+    installing ||
+    detailLocalInstallState.loaded ||
+    Boolean(detailLocalInstallState.installResult) ||
+    Boolean(detailLocalInstallState.targetError || detailLocalInstallState.installError);
 
   return (
     <section
       className="redesign-detail-agent-panel"
       data-testid={`skill-detail-agent-panel-${skill.id}`}
     >
-      <button
-        aria-controls={`skill-detail-agent-paths-${skill.id}`}
-        aria-expanded={isExpanded}
-        className="redesign-detail-agent-toggle"
-        data-testid={`skill-detail-agent-toggle-${skill.id}`}
-        onClick={() => setIsExpanded((current) => !current)}
-      >
-        <span>
-          <small>安装位置</small>
-          <strong>{rows.length} 个 Agent 已安装此 skill</strong>
-        </span>
-        <span className="redesign-detail-agent-toggle-action">
-          {isExpanded ? "收起" : "展开"}
-          <span aria-hidden="true">{isExpanded ? "↑" : "↓"}</span>
-        </span>
-      </button>
+      <div className="redesign-detail-agent-header">
+        <button
+          aria-controls={`skill-detail-agent-paths-${skill.id}`}
+          aria-expanded={isExpanded}
+          className="redesign-detail-agent-toggle"
+          data-testid={`skill-detail-agent-toggle-${skill.id}`}
+          onClick={() => {
+            const nextExpanded = !isExpanded;
+            setIsExpanded(nextExpanded);
+            if (
+              nextExpanded &&
+              !targetLoading &&
+              (!detailLocalInstallState.loaded || detailLocalInstallState.targetError)
+            ) {
+              onLoadTargets();
+            }
+          }}
+          type="button"
+        >
+          <span>
+            <small>安装位置</small>
+            <strong>{rows.length} 个 Agent 已安装此 skill</strong>
+          </span>
+          <span className="redesign-detail-agent-toggle-action">
+            {isExpanded ? "收起" : "展开"}
+            <span aria-hidden="true">{isExpanded ? "↑" : "↓"}</span>
+          </span>
+        </button>
+      </div>
       {isExpanded && (
         <div
           className="redesign-detail-agent-paths"
@@ -392,12 +472,55 @@ function FormalDetailAgentPaths({
                     }
                   }}
                   title="会先创建备份，再用来源版本覆盖这个安装目录"
+                  type="button"
                 >
                   {actionBusy === `apply:${row.skillId}` ? "覆盖中" : "覆盖更新"}
                 </button>
               )}
             </div>
           ))}
+          {showInstallTargets && (
+            <div className="detail-install-targets">
+              <CrossAgentTargetMatrix
+                currentAgentId={skill.agent_id}
+                error={
+                  detailLocalInstallState.installError ??
+                  detailLocalInstallState.refreshError ??
+                  detailLocalInstallState.targetError ??
+                  undefined
+                }
+                description="复制当前本地 Skill 到选中位置，不检查远端更新。"
+                installResult={detailLocalInstallState.installResult ?? undefined}
+                installing={installing}
+                loading={targetLoading}
+                mode="local-copy"
+                resultTargets={detailLocalInstallState.targets}
+                selectedTargetIds={detailLocalInstallState.selectedTargetIds}
+                targets={notInstalledTargets}
+                title="可安装位置"
+                onInstall={onInstallTargets}
+                onSelectAllValid={onSelectAllTargets}
+                onToggleTarget={onToggleTarget}
+              />
+              {(detailLocalInstallState.targetError || detailLocalInstallState.refreshError) &&
+                !targetLoading &&
+                !installing && (
+                <button
+                  className="ghost-button compact detail-install-retry"
+                  data-testid={`retry-detail-targets-${skill.id}`}
+                  onClick={onLoadTargets}
+                  type="button"
+                >
+                  {detailLocalInstallState.refreshError ? "重新刷新" : "重新读取"}
+                </button>
+                )}
+              {unavailableCount > 0 && (
+                <p className="detail-install-unavailable-note">
+                  另有 {unavailableCount} 个路径不可用，请到 Settings 检查路径配置。
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -406,19 +529,13 @@ function FormalDetailAgentPaths({
 
 function FormalCheckPanel({
   skill,
-  source,
   updateResult,
 }: {
   skill: DesktopSkill;
-  source: DesktopSkill["source"];
   updateResult?: DesktopUpdateCheckResult;
 }) {
-  const currentCommit = updateResult?.source?.current_commit ?? source?.current_commit;
-  const localVersion = currentCommit ? shortCommit(currentCommit) : "未绑定来源";
-  const targetCommit = updateResult?.source?.remote_commit
-    ? shortCommit(updateResult.source.remote_commit)
-    : "等待检查";
   const diffPending = !updateResult?.diff_summary && updateResult?.status !== "UpToDate";
+  const statusLabel = checkPanelStatusLabel(updateResult);
   const summary = updateResult?.diff_summary
     ? diffSummaryParts(updateResult.diff_summary)
     : updateResult?.status === "UpToDate"
@@ -428,12 +545,8 @@ function FormalCheckPanel({
   return (
     <div className="redesign-check-panel" data-testid={`check-panel-${skill.id}`}>
       <div>
-        <span>本地版本</span>
-        <strong>{localVersion}</strong>
-      </div>
-      <div>
-        <span>远端版本</span>
-        <strong>{targetCommit}</strong>
+        <span>检查结果</span>
+        <strong>{statusLabel}</strong>
       </div>
       <div className="redesign-check-diff-summary">
         <span>差异</span>
@@ -451,6 +564,27 @@ function FormalCheckPanel({
       </div>
     </div>
   );
+}
+
+function checkPanelStatusLabel(updateResult?: DesktopUpdateCheckResult) {
+  if (!updateResult) {
+    return "等待检查";
+  }
+  if (updateResult.local_modified) {
+    return "本地已修改";
+  }
+  switch (updateResult.status) {
+    case "UpdateAvailable":
+      return "需要更新";
+    case "UpToDate":
+      return "无需更新";
+    case "CheckFailed":
+      return "检查失败";
+    case "NoSource":
+      return "来源未绑定";
+    default:
+      return "等待检查";
+  }
 }
 
 function diffSummaryParts(summary: DesktopUpdateCheckResult["diff_summary"]) {
@@ -494,24 +628,59 @@ function auditActionLabel(action: string) {
       return "已解绑来源";
     case "BackupDeleted":
       return "已删除备份";
+    case "LockFileExported":
+      return "已导出团队清单";
+    case "LockFileImported":
+      return "已导入团队清单";
     default:
       return "记录";
   }
 }
 
-function auditCommitSummary(event: DesktopAuditEvent) {
-  const before = event.commit_before ? shortCommit(event.commit_before) : null;
-  const after = event.commit_after ? shortCommit(event.commit_after) : null;
-  if (before && after) {
-    return `${before} -> ${after}`;
+function auditEventSummary(event: DesktopAuditEvent) {
+  switch (event.action) {
+    case "SourceBound": {
+      const sourceUrl = extractAuditSourceUrl(event.detail);
+      return sourceUrl || "来源已绑定";
+    }
+    case "SourceUnbound":
+      return "来源已移除";
+    case "UpdateChecked":
+      return "已检查来源状态";
+    case "UpdateApplied":
+      return "已更新到来源版本";
+    case "UpdateBlocked":
+      return "已提示需要确认后再更新";
+    case "UpdateFailed":
+      return "更新没有完成";
+    case "RollbackApplied":
+      return "已恢复到备份版本";
+    case "RollbackFailed":
+      return "回滚没有完成";
+    case "BackupDeleted":
+      return "备份已删除";
+    case "LockFileExported":
+      return "团队清单已导出";
+    case "LockFileImported":
+      return "团队清单已导入";
+    default:
+      return event.status === "success" ? "操作已完成" : "操作未完成";
   }
-  if (after) {
-    return `版本 ${after}`;
+}
+
+function extractAuditSourceUrl(detail?: string | null) {
+  const normalized = detail?.trim();
+  if (!normalized) {
+    return null;
   }
-  if (before) {
-    return `原版本 ${before}`;
+  const boundSourceMatch = normalized.match(/^bound git source\s+(.+)$/i);
+  if (boundSourceMatch?.[1]) {
+    return boundSourceMatch[1].trim();
   }
-  return event.detail || event.status;
+  if (/^(?:file:\/\/|https?:\/\/|ssh:\/\/|git@)/.test(normalized)) {
+    return normalized;
+  }
+  return null;
 }
 
 function compactDateTime(value: string) {

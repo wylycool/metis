@@ -1,15 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  DesktopAgentPath,
   DesktopAgentStatus,
   DesktopApplyUpdateResult,
   DesktopAuditEvent,
   DesktopBackupSummary,
   DesktopBindSourceRequest,
+  DesktopCopyLocalSkillRequest,
+  DesktopCopyLocalSkillResult,
   DesktopDiffDetail,
   DesktopEnvironmentReport,
   DesktopFileExportResult,
   DesktopInstallRemoteSkillRequest,
   DesktopInstallRemoteSkillResult,
+  DesktopLocalSkillTarget,
   DesktopGitEnvironmentTestResult,
   DesktopPreviewRemoteSkillSourceRequest,
   DesktopRemoteSkillPreview,
@@ -57,6 +61,10 @@ export function saveDesktopSettings(settings: DesktopSettings): Promise<DesktopS
   return invoke("save_desktop_settings", { settings });
 }
 
+export function checkPathStatus(path: string): Promise<DesktopAgentPath> {
+  return invoke("check_path_status", { path });
+}
+
 export function getTeamPolicySummary(): Promise<DesktopTeamPolicySummary | null> {
   return invoke("get_team_policy_summary");
 }
@@ -97,10 +105,24 @@ export function getSkillTargetsForSource(
   return invoke("get_skill_targets_for_source", { request });
 }
 
+export function getLocalSkillInstallTargets(
+  sourceSkillId: string,
+): Promise<DesktopLocalSkillTarget[]> {
+  return invoke("get_local_skill_install_targets", {
+    request: { source_skill_id: sourceSkillId },
+  });
+}
+
 export function installRemoteSkillToTargets(
   request: DesktopInstallRemoteSkillRequest,
 ): Promise<DesktopInstallRemoteSkillResult> {
   return invoke("install_remote_skill_to_targets", { request });
+}
+
+export function copyLocalSkillToTargets(
+  request: DesktopCopyLocalSkillRequest,
+): Promise<DesktopCopyLocalSkillResult> {
+  return invoke("copy_local_skill_to_targets", { request });
 }
 
 export function checkSkillUpdates(

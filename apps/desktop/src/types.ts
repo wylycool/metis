@@ -102,6 +102,7 @@ export interface DesktopSourceConnectionTestResult {
   description?: string | null;
   commit: string;
   repo_path: string;
+  ref_: string;
 }
 
 export interface DesktopGitEnvironmentTestResult {
@@ -117,6 +118,7 @@ export interface DesktopRemoteSkillPreview {
   install_name: string;
   commit: string;
   repo_path: string;
+  ref_: string;
 }
 
 export interface DesktopSkillTargetsRequest {
@@ -140,6 +142,16 @@ export interface DesktopSkillTarget {
   root_status: string;
 }
 
+export interface DesktopLocalSkillTarget {
+  agent_id: string;
+  agent_name: string;
+  root_path: string;
+  install_path: string;
+  status: string;
+  root_available: boolean;
+  root_status: string;
+}
+
 export interface DesktopInstallRemoteSkillRequest {
   url: string;
   repo_path: string;
@@ -153,6 +165,24 @@ export interface DesktopInstallSkillTarget {
   agent_id: string;
   agent_name: string;
   install_path: string;
+}
+
+export interface DesktopCopyLocalSkillRequest {
+  source_skill_id: string;
+  targets: DesktopInstallSkillTarget[];
+}
+
+export interface DesktopCopyLocalSkillResult {
+  targets: DesktopCopyLocalSkillTargetResult[];
+}
+
+export interface DesktopCopyLocalSkillTargetResult {
+  agent_id: string;
+  install_path: string;
+  status: string;
+  reason?: string | null;
+  debug_detail?: string | null;
+  skill_id?: string | null;
 }
 
 export interface DesktopInstallRemoteSkillResult {

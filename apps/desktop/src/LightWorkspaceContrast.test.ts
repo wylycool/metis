@@ -69,6 +69,39 @@ function exactBlockFor(selector: string): string {
   return match[2];
 }
 
+function mediaBlocksFor(query: string): string[] {
+  const marker = `@media ${query}`;
+  const blocks: string[] = [];
+  let cursor = 0;
+
+  while (cursor < stylesheet.length) {
+    const start = stylesheet.indexOf(marker, cursor);
+    if (start === -1) {
+      break;
+    }
+    const openingBrace = stylesheet.indexOf("{", start + marker.length);
+    let depth = 0;
+    let end = openingBrace;
+    for (; end < stylesheet.length; end += 1) {
+      if (stylesheet[end] === "{") {
+        depth += 1;
+      } else if (stylesheet[end] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          blocks.push(stylesheet.slice(start, end + 1));
+          cursor = end + 1;
+          break;
+        }
+      }
+    }
+    if (end >= stylesheet.length) {
+      break;
+    }
+  }
+
+  return blocks;
+}
+
 function declaredPx(block: string, property: string): number {
   const match = block.match(new RegExp(`${property}:\\s*(\\d+)px`));
 
@@ -224,14 +257,63 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".add-skill-page .target-matrix")).toContain(
       "background: var(--command-surface);",
     );
+    expect(latestBlockFor(".remote-target-loading")).toContain("position: relative;");
+    expect(latestBlockFor(".remote-target-loading")).toContain("overflow: hidden;");
+    expect(latestBlockFor(".remote-target-loading")).toContain("grid-template-columns: auto 1fr;");
+    expect(latestBlockFor(".remote-target-loading")).toContain("background: linear-gradient(135deg");
+    expect(latestBlockFor(".remote-target-loading::after")).toContain("content: \"\";");
+    expect(latestBlockFor(".remote-target-loading::after")).toContain(
+      "animation: remoteTargetLoadingSweep 1250ms ease-in-out infinite;",
+    );
+    expect(blockFor(".remote-target-loading-spinner")).toContain(
+      "animation: remoteTargetLoadingSpin 820ms linear infinite;",
+    );
+    expect(stylesheet).toContain("@keyframes remoteTargetLoadingSweep");
+    expect(stylesheet).toContain("@keyframes remoteTargetLoadingSpin");
     expect(latestBlockFor(".add-skill-page .remote-target-row")).toContain(
       "background: rgba(248, 250, 252, 0.72);",
     );
-    expect(latestBlockFor(".remote-preview-version-label")).toContain("color: var(--muted);");
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed")).toContain(
+      "background: rgba(248, 250, 252, 0.72);",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed")).toContain(
+      "border-color: rgba(203, 213, 225, 0.86);",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed")).not.toContain(
+      "rgba(255, 247, 237",
+    );
+    expect(latestBlockFor(".add-skill-page .remote-target-row.failed:hover")).toContain(
+      "background: rgba(241, 245, 249, 0.92);",
+    );
+    expect(latestBlockFor(".target-status-danger")).toContain("background: var(--danger-bg");
     expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-start");
     expect(latestBlockFor(".remote-preview-card")).toContain("var(--redesign-accent-end");
-    expect(latestBlockFor(".remote-preview-success-hint")).toContain(
-      "background: linear-gradient(135deg, #f0fdf8 0%, #ecfeff 100%);",
+    expect(latestBlockFor(".remote-preview-card")).toContain("position: relative;");
+    expect(latestBlockFor(".remote-preview-card")).toContain("overflow: hidden;");
+    expect(stylesheet).not.toContain(".remote-preview-version");
+    expect(stylesheet).not.toContain(".remote-preview-version-label");
+    expect(stylesheet).not.toContain(".remote-preview-card::before");
+    expect(stylesheet).not.toContain("remotePreviewSparkleBurst");
+    expect(blockFor(".remote-preview-card::after")).toContain("content: \"\";");
+    expect(blockFor(".remote-preview-card::after")).toContain("inset: -42% auto -42% -86%;");
+    expect(blockFor(".remote-preview-card::after")).toContain("width: 72%;");
+    expect(blockFor(".remote-preview-card::after")).toContain("linear-gradient(105deg");
+    expect(blockFor(".remote-preview-card::after")).toContain("rgba(255, 255, 255, 0.9) 50%");
+    expect(blockFor(".remote-preview-card::after")).toContain(
+      "animation: remotePreviewSunSweep 1450ms ease-in-out 180ms both;",
+    );
+    expect(stylesheet).toContain("@keyframes remotePreviewSunSweep");
+    expect(stylesheet).toContain("transform: translateX(315%) skewX(-16deg);");
+    expect(stylesheet).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(stylesheet).toContain(".remote-preview-card::after");
+    expect(stylesheet).toContain(".remote-target-loading::after");
+    expect(stylesheet).toContain(".remote-target-loading-spinner");
+    expect(latestBlockFor(".remote-preview-success-hint")).toContain("border: 0;");
+    expect(latestBlockFor(".remote-preview-success-hint")).toContain("background: transparent;");
+    expect(latestBlockFor(".remote-preview-success-hint")).not.toContain("linear-gradient");
+    expect(latestBlockFor(".remote-preview-success-hint span")).toContain("color: #0f766e;");
+    expect(latestBlockFor(".remote-preview-success-hint span")).toContain(
+      "background: rgba(20, 160, 118, 0.1);",
     );
     expect(latestBlockFor(".remote-preview-success-hint strong")).toContain("color: #0f766e;");
     expect(latestBlockFor(".add-skill-page .remote-target-row .remote-target-checkbox")).toContain(
@@ -295,7 +377,17 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-help-popover")).toContain("border-radius: 16px;");
     expect(latestBlockFor(".source-help-card")).toContain("display: grid;");
     expect(latestBlockFor(".source-help-card code")).toContain("user-select: text;");
-    expect(latestBlockFor(".source-form-field input")).toContain("min-height: 48px;");
+    expect(exactBlockFor(".source-form-field input")).toContain("min-height: 48px;");
+    expect(latestBlockFor(".git-source-fields--compact .source-field-stack")).toContain("gap: 10px;");
+    expect(exactBlockFor(".git-source-fields--compact .source-secondary-fields")).toContain(
+      "grid-template-columns: minmax(0, 1fr) minmax(120px, 0.42fr);",
+    );
+    expect(stylesheet).toMatch(
+      /@media\s*\(max-width:\s*760px\)\s*\{[\s\S]*\.git-source-fields--compact \.source-secondary-fields\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+    );
+    expect(latestBlockFor(".git-source-fields--compact .source-form-field input")).toContain(
+      "min-height: 40px;",
+    );
     expect(latestBlockFor(".source-form-field input::placeholder")).toContain("font-weight: 600;");
     expect(latestBlockFor(".source-settings-grid")).toContain("gap: 10px;");
     expect(latestBlockFor(".source-setting-row")).toContain(
@@ -314,6 +406,11 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-test-button[data-busy=\"true\"]")).toContain("cursor: wait;");
     expect(latestBlockFor(".source-save-button:disabled")).toContain("cursor: default;");
     expect(latestBlockFor(".source-save-button[data-busy=\"true\"]")).toContain("cursor: wait;");
+    expect(exactBlockFor("button:disabled")).toContain("cursor: default;");
+    expect(exactBlockFor("button:disabled")).not.toContain("cursor: wait;");
+    const previewDisabledBlock = latestBlockFor(".add-skill-preview-button:disabled");
+    expect(previewDisabledBlock).toContain("cursor: default;");
+    expect(previewDisabledBlock).not.toContain("cursor: wait;");
     expect(latestBlockFor(".settings-section.git-health-section")).toContain("min-height: auto;");
     expect(latestBlockFor(".settings-section.git-health-section")).toContain("grid-template-rows: auto auto;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("display: flex;");
@@ -324,12 +421,62 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 76px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("padding: 0 14px;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("font-size: 13px;");
-    expect(latestBlockFor(".settings-git-test-button")).toContain("box-shadow: none;");
-    expect(latestBlockFor(".settings-git-test-button:hover:not(:disabled)")).toContain("background: #eff6ff;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain(
+      "background: linear-gradient(135deg, #3154df, #4b7df0);",
+    );
+    expect(latestBlockFor(".settings-git-test-button")).toContain(
+      "box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);",
+    );
+    const gitTestHoverBlock = latestBlockFor(".settings-git-test-button:hover:not(:disabled)");
+    expect(gitTestHoverBlock).toContain("color: #ffffff;");
+    expect(gitTestHoverBlock).toContain("border-color: transparent;");
+    expect(gitTestHoverBlock).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
+    expect(gitTestHoverBlock).toContain("box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);");
+    expect(gitTestHoverBlock).toContain("transform: none;");
+    expect(gitTestHoverBlock).not.toContain("background: #eff6ff;");
+    const gitTestFocusBlock = latestBlockFor(".settings-git-test-button:focus-visible");
+    expect(gitTestFocusBlock).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
+    expect(gitTestFocusBlock).toContain("color: #ffffff;");
+    expect(gitTestFocusBlock).toContain("transform: none;");
+    expect(latestBlockFor(".settings-git-test-button:disabled")).toContain("color: #64708a;");
+    expect(latestBlockFor(".settings-git-test-button:disabled")).toContain("background: #f8fafc;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("background: #fff7ed;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("border: 1px solid #fed7aa;");
     expect(latestBlockFor(".settings-git-health-notice")).not.toContain("danger");
     expect(latestBlockFor(".settings-git-health-notice")).not.toContain("#dc2626");
+    expect(latestBlockFor(".custom-monitor-add")).toContain("justify-self: end;");
+    expect(latestBlockFor(".custom-monitor-add")).toContain("min-width: 78px;");
+    expect(latestBlockFor(".custom-monitor-add")).toContain("background: #ffffff;");
+    expect(exactBlockFor(".path-management-heading")).toContain("display: flex;");
+    expect(exactBlockFor(".path-status-legend")).toContain("display: inline-flex;");
+    expect(latestBlockFor(".path-status-legend-item")).toContain("white-space: nowrap;");
+    expect(
+      latestBlockFor(".settings-agent-path-row.redesign-agent-path-row input[readonly]"),
+    ).toContain("background: #eef2f6;");
+    expect(exactBlockFor(".agent-path-row-actions")).toContain("justify-self: end;");
+    expect(latestBlockFor(".agent-path-pending-badge")).toContain("white-space: nowrap;");
+    expect(latestBlockFor(".redesign-agent-path-row span.pending::before")).toContain(
+      "background: #64748b;",
+    );
+    expect(
+      mediaBlocksFor("(max-width: 760px)").some((block) =>
+        /\.settings-agent-path-row\.redesign-agent-path-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/.test(
+          block,
+        ),
+      ),
+    ).toBe(true);
+    expect(latestBlockFor(".settings-save-button")).toContain(
+      "background: linear-gradient(135deg, #3154df, #4b7df0);",
+    );
+    expect(latestBlockFor(".settings-save-button")).toContain(
+      "box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);",
+    );
+    expect(latestBlockFor(".settings-save-button:hover:not(:disabled)")).toContain(
+      "background: linear-gradient(135deg, #2749cf, #416fed);",
+    );
+    expect(latestBlockFor(".settings-save-button:hover:not(:disabled)")).toContain(
+      "transform: none;",
+    );
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain("gap: 16px 28px;");
@@ -492,7 +639,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toContain(".target-status-warning");
     expect(stylesheet).toContain(".target-status-danger");
     expect(stylesheet).toContain(".target-status-muted");
-    expect(latestBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
+    expect(exactBlockFor(".target-status-badge")).toContain("border-radius: 999px;");
     expect(latestBlockFor(".add-skill-page .target-matrix-select-all")).not.toContain(
       "background: var(--ink)",
     );
@@ -527,6 +674,29 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".redesign-detail-hero")).toContain(
       "grid-template-columns: minmax(0, 1fr) auto;",
+    );
+    expect(exactBlockFor(".redesign-detail-agent-header")).toContain(
+      "grid-template-columns: minmax(0, 1fr);",
+    );
+    expect(stylesheet).not.toContain(".redesign-detail-agent-install-action");
+    expect(latestBlockFor(".detail-install-targets")).toContain("display: grid;");
+    expect(exactBlockFor(".detail-install-targets .remote-target-row.redesign-detail-agent-path-row")).toContain(
+      "grid-template-columns: auto auto minmax(112px, max-content) minmax(0, 1fr) auto;",
+    );
+    expect(exactBlockFor(".detail-install-targets .remote-target-agent-name")).toContain(
+      "min-width: 0;",
+    );
+    expect(exactBlockFor(".detail-install-targets .remote-target-agent-name")).toContain(
+      "width: 100%;",
+    );
+    expect(exactBlockFor(".detail-install-targets .remote-target-row code")).toContain(
+      "min-width: 0;",
+    );
+    expect(mediaBlocksFor("(max-width: 760px)").join("\n")).toMatch(
+      /\.detail-install-targets \.remote-target-row\.redesign-detail-agent-path-row\s*\{[\s\S]*grid-template-columns:\s*auto auto minmax\(0, 1fr\) auto;/,
+    );
+    expect(mediaBlocksFor("(max-width: 760px)").join("\n")).toMatch(
+      /\.detail-install-targets \.remote-target-row code\s*\{[\s\S]*grid-column:\s*3 \/ -1;[\s\S]*grid-row:\s*2;/,
     );
   });
 
@@ -589,12 +759,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor("button.redesign-detail-agent-toggle:hover:not(:disabled)")).toContain("background:");
     expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("display: grid;");
     expect(latestBlockFor(".redesign-detail-agent-paths")).toContain("gap: 8px;");
-    expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("background: rgba(248, 250, 252, 0.72);");
-    expect(latestBlockFor(".redesign-detail-agent-path-row")).toContain("grid-template-columns: auto minmax(96px, 0.24fr) minmax(0, 1fr) auto auto;");
+    expect(exactBlockFor(".redesign-detail-agent-path-row")).toContain("background: rgba(248, 250, 252, 0.72);");
+    expect(exactBlockFor(".redesign-detail-agent-path-row")).toContain("grid-template-columns: auto minmax(96px, 0.24fr) minmax(0, 1fr) auto auto;");
     expect(latestBlockFor(".redesign-detail-agent-path-row.update")).toContain("background: rgba(239, 246, 255, 0.88);");
     expect(latestBlockFor(".redesign-detail-agent-path-row.latest small")).toContain("color: #157a58;");
     expect(latestBlockFor(".redesign-detail-agent-path-row .agent-badge")).toContain("margin-left: 0;");
-    expect(latestBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
+    expect(exactBlockFor(".redesign-detail-agent-path-row code")).toContain("color: #64748b;");
     expect(latestBlockFor(".redesign-detail-agent-row-action")).toContain("white-space: nowrap;");
     expect(latestBlockFor(".redesign-backup-panel .backup-row")).toContain("grid-template-columns: minmax(0, 1fr) auto;");
     expect(exactBlockFor(".redesign-side-nav button")).toContain("color: #526174;");

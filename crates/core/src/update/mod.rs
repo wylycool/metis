@@ -3,7 +3,9 @@ use crate::local_state::{capture_local_baseline, check_local_modification};
 use crate::rollback::{create_backup, CreateBackupOptions};
 use chrono::Utc;
 use metis_git_provider::diff::{GitDiffDetail, GitDiffRequest, GitDiffStatus, GitDiffSummary};
-use metis_git_provider::fetch::{GitCliProvider, GitCommandRunner, GitRemoteRef};
+use metis_git_provider::fetch::{
+    GitCliProvider, GitCommandRunner, GitRemoteRef, RemoteDefaultBranch as GitRemoteDefaultBranch,
+};
 use metis_git_provider::source::GitCheckoutRequest;
 use metis_security::checker::scan_directory;
 use metis_security::findings::SecurityFinding;
@@ -140,7 +142,17 @@ pub enum DiffError {
     Storage(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteDefaultBranch {
+    pub branch: String,
+    pub commit: Option<String>,
+}
+
 pub trait RemoteCommitChecker {
+    fn remote_default_branch(&self, _url: &str) -> Result<RemoteDefaultBranch, String> {
+        Err("remote default branch unavailable".to_string())
+    }
+
     fn remote_commit(&self, source: &SourceRecord) -> Result<String, String>;
 
     fn diff_summary(
@@ -173,6 +185,12 @@ pub trait RemoteCommitChecker {
 }
 
 impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
+    fn remote_default_branch(&self, url: &str) -> Result<RemoteDefaultBranch, String> {
+        GitCliProvider::remote_default_branch(self, url)
+            .map(remote_default_branch_from_git)
+            .map_err(|error| error.to_string())
+    }
+
     fn remote_commit(&self, source: &SourceRecord) -> Result<String, String> {
         self.remote_commit(&GitRemoteRef {
             url: source.url.clone(),
@@ -244,6 +262,13 @@ impl<R: GitCommandRunner> RemoteCommitChecker for GitCliProvider<R> {
             skill_dir: result.skill_dir,
         })
         .map_err(|error| error.to_string())
+    }
+}
+
+fn remote_default_branch_from_git(branch: GitRemoteDefaultBranch) -> RemoteDefaultBranch {
+    RemoteDefaultBranch {
+        branch: branch.branch,
+        commit: branch.commit,
     }
 }
 

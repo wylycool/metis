@@ -1,5 +1,5 @@
 import { CrossAgentTargetMatrix } from "./CrossAgentTargetMatrix";
-import { shortCommit } from "./commitDisplay";
+import { GitSourceFields } from "./GitSourceFields";
 import { InlineError } from "./SkillRow";
 import type { CSSProperties } from "react";
 import type {
@@ -50,7 +50,7 @@ export function AddSkillPage({
     <section className="skill-panel add-skill-page" data-testid="add-skill-page">
       <button className="breadcrumb-button" onClick={onBack}>
         <span aria-hidden="true">←</span>
-        <span>Skills / 添加 Skill</span>
+        <span>返回</span>
       </button>
       <section className="remote-sync-panel add-skill-source-card" aria-label="添加 Skill">
         <div className="remote-sync-header">
@@ -67,47 +67,26 @@ export function AddSkillPage({
               重置
             </button>
             <button
-              className="compact"
+              className="compact add-skill-preview-button"
               data-testid="add-skill-preview"
               disabled={actionBusy === "remote-sync-preview" || draft.url.trim().length === 0}
               onClick={onPreview}
             >
-              {actionBusy === "remote-sync-preview" ? "预览中" : "预览远端"}
+              {actionBusy === "remote-sync-preview" ? "预览中" : "预览Skill"}
             </button>
           </div>
         </div>
-        <div className="remote-sync-form">
-          <input
-            autoCapitalize="none"
-            autoComplete="off"
-            autoCorrect="off"
-            data-testid="add-skill-url"
-            spellCheck={false}
-            value={draft.url}
-            placeholder="https://github.com/example/metis-skills.git"
-            onChange={(event) => onDraftChange({ ...draft, url: event.target.value })}
-          />
-          <input
-            autoCapitalize="none"
-            autoComplete="off"
-            autoCorrect="off"
-            data-testid="add-skill-repo-path"
-            spellCheck={false}
-            value={draft.repo_path}
-            placeholder="skills/example"
-            onChange={(event) => onDraftChange({ ...draft, repo_path: event.target.value })}
-          />
-          <input
-            autoCapitalize="none"
-            autoComplete="off"
-            autoCorrect="off"
-            data-testid="add-skill-ref"
-            spellCheck={false}
-            value={draft.ref_}
-            placeholder="main"
-            onChange={(event) => onDraftChange({ ...draft, ref_: event.target.value })}
-          />
-        </div>
+        <GitSourceFields
+          draft={draft}
+          fieldId="add-skill"
+          testIds={{
+            url: "add-skill-url",
+            repoPath: "add-skill-repo-path",
+            ref: "add-skill-ref",
+          }}
+          onChange={onDraftChange}
+          variant="compact"
+        />
         {previewError && <InlineError error={previewError} />}
         {preview && (
           <>
@@ -116,10 +95,6 @@ export function AddSkillPage({
                 <strong>{preview.name}</strong>
                 <span>{preview.description ?? "无描述"}</span>
               </div>
-              <div className="remote-preview-version">
-                <span className="remote-preview-version-label">远端版本</span>
-                <code>{shortCommit(preview.commit)}</code>
-              </div>
             </div>
             <div
               className="remote-preview-success-hint"
@@ -127,7 +102,7 @@ export function AddSkillPage({
               role="status"
             >
               <span aria-hidden="true">✓</span>
-              <strong>已成功获取Skill。确认信息无误后，选择下方 Agent / 目录完成安装。</strong>
+              <strong>已成功获取Skill。确认信息无误后，在下方完成安装。</strong>
             </div>
           </>
         )}

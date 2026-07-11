@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddSkillPage, type RemoteSyncDraft } from "./AddSkillPage";
 import { isRemoteTargetSelectable, remoteTargetId } from "./CrossAgentTargetMatrix";
-import { SkillDetailPage } from "./SkillDetailPage";
+import {
+  emptyDetailLocalInstallState,
+  SkillDetailPage,
+  type DetailLocalInstallState,
+} from "./SkillDetailPage";
 import { InlineError, SkillRow, type BindDraft } from "./SkillRow";
 import type {
   DesktopBackupSummary,
@@ -9,6 +13,7 @@ import type {
   DesktopDiffDetail,
   DesktopError,
   DesktopInstallRemoteSkillResult,
+  DesktopLocalSkillTarget,
   DesktopRemoteSkillPreview,
   DesktopSkill,
   DesktopSkillSize,
@@ -30,6 +35,7 @@ export function SkillsWorkspace({
   backups,
   bindDraft,
   bindingSkillId,
+  detailLocalInstallStates,
   diffDetails,
   diffError,
   error,
@@ -39,6 +45,7 @@ export function SkillsWorkspace({
   remoteSyncDraft,
   remoteTargets,
   selectedRemoteTargetIds,
+  homeNavigationKey,
   skillAuditEvents,
   skillSearchQuery,
   skillSizes,
@@ -55,7 +62,9 @@ export function SkillsWorkspace({
   onCheckDetailUpdates,
   onCheckUpdates,
   onDraftChange,
+  onInstallDetailTargets,
   onInstallRemoteTargets,
+  onLoadDetailTargets,
   onLoadSkillAuditEvents,
   onLoadSkillSize,
   onOpenBind,
@@ -64,12 +73,14 @@ export function SkillsWorkspace({
   onApplyNeededAgentUpdates,
   onResetRemoteSync,
   onSelectAllValidRemoteTargets,
+  onSelectAllDetailTargets,
   onRestoreBackup,
   onRouteKindChange,
   onScan,
   onSetRemoteSyncDraft,
   onToggleDetailDiff,
   onToggleDiff,
+  onToggleDetailTarget,
   onToggleRemoteTarget,
   onTestSourceConnection,
   onUnbind,
@@ -80,6 +91,7 @@ export function SkillsWorkspace({
   backups: Record<string, DesktopBackupSummary[]>;
   bindDraft: BindDraft;
   bindingSkillId: string | null;
+  detailLocalInstallStates: Record<string, DetailLocalInstallState>;
   diffDetails: Record<string, DesktopDiffDetail>;
   diffError: Record<string, DesktopError>;
   error: DesktopError | null;
@@ -89,6 +101,7 @@ export function SkillsWorkspace({
   remoteSyncDraft: RemoteSyncDraft;
   remoteTargets: DesktopSkillTarget[];
   selectedRemoteTargetIds: string[];
+  homeNavigationKey: number;
   skillAuditEvents: Record<string, DesktopAuditEvent[]>;
   skillSearchQuery: string;
   skillSizes: Record<string, DesktopSkillSize>;
@@ -106,7 +119,9 @@ export function SkillsWorkspace({
   onCheckDetailUpdates: (skills: DesktopSkill[]) => void;
   onCheckUpdates: (skillIds: string[]) => void;
   onDraftChange: (draft: BindDraft) => void;
+  onInstallDetailTargets: (skill: DesktopSkill) => void;
   onInstallRemoteTargets: () => void;
+  onLoadDetailTargets: (skill: DesktopSkill) => void;
   onLoadSkillAuditEvents: (skillId: string) => void;
   onLoadSkillSize: (skillId: string) => void;
   onOpenBind: (skill: DesktopSkill) => void;
@@ -114,12 +129,14 @@ export function SkillsWorkspace({
   onPreviewRemoteSync: () => void;
   onResetRemoteSync: () => void;
   onSelectAllValidRemoteTargets: () => void;
+  onSelectAllDetailTargets: (skillId: string) => void;
   onRestoreBackup: (skillId: string, backupId: string) => void;
   onRouteKindChange: (kind: SkillsRoute["kind"]) => void;
   onScan: () => void;
   onSetRemoteSyncDraft: (draft: RemoteSyncDraft) => void;
   onToggleDetailDiff: (skill: DesktopSkill, updateResult?: DesktopUpdateCheckResult) => void;
   onToggleDiff: (skillId: string) => void;
+  onToggleDetailTarget: (skillId: string, target: DesktopLocalSkillTarget) => void;
   onToggleRemoteTarget: (target: DesktopSkillTarget) => void;
   onTestSourceConnection: (skillId: string) => void;
   onUnbind: (skillId: string) => void;
@@ -183,6 +200,10 @@ export function SkillsWorkspace({
   }, [onRouteKindChange, route.kind]);
 
   useEffect(() => {
+    setRoute({ kind: "list" });
+  }, [homeNavigationKey]);
+
+  useEffect(() => {
     setShowAllSkills(false);
   }, [normalizedSearchQuery, skillSortMode, skills.length]);
 
@@ -231,6 +252,9 @@ export function SkillsWorkspace({
           backupOpen={backupPanels[routedDetailSkill.id] ?? false}
           backups={backups[routedDetailSkill.id] ?? []}
           bindDraft={bindDraft}
+          detailLocalInstallState={
+            detailLocalInstallStates[routedDetailSkill.id] ?? emptyDetailLocalInstallState()
+          }
           diffDetail={diffDetails[routedDetailSkill.id]}
           diffError={diffError[routedDetailSkill.id]}
           isBinding={bindingSkillId === routedDetailSkill.id}
@@ -246,7 +270,13 @@ export function SkillsWorkspace({
           onCancelBind={onCancelBind}
           onCheck={() => onCheckDetailUpdates(uniqueSkillsById([...routedAgentMemberships, routedDetailSkill]))}
           onDraftChange={onDraftChange}
+          onInstallDetailTargets={() => onInstallDetailTargets(routedDetailSkill)}
+          onLoadDetailTargets={() => onLoadDetailTargets(routedDetailSkill)}
+          onSelectAllDetailTargets={() => onSelectAllDetailTargets(routedDetailSkill.id)}
           onTestSourceConnection={() => onTestSourceConnection(routedDetailSkill.id)}
+          onToggleDetailTarget={(target) =>
+            onToggleDetailTarget(routedDetailSkill.id, target)
+          }
           onApplyUpdate={onApplyUpdate}
           onApplyNeededAgentUpdates={onApplyNeededAgentUpdates}
           onOpenBind={() => onOpenBind(routedDetailSkill)}

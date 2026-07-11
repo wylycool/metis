@@ -172,7 +172,7 @@ fn record_to_source(record: SourceRecord) -> Source {
     }
 }
 
-fn stable_source_id(input: &SourceInput) -> String {
+pub(crate) fn stable_source_id(input: &SourceInput) -> String {
     let mut hasher = Sha256::new();
     hasher.update(source_type_to_storage(&input.source_type).as_bytes());
     hasher.update([0]);
