@@ -131,7 +131,7 @@ pnpm tauri dev
 - **集成测试**：Core Engine + Adapter + Storage 的集成测试。
 - **端到端测试**：模拟真实 skill 安装、更新、回滚流程（Phase 2+）。
 - **GUI Harness**：桌面主链路和错误路径通过 `apps/desktop/src/App.e2e.test.tsx` 覆盖。
-- **发布验证**：预览包和安装 smoke 参见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
+- **发布验证**：桌面发布包和安装 smoke 参见 [docs/release-checklist.md](docs/release-checklist.md)。
 
 提交前至少完成本次改动对应的验证。Core/Git/安全或跨层改动通常包括 `cargo fmt --check`、`cargo test`、`cargo clippy --all-targets --all-features`；桌面交互按风险补充前端 E2E 和构建。发布 workflow 会在对应 tag/触发条件下构建桌面产物。
 

@@ -1,4 +1,4 @@
-name: Desktop Preview Packages
+name: Desktop Release Packages
 
 on:
   workflow_dispatch:
@@ -10,8 +10,106 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    name: Validate desktop release version
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate package versions and tag
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          def workspace_version() -> str:
+              contents = Path("Cargo.toml").read_text()
+              section = re.search(
+                  r"(?ms)^\[workspace\.package\]\s*(.*?)(?=^\[|\Z)",
+                  contents,
+              )
+              if section is None:
+                  raise SystemExit("Cargo.toml is missing [workspace.package]")
+              version = re.search(
+                  r'(?m)^version\s*=\s*"([^"]+)"\s*$',
+                  section.group(1),
+              )
+              if version is None:
+                  raise SystemExit("Cargo.toml is missing workspace.package.version")
+              return version.group(1)
+
+          versions = {
+              "Cargo.toml": workspace_version(),
+              "apps/desktop/package.json": json.loads(
+                  Path("apps/desktop/package.json").read_text()
+              )["version"],
+              "apps/desktop/src-tauri/tauri.conf.json": json.loads(
+                  Path("apps/desktop/src-tauri/tauri.conf.json").read_text()
+              )["version"],
+          }
+          cargo_lock = Path("Cargo.lock").read_text()
+          for package_name in (
+              "metis-adapters",
+              "metis-core",
+              "metis-desktop",
+              "metis-git-provider",
+              "metis-security",
+              "metis-storage",
+          ):
+              package = re.search(
+                  rf'(?ms)^\[\[package\]\]\s*name = "{package_name}"\s*version = "([^"]+)"',
+                  cargo_lock,
+              )
+              if package is None:
+                  raise SystemExit(f"Cargo.lock is missing {package_name}")
+              versions[f"Cargo.lock:{package_name}"] = package.group(1)
+          if len(set(versions.values())) != 1:
+              details = ", ".join(f"{path}={version}" for path, version in versions.items())
+              raise SystemExit(f"Desktop package versions do not match: {details}")
+
+          release_version = next(iter(versions.values()))
+          semver = re.fullmatch(
+              r"(0|[1-9][0-9]*)\."
+              r"(0|[1-9][0-9]*)\."
+              r"(0|[1-9][0-9]*)"
+              r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+              r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?",
+              release_version,
+          )
+          if semver is None:
+              raise SystemExit(f"Desktop version is not valid SemVer: {release_version}")
+          prerelease = semver.group(4)
+          if prerelease:
+              for identifier in prerelease.split("."):
+                  if identifier.isdigit() and len(identifier) > 1 and identifier.startswith("0"):
+                      raise SystemExit(
+                          f"Numeric prerelease identifier has a leading zero: {identifier}"
+                      )
+
+          if os.environ["REF_TYPE"] == "tag":
+              ref_name = os.environ["REF_NAME"]
+              prefix = "desktop-v"
+              if not ref_name.startswith(prefix):
+                  raise SystemExit(f"Desktop release tag must start with {prefix}: {ref_name}")
+              tag_version = ref_name[len(prefix):]
+              if tag_version != release_version:
+                  raise SystemExit(
+                      f"Tag version {tag_version} does not match package version {release_version}"
+                  )
+
+          print(f"Validated desktop release version {release_version}")
+          PY
+
   build:
     name: Build ${{ matrix.platform.name }}
+    needs: validate
     runs-on: ${{ matrix.platform.os }}
     strategy:
       fail-fast: false
@@ -78,7 +176,7 @@ jobs:
         working-directory: apps/desktop
         run: pnpm tauri build ${{ matrix.platform.build_args }}
 
-      - name: Upload preview bundle
+      - name: Upload desktop package
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform.artifact }}
@@ -87,7 +185,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: [validate, build]
     if: startsWith(github.ref, 'refs/tags/desktop-v')
     runs-on: ubuntu-22.04
     permissions:
@@ -97,7 +195,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download preview bundles
+      - name: Download desktop packages
         uses: actions/download-artifact@v4
         with:
           path: release-downloads
@@ -131,6 +229,21 @@ jobs:
             exit 1
           fi
 
+          release_version="${GITHUB_REF_NAME#desktop-v}"
+          expected_assets=(
+            "Metis_${release_version}_universal.dmg"
+            "Metis_${release_version}_x64-setup.exe"
+            "Metis_${release_version}_amd64.deb"
+            "Metis_${release_version}_amd64.AppImage"
+          )
+          for expected_asset in "${expected_assets[@]}"; do
+            if [[ ! -f "release-assets/$expected_asset" ]]; then
+              echo "Missing required release asset: $expected_asset"
+              find release-assets -maxdepth 1 -type f -print
+              exit 1
+            fi
+          done
+
           (
             cd release-assets
             find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \
@@ -140,18 +253,35 @@ jobs:
 
           ls -la release-assets
 
-      - name: Create or update prerelease
+      - name: Create or update GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          release_version="${GITHUB_REF_NAME#desktop-v}"
+          if [[ -z "$release_version" || "$release_version" == "$GITHUB_REF_NAME" ]]; then
+            echo "Invalid desktop release tag: $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+          release_flags=(--prerelease=false --latest)
+          version_without_build="${release_version%%+*}"
+          if [[ "$version_without_build" == *-* ]]; then
+            release_flags=(--prerelease --latest=false)
+          fi
+
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "Metis ${release_version}" \
+              --notes-file docs/release-notes/desktop.md \
+              --draft=false \
+              "${release_flags[@]}"
           else
             gh release create "$GITHUB_REF_NAME" release-assets/* \
-              --title "Metis ${GITHUB_REF_NAME}" \
-              --notes-file docs/release-notes/desktop-beta.md \
-              --prerelease \
+              --title "Metis ${release_version}" \
+              --notes-file docs/release-notes/desktop.md \
+              "${release_flags[@]}" \
               --verify-tag
           fi

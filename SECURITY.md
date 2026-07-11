@@ -82,8 +82,8 @@ Metis 的威胁模型假设：
 ## 构建与分发安全
 
 - Release 构建通过 GitHub Actions 自动化，构建日志公开可审计。
-- 当前 Beta 的 macOS 包尚未进行 Developer ID 签名和公证。
-- 当前 Beta 的 Windows 包尚未进行 Authenticode 签名。
+- 当前通过 GitHub Releases 分发的 macOS 安装包尚未进行 Developer ID 签名和公证。
+- 当前通过 GitHub Releases 分发的 Windows 安装包尚未进行 Authenticode 签名。
 - 构建产物提供 SHA256 校验和。
 
 ## 隐私承诺

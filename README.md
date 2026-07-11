@@ -8,25 +8,17 @@ Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill
 
 > 用户本机已经有很多 skills，如何让它们可见、可追踪、可更新、可回滚、可审计。
 
-## 下载 Beta
+## 下载
 
-最新 Beta：[`desktop-v0.1.0-beta.5`](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.5)
+下一正式版是 **Metis 1.5.0**，计划 tag 为 `desktop-v1.5.0`，目前正在进行发布准备。正式 Release 创建前不提供可能失效的 1.5.0 直接下载链接。
 
-| 系统 | 下载 |
-| --- | --- |
-| macOS | [`Metis_0.1.0_universal.dmg`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_universal.dmg) |
-| Windows | [`Metis_0.1.0_x64-setup.exe`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_x64-setup.exe) |
-| Linux deb | [`Metis_0.1.0_amd64.deb`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_amd64.deb) |
-| Linux AppImage | [`Metis_0.1.0_amd64.AppImage`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/Metis_0.1.0_amd64.AppImage) |
-| 校验文件 | [`SHA256SUMS`](https://github.com/wylycool/metis/releases/download/desktop-v0.1.0-beta.5/SHA256SUMS) |
-
-当前 Beta 包未做系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。完整发布页见 [GitHub Releases](https://github.com/wylycool/metis/releases/tag/desktop-v0.1.0-beta.5)。
+当前历史 Beta 安装包和全部发布记录可在 [GitHub Releases](https://github.com/wylycool/metis/releases) 查看。通过 GitHub Releases 分发的安装包尚未进行系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。
 
 ## 当前阶段
 
-项目处于 **Phase 6 UI 重构完成点 / Beta 5 已发布**：Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 Beta 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地治理能力、Phase 5 产品化收口和 Phase 6 前端体验重构均已完成。桌面应用当前提供 `Skills` 和 `Settings` 两个工作区：Skills 用于扫描、来源绑定、更新检查、diff、手动更新、备份回滚和安装；Settings 用于管理内置 Agent 路径、自定义路径、受控自动更新列表和本机 Git 检测。
+Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地治理能力、Phase 5 产品化收口和 Phase 6 前端体验重构均已完成。项目当前正在准备 **Metis 1.5.0 正式版**。
 
-当前推荐下载版本是 `desktop-v0.1.0-beta.5`；该版本包含 Phase 6 UI 重设计、Skills 首页与详情页视觉收口、搜索去重、前端组件拆分和 Git checkout cache 优化。添加 Skill 页面支持预览远端 Git Skill 后安装到选中路径；已安装 Skill 的详情页支持把当前本地目录直接复制到其他未安装路径。
+桌面应用当前提供 `Skills` 和 `Settings` 两个工作区：Skills 用于扫描、来源绑定、更新检查、diff、手动更新、备份回滚和安装；Settings 用于管理内置 Agent 路径、自定义路径、受控自动更新列表和本机 Git 检测。添加 Skill 页面支持预览远端 Git Skill 后安装到选中路径；已安装 Skill 的详情页支持把当前本地目录直接复制到其他未安装路径。
 
 ## 技术栈
 
@@ -93,18 +85,18 @@ cargo clippy
 (cd apps/desktop && pnpm tauri:build:mac-universal)
 ```
 
-macOS 面向下载的首选预览包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_0.1.0_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台预览包由 GitHub Actions workflow `Desktop Preview Packages` 构建 macOS universal、Windows 和 Linux artifact。Beta 发布检查清单见 [docs/beta-release-checklist.md](docs/beta-release-checklist.md)。
+macOS 面向发布的首选安装包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_<version>_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台桌面发布包由 GitHub Actions workflow `Desktop Release Packages` 构建 macOS universal、Windows 和 Linux artifact。发布检查清单见 [docs/release-checklist.md](docs/release-checklist.md)。
 
 ## 安装提示
 
-Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。当前推荐 Beta tag 为 `desktop-v0.1.0-beta.5`。
+Metis 桌面版通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。下一正式版 tag 为 `desktop-v1.5.0`，当前尚在准备中。
 
 - macOS：下载 universal `.dmg`，挂载后拖拽或启动 Metis。当前包未签名和公证，首次启动可能需要右键打开，或到系统设置中允许打开。
 - Windows：下载 Windows installer。当前包未做 Authenticode 签名，SmartScreen 可能提示未知发布者，需要选择继续运行。
 - Linux：下载 `.deb` 或 `.AppImage`；AppImage 如无执行权限，可先执行 `chmod +x <file>.AppImage`。
 - 校验：Release 中的 `SHA256SUMS` 可用于核对下载文件完整性，macOS/Linux 可运行 `shasum -a 256 -c SHA256SUMS`。
 
-签名、公证和 Windows Authenticode 属于后续可选信任增强，不阻塞开源 Beta 通过 GitHub Releases 分发。
+签名、公证和 Windows Authenticode 属于后续信任增强；当前未签名状态需要在发布说明和安装提示中持续明确。
 
 首次打开后的建议路径：
 
@@ -116,7 +108,7 @@ Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 
 
 ## 当前不做
 
-以下方向重要，但不进入当前 Beta 产品化收口：
+以下方向重要，但不进入当前 1.5.0 发布范围：
 
 - skill marketplace
 - 云同步
