@@ -77,7 +77,7 @@ Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
 - 更新前自动备份。
 - 更新失败自动回滚。
 - 支持查看更新 diff。
-- 支持私有仓库凭据引用入口；当前只保存 `credential_ref` 名称作为引用名/备注名，真实认证由本机 Git、SSH agent 或 Git credential helper 完成，Metis 不读取 Keychain 或 token。
+- 支持通过本机 Git、SSH agent 或 Git credential helper 访问私有仓库；Metis 不保存 Keychain、token 或私钥。Storage 仍兼容 `credential_ref` 备注字段，但当前正式 UI 不提供凭据输入入口。
 - 支持受控自动更新：只处理用户同时标记为 trusted 和 auto update、且本地未修改的 source。
 - 支持添加远端 Skill：预览 Git 来源后，选择 Codex、Claude Code、OpenClaw、Hermes、opencode 或自定义路径进行安装或更新。
 - 支持详情页本地复制：展开安装位置后，把当前已安装 Skill 复制到其他尚未安装的 Agent 或自定义路径；此过程不检查远端更新，也不覆盖已有目录。
@@ -129,33 +129,14 @@ Beta 版本通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 
 - 插件市场
 - 多人协作平台
 
-## 初始技术方向
-
-当前推荐方向是：
-
-- Desktop App：Tauri
-- UI：TypeScript 前端
-- Core Engine：Rust core，保持独立可复用
-- Storage：SQLite、lock 文件、本地备份目录；当前不保存 token 或 secret
-- Git：支持公开仓库和私有仓库
-- Distribution：macOS、Windows、Linux，后续通过 GitHub Releases 发布
-
-架构上要求 Core Engine 不依赖具体 UI，未来可以被桌面应用和 CLI 共用。
-
 ## 文档索引
 
 - [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md)：项目愿景、边界、用户、MVP、非目标和成功标准。
-- [ARCHITECTURE.md](ARCHITECTURE.md)：高层架构、模块边界、数据流、更新流程、安全模型和跨平台策略。
-- [ROADMAP.md](ROADMAP.md)：Phase 0 → Phase 5 路线图，包含 MVP、Beta、企业增强和生态扩展。
+- [ARCHITECTURE.md](ARCHITECTURE.md)：当前高层架构、模块边界和关键数据流。
+- [ROADMAP.md](ROADMAP.md)：Phase 0 → Phase 6 演进记录、近期优先级和已知加固项。
 - [SECURITY.md](SECURITY.md)：安全策略、凭据模型、威胁模型和隐私承诺。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献指南，包含开发环境设置和 Adapter 贡献规范。
-- [docs/design/core-engine-api.md](docs/design/core-engine-api.md)：Core Engine API 接口规格。
-- [docs/design/adapter-interface.md](docs/design/adapter-interface.md)：Adapter trait 接口设计。
-- [docs/design/database-schema.md](docs/design/database-schema.md)：SQLite 数据库 Schema 设计。
-- [docs/design/desktop-command-api.md](docs/design/desktop-command-api.md)：Tauri 桌面 Command 和 DTO 设计。
-- [docs/design/git-provider.md](docs/design/git-provider.md)：Git source、更新检测、diff 和 checkout cache 设计。
-- [docs/design/cross-agent-skill-sync.md](docs/design/cross-agent-skill-sync.md)：跨 Agent Git skill 同步设计。
-- [docs/beta-release-checklist.md](docs/beta-release-checklist.md)：Beta 发布工程检查清单。
+- [docs/README.md](docs/README.md)：权威设计、进度历史、发布验收入口和文档维护规则。
 
 ## 项目原则
 
