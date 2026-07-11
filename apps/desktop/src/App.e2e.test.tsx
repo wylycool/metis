@@ -349,6 +349,75 @@ describe("Metis desktop GUI main flow", () => {
     expect((screen.getByTestId("add-skill-ref") as HTMLInputElement).placeholder).toBe("可选");
   });
 
+  test("keeps detail diff and backup controls semantic, busy-aware, and mutually exclusive", async () => {
+    const user = userEvent.setup();
+    const scenario = createMainFlowScenario({ slowBackups: true, slowDiff: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("skill-row-e2e-skill"));
+    await user.click(screen.getByTestId("open-bind-source-e2e-skill"));
+    await user.type(screen.getByTestId("bind-url-e2e-skill"), "file:///tmp/metis-e2e-repo");
+    await user.type(screen.getByTestId("bind-repo-path-e2e-skill"), "skills/e2e-skill");
+    await user.click(screen.getByTestId("submit-bind-source-e2e-skill"));
+    await user.click(await screen.findByTestId("check-updates-e2e-skill"));
+    await screen.findByText("有 Agent 需要更新");
+
+    const operationGroup = screen.getByRole("group", { name: "Skill 版本操作" });
+    const checkButton = within(operationGroup).getByTestId("check-updates-e2e-skill");
+    const diffButton = within(operationGroup).getByTestId("toggle-diff-e2e-skill");
+    const backupButton = within(operationGroup).getByTestId("toggle-backups-e2e-skill");
+
+    expect(checkButton.className).toContain("operation-button--check");
+    expect(checkButton.getAttribute("aria-busy")).toBe("false");
+    expect(diffButton.className).toContain("operation-button--diff");
+    expect(diffButton.getAttribute("aria-expanded")).toBe("false");
+    expect(diffButton.getAttribute("aria-controls")).toBe("detail-diff-panel-e2e-skill");
+    expect(backupButton.className).toContain("operation-button--backup");
+    expect(backupButton.getAttribute("aria-expanded")).toBe("false");
+    expect(backupButton.getAttribute("aria-controls")).toBe("detail-backup-panel-e2e-skill");
+
+    await user.click(diffButton);
+    expect(diffButton.getAttribute("aria-busy")).toBe("true");
+    expect((diffButton as HTMLButtonElement).disabled).toBe(true);
+    expect(diffButton.textContent).toContain("加载 diff");
+
+    expect(await screen.findByTestId("redesign-diff-viewer")).toBeTruthy();
+    expect(diffButton.getAttribute("aria-busy")).toBe("false");
+    expect(diffButton.getAttribute("aria-expanded")).toBe("true");
+    expect(diffButton.className).toContain("active");
+
+    await user.click(backupButton);
+    await waitFor(() => expect(screen.queryByTestId("redesign-diff-viewer")).toBeNull());
+    expect(diffButton.getAttribute("aria-expanded")).toBe("false");
+    expect(diffButton.className).not.toContain("active");
+    expect(backupButton.getAttribute("aria-busy")).toBe("true");
+    expect(backupButton.getAttribute("aria-expanded")).toBe("true");
+    expect((backupButton as HTMLButtonElement).disabled).toBe(true);
+    expect(backupButton.textContent).toContain("读取备份");
+
+    await waitFor(() => expect(backupButton.textContent).toContain("隐藏备份"));
+    expect(backupButton.getAttribute("aria-busy")).toBe("false");
+    expect((backupButton as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByTestId("backup-panel-e2e-skill").id).toBe("detail-backup-panel-e2e-skill");
+
+    await user.click(diffButton);
+    await waitFor(() => expect(screen.queryByTestId("backup-panel-e2e-skill")).toBeNull());
+    expect(backupButton.getAttribute("aria-expanded")).toBe("false");
+    expect(backupButton.className).not.toContain("active");
+    expect(await screen.findByTestId("redesign-diff-viewer")).toBeTruthy();
+    expect(screen.getByTestId("redesign-diff-viewer").id).toBe("detail-diff-panel-e2e-skill");
+
+    await user.click(diffButton);
+    expect(screen.queryByTestId("redesign-diff-viewer")).toBeNull();
+    expect(diffButton.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByTestId("check-panel-e2e-skill")).toBeTruthy();
+    expect(checkButton.className).not.toContain("active");
+  });
+
   test("previews a remote skill and syncs it to selected agents", async () => {
     const user = userEvent.setup();
     const scenario = createMainFlowScenario({
@@ -3370,6 +3439,7 @@ function createMainFlowScenario(
     sourceConnectionUrlFails?: boolean;
     sshSourceConnectionFails?: boolean;
     slowBind?: boolean;
+    slowBackups?: boolean;
     slowDiff?: boolean;
     remotePreviewHttpsAuthFails?: boolean;
     remotePreviewFails?: boolean;
@@ -4039,6 +4109,9 @@ function createMainFlowScenario(
               ]
             : [];
         case "list_skill_backups":
+          if (options.slowBackups) {
+            await delay(80);
+          }
           return backups;
         case "restore_skill_backup":
           backups = [

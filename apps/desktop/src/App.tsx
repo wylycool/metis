@@ -1296,6 +1296,9 @@ function MetisApp() {
       return;
     }
 
+    setBackupPanels((current) =>
+      current[skill.id] ? { ...current, [skill.id]: false } : current,
+    );
     setActionBusy(`diff:${skill.id}`);
     setActionError(null);
     setActionMessage(null);
@@ -1374,6 +1377,14 @@ function MetisApp() {
       return;
     }
 
+    setDiffDetails((current) => {
+      if (!current[skill.id]) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[skill.id];
+      return next;
+    });
     setBackupPanels((current) => ({ ...current, [skill.id]: true }));
     setActionBusy(`backups:${skill.id}`);
     setActionError(null);

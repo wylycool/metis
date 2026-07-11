@@ -165,7 +165,11 @@ export function BackupPanel({
   onRestoreBackup: (backupId: string) => void;
 }) {
   return (
-    <div className="backup-panel redesign-backup-panel" data-testid={`backup-panel-${skillId}`}>
+    <div
+      className="backup-panel redesign-backup-panel"
+      data-testid={`backup-panel-${skillId}`}
+      id={`detail-backup-panel-${skillId}`}
+    >
       {backups.length === 0 ? (
         <p className="empty-backups">暂无备份。应用更新或手动备份后会出现在这里。</p>
       ) : (
@@ -237,7 +241,15 @@ function formatBackupTime(value?: string | null) {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
-export function DiffPanel({ detail, repoPath }: { detail: DesktopDiffDetail; repoPath?: string }) {
+export function DiffPanel({
+  detail,
+  id,
+  repoPath,
+}: {
+  detail: DesktopDiffDetail;
+  id?: string;
+  repoPath?: string;
+}) {
   const files = useMemo(
     () => diffFilesWithDisplayPaths(detail.files, repoPath),
     [detail.files, repoPath],
@@ -247,7 +259,7 @@ export function DiffPanel({ detail, repoPath }: { detail: DesktopDiffDetail; rep
   const patchLines = activeFile ? sanitizedPatchLines(activeFile) : [];
 
   return (
-    <div className="diff-panel redesign-diff-viewer" data-testid="redesign-diff-viewer">
+    <div className="diff-panel redesign-diff-viewer" data-testid="redesign-diff-viewer" id={id}>
       <div className="diff-heading redesign-diff-files">
         {files.map((file) => (
           <button

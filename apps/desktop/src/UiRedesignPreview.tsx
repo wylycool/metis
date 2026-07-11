@@ -510,9 +510,10 @@ function RedesignDetail({
       <DetailAgentPaths skill={skill} />
 
       <section className="redesign-update-workbench" data-testid="redesign-update-workbench">
-        <div className="redesign-operation-tabs">
+        <div aria-label="Skill 版本操作" className="redesign-operation-tabs" role="group">
           <button
-            className={activeOperation === "check" ? "active" : ""}
+            aria-busy="false"
+            className="operation-button operation-button--check"
             data-testid="redesign-action-check"
             onClick={() => {
               onOperation("check");
@@ -522,14 +523,24 @@ function RedesignDetail({
             检查更新
           </button>
           <button
-            className={activeOperation === "diff" ? "active" : ""}
+            aria-busy="false"
+            aria-controls="redesign-preview-diff-panel"
+            aria-expanded={activeOperation === "diff"}
+            className={`operation-button operation-button--diff ${
+              activeOperation === "diff" ? "active" : ""
+            }`}
             data-testid="redesign-action-diff"
             onClick={() => onOperation("diff")}
           >
             查看 diff
           </button>
           <button
-            className={activeOperation === "backups" ? "active" : ""}
+            aria-busy="false"
+            aria-controls="redesign-preview-backup-panel"
+            aria-expanded={activeOperation === "backups"}
+            className={`operation-button operation-button--backup ${
+              activeOperation === "backups" ? "active" : ""
+            }`}
             data-testid="redesign-action-backups"
             onClick={() => onOperation("backups")}
           >
@@ -658,7 +669,11 @@ function DetailAgentPaths({ skill }: { skill: PreviewSkill }) {
 
 function DiffViewer() {
   return (
-    <div className="redesign-diff-viewer" data-testid="redesign-diff-viewer">
+    <div
+      className="redesign-diff-viewer"
+      data-testid="redesign-diff-viewer"
+      id="redesign-preview-diff-panel"
+    >
       <div className="redesign-diff-files">
         <button className="active">SKILL.md</button>
         <button>references/usage.md</button>
@@ -676,7 +691,11 @@ function DiffViewer() {
 
 function BackupPanel({ onRollback }: { onRollback: () => void }) {
   return (
-    <div className="redesign-backup-panel" data-testid="redesign-backup-panel">
+    <div
+      className="redesign-backup-panel"
+      data-testid="redesign-backup-panel"
+      id="redesign-preview-backup-panel"
+    >
       <div>
         <strong>pre-update-2026-06-30</strong>
         <span>7 files · 18 KB · before applying b9d4f1a</span>
