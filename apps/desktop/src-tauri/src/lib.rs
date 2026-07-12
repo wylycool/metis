@@ -1600,7 +1600,7 @@ async fn test_git_environment(
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let probe = SystemGitVersionProbe {
-            runtime: state.git_runtime(true)?,
+            runtime: state.git_runtime(true).map_err(git_runtime_error)?,
         };
         test_git_environment_with_probe(&probe)
     })
@@ -1817,7 +1817,7 @@ fn system_git_checker_for_state(
     state: &DesktopAppState,
 ) -> Result<GitCliProvider<EnvironmentGitRunner>, String> {
     let settings = get_desktop_settings_for_state(state)?;
-    let runtime = state.git_runtime(false)?;
+    let runtime = state.git_runtime(false).map_err(git_runtime_error)?;
     let mut environment = runtime.environment();
     environment.extend(git_environment_for_settings(&settings));
     Ok(GitCliProvider::with_cache_root(
@@ -2069,6 +2069,10 @@ fn git_environment_for_settings(settings: &DesktopSettings) -> Vec<(String, Stri
         environment.push(("GIT_SSL_CAINFO".to_string(), ca_bundle_path.clone()));
     }
     environment
+}
+
+fn git_runtime_error(error: String) -> String {
+    friendly_desktop_error(&format!("git unavailable: {error}")).wire_string()
 }
 
 fn list_indexed_skills_from_store(
@@ -2684,6 +2688,16 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
             "认证失败",
             "Metis 访问不了这个仓库",
             "请确认你有访问权限，或先在本机 Git 工具中完成登录。",
+            message,
+        );
+    }
+
+    if lower.contains("未找到可用 git") {
+        return desktop_error(
+            "git_unavailable",
+            "无法使用 Git",
+            "未找到可用 Git",
+            "",
             message,
         );
     }
@@ -5022,6 +5036,18 @@ description: {description}
             error.suggestion,
             "请检查分支名，或者可以手动修改为正确的分支名"
         );
+        assert_eq!(error.debug_detail.as_deref(), Some(raw));
+    }
+
+    #[test]
+    fn desktop_error_reports_missing_windows_path_git_without_install_prompt() {
+        let raw = "git unavailable: 未找到可用 Git";
+        let error = friendly_desktop_error(raw);
+
+        assert_eq!(error.category, "git_unavailable");
+        assert_eq!(error.title, "无法使用 Git");
+        assert_eq!(error.message, "未找到可用 Git");
+        assert_eq!(error.suggestion, "");
         assert_eq!(error.debug_detail.as_deref(), Some(raw));
     }
 

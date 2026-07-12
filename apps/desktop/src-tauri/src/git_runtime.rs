@@ -21,6 +21,7 @@ pub struct GitRuntime {
 pub enum GitRuntimeSource {
     LoginShell,
     ProcessPathFallback,
+    WindowsPath,
 }
 
 impl GitRuntime {
@@ -51,6 +52,12 @@ impl GitRuntimeResolver for SystemGitRuntimeResolver {
             GIT_RUNTIME_TIMEOUT.as_millis()
         );
 
+        #[cfg(target_os = "windows")]
+        {
+            return resolve_windows_path_runtime();
+        }
+
+        #[cfg(not(target_os = "windows"))]
         match resolve_login_shell_runtime() {
             Ok(runtime) => {
                 eprintln!(
@@ -77,6 +84,25 @@ impl GitRuntimeResolver for SystemGitRuntimeResolver {
             }
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_windows_path_runtime() -> Result<GitRuntime, String> {
+    let path_environment = env::var_os("PATH").ok_or_else(|| "未找到可用 Git".to_string())?;
+    let path_text = path_environment.to_string_lossy().to_string();
+    let executable = first_git_in_path(&path_text).ok_or_else(|| "未找到可用 Git".to_string())?;
+    let version = validate_git(&executable, Some(&path_text))?;
+    eprintln!(
+        "[metis][git-runtime] resolve selected source=windows-path executable={} version={}",
+        executable.display(),
+        version
+    );
+    Ok(GitRuntime {
+        executable,
+        version,
+        path_environment: Some(path_text),
+        source: GitRuntimeSource::WindowsPath,
+    })
 }
 
 pub struct GitRuntimeManager {
@@ -255,6 +281,7 @@ pub fn run_detection_git(runtime: &GitRuntime, args: &[&OsStr]) -> Result<Output
     )
 }
 
+#[cfg(not(target_os = "windows"))]
 fn resolve_login_shell_runtime() -> Result<GitRuntime, String> {
     let shell = login_shell()?;
     eprintln!(
@@ -273,6 +300,7 @@ fn resolve_login_shell_runtime() -> Result<GitRuntime, String> {
     })
 }
 
+#[cfg(not(target_os = "windows"))]
 fn resolve_process_path_fallback() -> Result<GitRuntime, String> {
     let executable = env::var_os("PATH")
         .and_then(|path| first_git_in_path(&path.to_string_lossy()))
@@ -286,6 +314,7 @@ fn resolve_process_path_fallback() -> Result<GitRuntime, String> {
     })
 }
 
+#[cfg(not(target_os = "windows"))]
 fn login_shell() -> Result<PathBuf, String> {
     #[cfg(target_os = "macos")]
     if let Ok(shell) = macos_account_shell() {
@@ -316,6 +345,7 @@ fn macos_account_shell() -> Result<PathBuf, String> {
     Ok(shell)
 }
 
+#[cfg(not(target_os = "windows"))]
 fn login_shell_path(shell: &Path) -> Result<String, String> {
     let mut command = Command::new(shell);
     command.args(["-l", "-i", "-c", "/usr/bin/printenv PATH"]);
@@ -334,8 +364,12 @@ fn login_shell_path(shell: &Path) -> Result<String, String> {
 }
 
 fn first_git_in_path(path_environment: &str) -> Option<PathBuf> {
+    first_executable_in_path(path_environment, git_executable_name())
+}
+
+fn first_executable_in_path(path_environment: &str, executable_name: &str) -> Option<PathBuf> {
     env::split_paths(OsStr::new(path_environment))
-        .map(|directory| directory.join(git_executable_name()))
+        .map(|directory| directory.join(executable_name))
         .find(|candidate| is_executable(candidate))
 }
 
@@ -559,6 +593,33 @@ mod tests {
 
         assert_eq!(
             first_git_in_path(&joined.to_string_lossy()),
+            Some(first_git)
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn windows_path_strategy_selects_first_git_exe_without_shell_discovery() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root =
+            std::env::temp_dir().join(format!("metis-windows-git-runtime-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let first = root.join("first");
+        let second = root.join("second");
+        std::fs::create_dir_all(&first).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+        let first_git = first.join("git.exe");
+        let second_git = second.join("git.exe");
+        std::fs::write(&first_git, "git").unwrap();
+        std::fs::write(&second_git, "git").unwrap();
+        std::fs::set_permissions(&first_git, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::set_permissions(&second_git, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let joined = env::join_paths([&first, &second]).unwrap();
+
+        assert_eq!(
+            first_executable_in_path(&joined.to_string_lossy(), "git.exe"),
             Some(first_git)
         );
         let _ = std::fs::remove_dir_all(root);
