@@ -1204,16 +1204,13 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
     expect(screen.getByTestId("auto-update-source-row-trusted-skill").className).toContain("is-open");
     const removeActions = within(screen.getByTestId("auto-update-remove-actions-trusted-skill"));
-    expect(screen.getByTestId("remove-auto-update-trusted-skill").className).not.toContain(
-      "ghost-button",
+    expect(screen.getByTestId("remove-auto-update-trusted-skill").className).toContain(
+      "ghost-button compact",
     );
-    expect(screen.getByTestId("remove-auto-update-trusted-skill").className).not.toContain(
-      "metis-action-button--danger",
+    expect(screen.getByTestId("remove-auto-update-trusted-skill").className).toContain(
+      "metis-action-button metis-action-button--compact metis-action-button--danger",
     );
-    expect(screen.getByTestId("remove-auto-update-trusted-skill").className).not.toContain(
-      "metis-action-button",
-    );
-    expect(screen.getByTestId("remove-auto-update-trusted-skill").textContent).toBe("移出列表");
+    expect(screen.getByTestId("remove-auto-update-trusted-skill").textContent).toBe("移除");
     expect(removeActions.queryByTestId("confirm-remove-auto-update-trusted-skill")).toBeNull();
     expect(removeActions.queryByTestId("cancel-remove-auto-update-trusted-skill")).toBeNull();
     const confirmPanel = within(screen.getByTestId("auto-update-remove-confirm-trusted-skill"));
