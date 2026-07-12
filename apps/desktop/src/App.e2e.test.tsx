@@ -588,12 +588,12 @@ describe("Metis desktop GUI main flow", () => {
         "target-checkbox-claude-code",
       ) as HTMLInputElement).disabled,
     ).toBe(true);
-    expect(screen.getByText("团队记忆")).toBeTruthy();
-    expect(screen.getByText("/tmp/team-memory-skills/remote")).toBeTruthy();
+    expect(screen.getByText("共享示例")).toBeTruthy();
+    expect(screen.getByText("/tmp/shared-skill-targets/remote")).toBeTruthy();
     await user.click(screen.getByTestId("target-checkbox-custom-team-memory"));
     await user.click(screen.getByTestId("install-selected-targets"));
 
-    expect(await screen.findByText(/团队记忆：Updated/)).toBeTruthy();
+    expect(await screen.findByText(/共享示例：Updated/)).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith("install_remote_skill_to_targets", {
       request: expect.objectContaining({
         url: "https://github.com/example/metis-skills.git",
@@ -1476,26 +1476,26 @@ describe("Metis desktop GUI main flow", () => {
     const addCustomMonitorButton = screen.getByTestId("custom-monitor-add");
     expect(addCustomMonitorButton.textContent).toBe("添加路径");
     expect((addCustomMonitorButton as HTMLButtonElement).disabled).toBe(true);
-    await user.type(screen.getByTestId("custom-monitor-name-new"), "团队记忆");
-    await user.type(screen.getByTestId("custom-monitor-path-new"), "/tmp/missing-team-memory-skills");
+    await user.type(screen.getByTestId("custom-monitor-name-new"), "共享示例");
+    await user.type(screen.getByTestId("custom-monitor-path-new"), "/tmp/missing-shared-skill-targets");
     expect(screen.getByTestId("custom-monitor-new-row").className).toContain(
       "redesign-agent-path-row",
     );
     expect((addCustomMonitorButton as HTMLButtonElement).disabled).toBe(false);
     await user.click(addCustomMonitorButton);
-    const customMonitorNameInput = await screen.findByDisplayValue("团队记忆");
+    const customMonitorNameInput = await screen.findByDisplayValue("共享示例");
     await waitFor(() => expect(scenario.commandCalls("check_path_status")).toBe(1));
     expect(invokeMock).toHaveBeenCalledWith("check_path_status", {
-      path: "/tmp/missing-team-memory-skills",
+      path: "/tmp/missing-shared-skill-targets",
     });
     const customMonitorRow = customMonitorNameInput.closest(
       "[data-testid^='custom-monitor-row-']",
     ) as HTMLElement;
     expect(customMonitorRow).toBeTruthy();
     expect(customMonitorRow.className).toContain("missing");
-    expectTextAssistanceDisabled(within(customMonitorRow).getByDisplayValue("团队记忆"));
+    expectTextAssistanceDisabled(within(customMonitorRow).getByDisplayValue("共享示例"));
     expectTextAssistanceDisabled(
-      within(customMonitorRow).getByDisplayValue("/tmp/missing-team-memory-skills"),
+      within(customMonitorRow).getByDisplayValue("/tmp/missing-shared-skill-targets"),
     );
     expect(within(customMonitorRow).getByText("路径不存在")).toBeTruthy();
     expect((screen.getByTestId("custom-monitor-name-new") as HTMLInputElement).value).toBe("");
@@ -1508,10 +1508,10 @@ describe("Metis desktop GUI main flow", () => {
     expect(scenario.commandCalls("scan_skills")).toBe(scanCallsBeforeSave);
 
     const customMonitorPathInput = within(customMonitorRow).getByDisplayValue(
-      "/tmp/missing-team-memory-skills",
+      "/tmp/missing-shared-skill-targets",
     );
     await user.clear(customMonitorPathInput);
-    await user.type(customMonitorPathInput, "/tmp/team-memory-skills");
+    await user.type(customMonitorPathInput, "/tmp/shared-skill-targets");
     await user.click(settingsSaveButton);
     expect(await screen.findByText("设置已保存")).toBeTruthy();
     expect(scenario.commandCalls("scan_skills")).toBe(scanCallsBeforeSave + 1);
@@ -1523,8 +1523,8 @@ describe("Metis desktop GUI main flow", () => {
         agent_path_overrides: [{ agent_id: "codex", path: "/tmp/my-codex-skills" }],
         custom_monitored_paths: expect.arrayContaining([
           expect.objectContaining({
-            name: "团队记忆",
-            path: "/tmp/team-memory-skills",
+            name: "共享示例",
+            path: "/tmp/shared-skill-targets",
           }),
         ]),
       }),
@@ -1637,7 +1637,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(scenario.commandCalls("save_desktop_settings")).toBe(0);
 
     await user.clear(screen.getByTestId("custom-monitor-name-new"));
-    await user.type(screen.getByTestId("custom-monitor-name-new"), "团队记忆");
+    await user.type(screen.getByTestId("custom-monitor-name-new"), "共享示例");
     await user.clear(screen.getByTestId("custom-monitor-path-new"));
     await user.type(screen.getByTestId("custom-monitor-path-new"), "/Users/me/.codex/skills");
     await user.click(screen.getByText("保存"));
@@ -1645,12 +1645,12 @@ describe("Metis desktop GUI main flow", () => {
     expect(scenario.commandCalls("save_desktop_settings")).toBe(0);
 
     await user.clear(screen.getByTestId("custom-monitor-path-new"));
-    await user.type(screen.getByTestId("custom-monitor-path-new"), "/tmp/team-memory-skills");
+    await user.type(screen.getByTestId("custom-monitor-path-new"), "/tmp/shared-skill-targets");
     await user.click(screen.getByText("保存"));
     expect(await screen.findByText("设置已保存")).toBeTruthy();
     expect(scenario.commandCalls("save_desktop_settings")).toBe(1);
 
-    await user.type(screen.getByTestId("custom-monitor-name-new"), "团队记忆");
+    await user.type(screen.getByTestId("custom-monitor-name-new"), "共享示例");
     await user.type(screen.getByTestId("custom-monitor-path-new"), "/tmp/another-team-memory");
     await user.click(screen.getByText("保存"));
     expect(await screen.findByText("自定义路径名称不能重复")).toBeTruthy();
@@ -1659,7 +1659,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.clear(screen.getByTestId("custom-monitor-name-new"));
     await user.type(screen.getByTestId("custom-monitor-name-new"), "其他路径");
     await user.clear(screen.getByTestId("custom-monitor-path-new"));
-    await user.type(screen.getByTestId("custom-monitor-path-new"), "/tmp/team-memory-skills");
+    await user.type(screen.getByTestId("custom-monitor-path-new"), "/tmp/shared-skill-targets");
     await user.click(screen.getByText("保存"));
     expect(await screen.findByText("自定义路径不能和已有路径重复")).toBeTruthy();
     expect(scenario.commandCalls("save_desktop_settings")).toBe(1);
@@ -1677,7 +1677,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     await screen.findByText("自定义路径管理");
     const savedCustomRow = await screen.findByTestId("custom-monitor-row-team-memory");
-    expect(within(savedCustomRow).getByDisplayValue("团队记忆")).toBeTruthy();
+    expect(within(savedCustomRow).getByDisplayValue("共享示例")).toBeTruthy();
 
     await user.click(within(savedCustomRow).getByText("移除"));
 
@@ -2527,7 +2527,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("install-selected-targets"));
 
     expect(await screen.findByText("Claude Code：Installed")).toBeTruthy();
-    expect(await screen.findByText(/团队记忆：Failed \(permission denied\)/)).toBeTruthy();
+    expect(await screen.findByText(/共享示例：Failed \(permission denied\)/)).toBeTruthy();
     expect(scenario.copyRequests()).toEqual([
       {
         source_skill_id: "codex-planner",
@@ -2539,7 +2539,7 @@ describe("Metis desktop GUI main flow", () => {
           },
           {
             agent_id: "custom-team-memory",
-            agent_name: "团队记忆",
+            agent_name: "共享示例",
             install_path: "/Users/me/team-memory/codex-planner",
           },
         ],
@@ -2564,7 +2564,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("open-add-skill"));
     expect(await screen.findByTestId("add-skill-page")).toBeTruthy();
     expect(screen.queryByTestId("target-row-custom-team-memory")).toBeNull();
-    expect(screen.queryByText(/团队记忆：Failed/)).toBeNull();
+    expect(screen.queryByText(/共享示例：Failed/)).toBeNull();
   });
 
   test("detail local copy retries both indexed skills and targets after indexed refresh fails", async () => {
@@ -2698,7 +2698,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("target-checkbox-custom-team-memory"));
     await user.click(screen.getByTestId("install-selected-targets"));
 
-    expect(await screen.findByText(/团队记忆：Failed \(permission denied\)/)).toBeTruthy();
+    expect(await screen.findByText(/共享示例：Failed \(permission denied\)/)).toBeTruthy();
     expect(
       (screen.getByTestId("target-checkbox-custom-team-memory") as HTMLInputElement).checked,
     ).toBe(true);
@@ -3470,8 +3470,8 @@ describe("Metis desktop GUI error paths", () => {
     const customRow = within(
       screen.getByTestId("skill-detail-agent-path-claude-memory-custom-team-memory"),
     );
-    expect(customRow.getByText("团队记忆")).toBeTruthy();
-    expect(customRow.getByText("/tmp/team-memory-skills/shared-example-skill")).toBeTruthy();
+    expect(customRow.getByText("共享示例")).toBeTruthy();
+    expect(customRow.getByText("/tmp/shared-skill-targets/shared-example-skill")).toBeTruthy();
     expect(customRow.getByText("未检查")).toBeTruthy();
     expect(customRow.queryByText("来源未绑定")).toBeNull();
   });
@@ -4325,7 +4325,7 @@ function createMainFlowScenario(
     agent_id: "claude-code",
     agent_name: "Claude Code",
     name: "shared-example-skill",
-    description: "Python team memory",
+    description: "Shared example skill",
     install_path: "/Users/example/.claude/skills/shared-example-skill",
     metadata_path: "/Users/example/.claude/skills/shared-example-skill/SKILL.md",
     source_id: claudeMemorySource.id,
@@ -4345,9 +4345,9 @@ function createMainFlowScenario(
     ...claudeMemorySkill,
     id: "custom-team-memory",
     agent_id: "custom-team-memory",
-    agent_name: "团队记忆",
-    install_path: "/tmp/team-memory-skills/shared-example-skill",
-    metadata_path: "/tmp/team-memory-skills/shared-example-skill/SKILL.md",
+    agent_name: "共享示例",
+    install_path: "/tmp/shared-skill-targets/shared-example-skill",
+    metadata_path: "/tmp/shared-skill-targets/shared-example-skill/SKILL.md",
     source_id: null,
     source: null,
     local_modified: false,
@@ -4428,8 +4428,8 @@ function createMainFlowScenario(
       ? [
           {
             id: "team-memory",
-            name: "团队记忆",
-            path: "/tmp/team-memory-skills",
+            name: "共享示例",
+            path: "/tmp/shared-skill-targets",
           },
         ]
       : [],
@@ -4769,9 +4769,9 @@ function createMainFlowScenario(
               ? [
                   {
                     agent_id: "custom-team-memory",
-                    agent_name: "团队记忆",
-                    root_path: "/tmp/team-memory-skills",
-                    install_path: "/tmp/team-memory-skills/remote",
+                    agent_name: "共享示例",
+                    root_path: "/tmp/shared-skill-targets",
+                    install_path: "/tmp/shared-skill-targets/remote",
                     status: "NotInstalled",
                     local_modified: false,
                     skill_id: null,
@@ -5642,7 +5642,7 @@ function createAgentDetailScenario(
               agent_id: "custom-team-memory",
               agent_name: options.longTargetNames
                 ? "团队共享知识与工作流超长自定义目录名称"
-                : "团队记忆",
+                : "共享示例",
               root_path: "/Users/me/team-memory",
               install_path: customInstallPath,
               status: customInstalled ? "Installed" : "NotInstalled",

