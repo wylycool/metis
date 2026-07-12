@@ -469,13 +469,26 @@ fn run_command_with_timeout(
 }
 
 fn sanitized_git_operation(args: &[&OsStr]) -> String {
-    args.iter()
-        .find_map(|arg| {
+    if let Some(operation) = args.iter().find_map(|arg| {
+        let value = arg.to_string_lossy();
+        (!value.starts_with('-') && !value.contains(std::path::MAIN_SEPARATOR))
+            .then(|| value.into_owned())
+    }) {
+        return operation;
+    }
+    let flags = args
+        .iter()
+        .filter_map(|arg| {
             let value = arg.to_string_lossy();
-            (!value.starts_with('-') && !value.contains(std::path::MAIN_SEPARATOR))
-                .then(|| value.into_owned())
+            value.starts_with('-').then(|| value.into_owned())
         })
-        .unwrap_or_else(|| "unknown".to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if flags.is_empty() {
+        "unknown".to_string()
+    } else {
+        flags
+    }
 }
 
 fn sanitized_reason(reason: &str) -> String {
@@ -623,6 +636,14 @@ mod tests {
             Some(first_git)
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn version_probe_log_uses_version_flag_instead_of_unknown() {
+        assert_eq!(
+            sanitized_git_operation(&[OsStr::new("--version")]),
+            "--version"
+        );
     }
 
     #[cfg(unix)]

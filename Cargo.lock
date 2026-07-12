@@ -2158,6 +2158,7 @@ dependencies = [
  "chrono",
  "log",
  "serde",
+ "sha2",
  "thiserror 1.0.69",
 ]
 
