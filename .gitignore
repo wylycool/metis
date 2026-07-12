@@ -48,3 +48,4 @@ release/
 
 # Internal project documents (kept locally, never published)
 internal-docs/
+/AGENTS.md
