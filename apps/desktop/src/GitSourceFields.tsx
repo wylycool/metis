@@ -93,7 +93,7 @@ export function GitSourceFields<TDraft extends GitSourceDraft>({
       <div className="source-field-stack">
         <div className="source-form-field">
           <div className="source-field-label-row">
-            <span>Skill 页面链接</span>
+            <span>Skill 文件夹页面链接</span>
             {renderSourceHelp(
               "url",
               "来源地址填写说明",
@@ -101,6 +101,7 @@ export function GitSourceFields<TDraft extends GitSourceDraft>({
                 <span className="source-help-heading">
                   <strong>复制 Skill 文件夹链接</strong>
                   <span>页面中能看到 SKILL.md 时，直接复制地址栏。</span>
+                  <span>不要填写仓库首页或 clone 地址。</span>
                 </span>
                 <span className="source-help-card">
                   <span>
@@ -112,11 +113,11 @@ export function GitSourceFields<TDraft extends GitSourceDraft>({
             )}
           </div>
           <input
-            aria-label="Skill 页面链接或 Git 地址"
+            aria-label="包含 SKILL.md 的文件夹页面链接"
             {...textInputAssistanceProps}
             data-testid={testIds.url}
             value={draft.url}
-            placeholder="填写包含SKILL.md文件的git链接"
+            placeholder="粘贴能看到 SKILL.md 的文件夹页面链接"
             onBlur={() => onChange(normalizeRemoteSyncDraft(draft))}
             onChange={(event) => onChange({ ...draft, url: event.target.value })}
           />
