@@ -93,6 +93,10 @@ interface AutoUpdateSourceGroup {
   members: DesktopSkill[];
 }
 
+function displayGitVersion(version: string): string {
+  return version.match(/\d+(?:\.\d+)+/)?.[0] ?? version;
+}
+
 function App() {
   if (isUiRedesignPreviewRoute()) {
     return <UiRedesignPreview />;
@@ -2349,7 +2353,7 @@ function MetisApp() {
               {gitEnvironmentResult && (
                 <div className="settings-git-health-result success" data-testid="git-environment-result">
                   <strong>{gitEnvironmentResult.message}</strong>
-                  <span>{gitEnvironmentResult.version}</span>
+                  <span>{displayGitVersion(gitEnvironmentResult.version)}</span>
                 </div>
               )}
               {gitEnvironmentError && (

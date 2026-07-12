@@ -1176,7 +1176,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(gitHealthSection.queryByText(/git --version/)).toBeNull();
     await user.click(gitHealthSection.getByTestId("test-git-environment"));
     expect(await screen.findByText("Git 可用")).toBeTruthy();
-    expect(screen.getByText("git version 2.45.0")).toBeTruthy();
+    expect(screen.getByText("2.30.1")).toBeTruthy();
+    expect(screen.queryByText(/Apple Git/)).toBeNull();
     expect(screen.queryByText(/clone\/fetch/)).toBeNull();
     expect(screen.queryByText(/github\.com/)).toBeNull();
     expect(invokeMock).toHaveBeenCalledWith("test_git_environment");
@@ -1188,7 +1189,7 @@ describe("Metis desktop GUI main flow", () => {
       await screen.findByTestId("settings-section-git-health"),
     );
     expect(reopenedGitHealthSection.queryByText("Git 可用")).toBeNull();
-    expect(reopenedGitHealthSection.queryByText("git version 2.45.0")).toBeNull();
+    expect(reopenedGitHealthSection.queryByText("2.30.1")).toBeNull();
     expect(reopenedGitHealthSection.queryByTestId("git-environment-notice")).toBeNull();
 
     await user.click(screen.getByTestId("run-auto-update"));
@@ -4651,7 +4652,7 @@ function createMainFlowScenario(
           return {
             ok: true,
             message: "Git 可用",
-            version: "git version 2.45.0",
+            version: "git version 2.30.1 (Apple Git-130)",
             clone_ok: true,
           };
         case "preview_remote_skill_source":
@@ -5130,7 +5131,7 @@ function createBetaReadinessScenario(
           return {
             ok: true,
             message: "Git 可用",
-            version: "git version 2.45.0",
+            version: "git version 2.30.1 (Apple Git-130)",
             clone_ok: true,
           };
         }
