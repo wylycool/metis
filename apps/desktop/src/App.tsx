@@ -1462,7 +1462,7 @@ function MetisApp() {
       });
       await refreshIndexedSkills();
       setPendingAutoUpdateRemovalSourceKey(null);
-      setActionMessage("已移出自动更新列表");
+      setActionMessage("已移出一键更新列表");
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -2216,13 +2216,13 @@ function MetisApp() {
           <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
             <div className="auto-update-copy">
               <h3>一键更新受信任 Skill</h3>
-              <p>只会更新已加入自动更新列表、且本地没有修改的 Skill。</p>
+              <p>仅更新已加入一键更新列表且本地无修改的 Skill。</p>
             </div>
             <div className="auto-update-source-list" data-testid="auto-update-source-list">
               {autoUpdateSourceGroups.length === 0 ? (
                 <div className="auto-update-empty-state" data-testid="auto-update-empty-state">
-                  <strong>暂无加入自动更新列表的 Skill</strong>
-                  <span>去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。</span>
+                  <strong>暂无加入一键更新列表的 Skill</strong>
+                  <span>在来源设置中加入一键更新列表后，这里会显示可安全更新的 Skill。</span>
                 </div>
               ) : (
                 autoUpdateSourceGroups.map((group) => {
@@ -2262,8 +2262,8 @@ function MetisApp() {
                           data-testid={`auto-update-remove-confirm-${skill.id}`}
                         >
                           <div className="auto-update-remove-confirm-copy">
-                            <strong>移出自动更新列表？</strong>
-                            <span>不会删除本地 Skill，只会关闭这个来源的信任与自动更新。</span>
+                            <strong>移出一键更新列表？</strong>
+                            <span>不会删除本地 Skill，只会停止通过一键更新处理这个来源。</span>
                           </div>
                           <div className="auto-update-remove-confirm-actions">
                             <button
@@ -2580,26 +2580,26 @@ function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
   );
 
   if (boundSourceCount === 0) {
-    return "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入自动更新列表」。";
+    return "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入一键更新列表」。";
   }
 
   if (autoUpdateSourceCount === 0) {
-    return "请先在来源里开启「信任此来源并加入自动更新列表」。";
+    return "请先在来源里开启「信任此来源并加入一键更新列表」。";
   }
 
   if (blockedByLocalChanges) {
     return "候选 Skill 都有本地修改，请先检查或手动处理本地修改。";
   }
 
-  return "请确认 Skill 已加入自动更新列表，且本地没有修改。";
+  return "请确认 Skill 已加入一键更新列表，且本地没有修改。";
 }
 
 function isAutoUpdateUnavailableMessage(message: string | null) {
   return (
-    message === "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入自动更新列表」。" ||
-    message === "请先在来源里开启「信任此来源并加入自动更新列表」。" ||
+    message === "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入一键更新列表」。" ||
+    message === "请先在来源里开启「信任此来源并加入一键更新列表」。" ||
     message === "候选 Skill 都有本地修改，请先检查或手动处理本地修改。" ||
-    message === "请确认 Skill 已加入自动更新列表，且本地没有修改。"
+    message === "请确认 Skill 已加入一键更新列表，且本地没有修改。"
   );
 }
 

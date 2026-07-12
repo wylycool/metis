@@ -116,7 +116,7 @@ export function GitSourceFields<TDraft extends GitSourceDraft>({
             {...textInputAssistanceProps}
             data-testid={testIds.url}
             value={draft.url}
-            placeholder="粘贴包含 SKILL.md 的文件夹页面链接"
+            placeholder="填写包含SKILL.md文件的git链接"
             onBlur={() => onChange(normalizeRemoteSyncDraft(draft))}
             onChange={(event) => onChange({ ...draft, url: event.target.value })}
           />

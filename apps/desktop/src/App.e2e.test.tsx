@@ -150,7 +150,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(sourceDrawer.getByText("Skill 路径"));
     expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("false");
     expect((screen.getByTestId("bind-url-e2e-skill") as HTMLInputElement).placeholder).toBe(
-      "粘贴包含 SKILL.md 的文件夹页面链接",
+      "填写包含SKILL.md文件的git链接",
     );
     expect(sourceDrawer.queryByText(/multica-ai|andrej-karpathy/)).toBeNull();
     const sourceSettings = within(sourceDrawer.getByTestId("source-settings-grid-e2e-skill"));
@@ -190,7 +190,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(document.activeElement).not.toBe(screen.getByTestId("bind-repo-path-e2e-skill"));
     await user.click(sourceDrawer.getByText("分支"));
     expect(document.activeElement).not.toBe(screen.getByTestId("bind-ref-e2e-skill"));
-    expect(sourceSettings.getByText("信任此来源并加入自动更新列表")).toBeTruthy();
+    expect(sourceSettings.getByText("信任此来源并加入一键更新列表")).toBeTruthy();
     expect(sourceSettings.queryByText("开启后，Metis 只会在本地无修改时自动更新这个 Skill。")).toBeNull();
     expect(sourceSettings.queryByText("可信来源")).toBeNull();
     const sourceVerification = within(
@@ -1134,8 +1134,8 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     expect(await screen.findByText("一键更新受信任 Skill")).toBeTruthy();
-    expect(screen.getByText("只会更新已加入自动更新列表、且本地没有修改的 Skill。")).toBeTruthy();
-    expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
+    expect(screen.getByText("仅更新已加入一键更新列表且本地无修改的 Skill。")).toBeTruthy();
+    expect(screen.queryByText(/一键更新列表 \d+ 个/)).toBeNull();
     expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
     const autoUpdateList = within(screen.getByTestId("auto-update-source-list"));
     expect(autoUpdateList.getByText("Trusted Skill")).toBeTruthy();
@@ -1204,9 +1204,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(removeActions.queryByTestId("confirm-remove-auto-update-trusted-skill")).toBeNull();
     expect(removeActions.queryByTestId("cancel-remove-auto-update-trusted-skill")).toBeNull();
     const confirmPanel = within(screen.getByTestId("auto-update-remove-confirm-trusted-skill"));
-    expect(confirmPanel.getByText("移出自动更新列表？")).toBeTruthy();
+    expect(confirmPanel.getByText("移出一键更新列表？")).toBeTruthy();
     expect(
-      confirmPanel.getByText("不会删除本地 Skill，只会关闭这个来源的信任与自动更新。"),
+      confirmPanel.getByText("不会删除本地 Skill，只会停止通过一键更新处理这个来源。"),
     ).toBeTruthy();
     expect(confirmPanel.getByTestId("cancel-remove-auto-update-trusted-skill").textContent).toBe(
       "取消",
@@ -1358,13 +1358,13 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
     expect(await screen.findByText("一键更新受信任 Skill")).toBeTruthy();
-    expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
+    expect(screen.queryByText(/一键更新列表 \d+ 个/)).toBeNull();
     expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
     const autoUpdateSection = within(screen.getByTestId("settings-section-auto-update"));
     const emptyState = within(screen.getByTestId("auto-update-empty-state"));
-    expect(emptyState.getByText("暂无加入自动更新列表的 Skill")).toBeTruthy();
+    expect(emptyState.getByText("暂无加入一键更新列表的 Skill")).toBeTruthy();
     expect(
-      emptyState.getByText("去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。"),
+      emptyState.getByText("在来源设置中加入一键更新列表后，这里会显示可安全更新的 Skill。"),
     ).toBeTruthy();
     expect(autoUpdateSection.getAllByText("立即更新")).toHaveLength(1);
 
@@ -1374,7 +1374,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(autoUpdateNotice.getByText("没有可自动更新的 Skill")).toBeTruthy();
     expect(
       autoUpdateNotice.getByText(
-        "请先在来源里开启「信任此来源并加入自动更新列表」。",
+        "请先在来源里开启「信任此来源并加入一键更新列表」。",
       ),
     ).toBeTruthy();
     expect(autoUpdateNotice.queryByText(/当前没有可用的自动更新 Skill/)).toBeNull();
