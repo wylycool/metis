@@ -766,6 +766,7 @@ pub fn save_desktop_settings_for_state(
         enterprise_network: normalize_enterprise_network_settings(settings.enterprise_network),
         software_update: settings.software_update,
     };
+    validate_custom_monitored_path_availability(&normalized.custom_monitored_paths)?;
     let contents = serde_json::to_string_pretty(&normalized).map_err(|error| error.to_string())?;
     fs::write(state.settings_path(), contents).map_err(|error| error.to_string())?;
     Ok(normalized)
@@ -1900,6 +1901,25 @@ fn normalize_custom_monitored_paths(
         });
     }
     normalized
+}
+
+fn validate_custom_monitored_path_availability(
+    paths: &[DesktopCustomMonitoredPath],
+) -> Result<(), String> {
+    for path in paths {
+        let status = check_path_status_for_path(&path.path);
+        if !status.exists || !status.readable || !status.writable {
+            return Err(desktop_error(
+                "settings",
+                "设置未保存",
+                "自定义路径不可用",
+                "请确认该目录存在，并且当前用户拥有读取和写入权限。",
+                &path.path,
+            )
+            .wire_string());
+        }
+    }
+    Ok(())
 }
 
 fn core_agent_path_overrides(settings: &DesktopSettings) -> Vec<CoreAgentPathOverride> {
@@ -4152,6 +4172,8 @@ description: {description}
     #[test]
     fn desktop_settings_default_when_file_is_missing_and_save_normalizes_paths() {
         let workspace = temp_dir("settings-state");
+        let custom_monitor = workspace.join("team-memory");
+        fs::create_dir_all(&custom_monitor).expect("custom monitor should be created");
         let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
 
         let default_settings =
@@ -4172,7 +4194,7 @@ description: {description}
                 custom_monitored_paths: vec![DesktopCustomMonitoredPath {
                     id: "".to_string(),
                     name: "  Team Memory  ".to_string(),
-                    path: "  /tmp/metis/team-memory  ".to_string(),
+                    path: format!("  {}  ", custom_monitor.to_string_lossy()),
                 }],
                 team_policy_path: Some("  /tmp/metis/team-policy.json  ".to_string()),
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
@@ -4202,7 +4224,7 @@ description: {description}
             vec![DesktopCustomMonitoredPath {
                 id: "monitor-1".to_string(),
                 name: "Team Memory".to_string(),
-                path: "/tmp/metis/team-memory".to_string(),
+                path: custom_monitor.to_string_lossy().to_string(),
             }]
         );
         assert_eq!(loaded, saved);
@@ -4211,6 +4233,30 @@ description: {description}
             Some("/tmp/metis/team-policy.json")
         );
         assert!(loaded.software_update.check_on_startup);
+    }
+
+    #[test]
+    fn desktop_settings_rejects_missing_custom_monitored_paths_without_writing() {
+        let workspace = temp_dir("settings-missing-custom-monitor");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let missing_path = workspace.join("missing-team-memory");
+
+        let error = save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_monitored_paths: vec![DesktopCustomMonitoredPath {
+                    id: "team-memory".to_string(),
+                    name: "团队记忆".to_string(),
+                    path: missing_path.to_string_lossy().to_string(),
+                }],
+                ..Default::default()
+            },
+        )
+        .expect_err("missing custom monitor should be rejected");
+
+        assert!(error.contains("自定义路径不可用"));
+        assert!(!state.settings_path().exists());
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
     }
 
     #[test]

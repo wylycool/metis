@@ -1478,6 +1478,17 @@ describe("Metis desktop GUI main flow", () => {
     expect((screen.getByTestId("custom-monitor-path-new") as HTMLInputElement).value).toBe("");
     const scanCallsBeforeSave = scenario.commandCalls("scan_skills");
     await user.click(settingsSaveButton);
+    expect(await screen.findByText("自定义路径不可用")).toBeTruthy();
+    expect(screen.getByText("请确认该目录存在，并且当前用户拥有读取和写入权限。")).toBeTruthy();
+    expect(scenario.commandCalls("save_desktop_settings")).toBe(0);
+    expect(scenario.commandCalls("scan_skills")).toBe(scanCallsBeforeSave);
+
+    const customMonitorPathInput = within(customMonitorRow).getByDisplayValue(
+      "/tmp/missing-team-memory-skills",
+    );
+    await user.clear(customMonitorPathInput);
+    await user.type(customMonitorPathInput, "/tmp/team-memory-skills");
+    await user.click(settingsSaveButton);
     expect(await screen.findByText("设置已保存")).toBeTruthy();
     expect(scenario.commandCalls("scan_skills")).toBe(scanCallsBeforeSave + 1);
     expect(codexPathInput.readOnly).toBe(true);
@@ -1489,7 +1500,7 @@ describe("Metis desktop GUI main flow", () => {
         custom_monitored_paths: expect.arrayContaining([
           expect.objectContaining({
             name: "团队记忆",
-            path: "/tmp/missing-team-memory-skills",
+            path: "/tmp/team-memory-skills",
           }),
         ]),
       }),

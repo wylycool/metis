@@ -444,6 +444,8 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".settings-git-health-action")).toContain("justify-content: space-between;");
     expect(latestBlockFor(".settings-git-health-action")).toContain("width: 100%;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 108px;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain("margin-left: auto;");
+    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 108px;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("background: #fff7ed;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("border: 1px solid #fed7aa;");
     expect(latestBlockFor(".settings-git-health-notice")).not.toContain("danger");
@@ -484,7 +486,7 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(exactBlockFor(".auto-update-run")).toContain("grid-column: 2;");
     expect(exactBlockFor(".auto-update-run")).toContain("justify-self: end;");
-    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 160px;");
+    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 108px;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("grid-column: 1 / -1;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("gap: 10px;");
@@ -1286,7 +1288,7 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 108px;");
     expect(latestBlockFor(".software-update-check-button")).toContain("min-width: 108px;");
-    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 160px;");
+    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 108px;");
     expect(latestBlockFor(".settings-save-button")).toContain("min-width: 108px;");
     expect(exactBlockFor(".auto-update-confirm")).toContain("min-width: 104px;");
   });

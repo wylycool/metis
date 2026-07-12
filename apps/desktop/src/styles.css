@@ -6055,7 +6055,7 @@ textarea {
   grid-row: 1;
   justify-self: end;
   align-self: start;
-  min-width: 160px;
+  min-width: 108px;
 }
 
 .settings-agent-path-row.redesign-agent-path-row input,
@@ -9096,6 +9096,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .settings-git-test-button {
+  margin-left: auto;
   min-width: 108px;
 }
 

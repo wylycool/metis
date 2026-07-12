@@ -477,6 +477,11 @@ function MetisApp() {
     setActionBusy("settings");
 
     try {
+      const pathValidationError = await validateCustomMonitorPathAvailability(nextSettings);
+      if (pathValidationError) {
+        setActionError(pathValidationError);
+        return;
+      }
       const saved = await saveDesktopSettings(nextSettings);
       setSettings(saved);
       syncPathSettingsDrafts(saved);
@@ -538,6 +543,39 @@ function MetisApp() {
     }
 
     return null;
+  }
+
+  async function validateCustomMonitorPathAvailability(
+    nextSettings: DesktopSettings,
+  ): Promise<DesktopError | null> {
+    const customPaths = nextSettings.custom_monitored_paths ?? [];
+    const statuses = await Promise.all(
+      customPaths.map(async (customPath) => {
+        const status = await checkPathStatus(customPath.path).catch(
+          () =>
+            ({
+              path: customPath.path,
+              scope: "custom",
+              exists: false,
+              readable: false,
+              writable: false,
+            }) satisfies DesktopAgentPath,
+        );
+        return [customPath.id, status] as const;
+      }),
+    );
+    setCustomMonitorPathStatuses(Object.fromEntries(statuses));
+
+    const invalidPath = statuses.find(
+      ([, status]) => !status.exists || !status.readable || !status.writable,
+    );
+    if (!invalidPath) {
+      return null;
+    }
+    return settingsValidationError(
+      "自定义路径不可用",
+      "请确认该目录存在，并且当前用户拥有读取和写入权限。",
+    );
   }
 
   function handleAgentPathDraftChange(agentId: string, nextPath: string) {
