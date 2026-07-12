@@ -799,7 +799,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #8a4b0f;");
   });
 
-  test("keeps the Metis wordmark i and s rounded without clipping the s edge", () => {
+  test("uses the native Metis i dot without a decorative overlay", () => {
     expect(latestBlockFor(".redesign-brand .metis-brand-wordmark")).toContain(
       "letter-spacing: -0.02em;",
     );
@@ -808,14 +808,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("color: #3154df;");
     expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("font-family: ui-rounded");
     expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("font-weight: 800;");
-    expect(blockFor(".metis-brand-wordmark-i::after")).toContain('content: "";');
-    expect(blockFor(".metis-brand-wordmark-i::after")).toContain(
-      "transform: translateX(-50%);",
-    );
-    expect(blockFor(".metis-brand-wordmark-i::after")).toContain("border-radius: 999px;");
-    expect(blockFor(".metis-brand-wordmark-i::after")).toContain(
-      "background: radial-gradient(",
-    );
+    expect(stylesheet).not.toContain(".metis-brand-wordmark-i::after");
     expect(blockFor(".metis-brand-wordmark-s")).toContain("background: linear-gradient(");
     expect(blockFor(".metis-brand-wordmark-s")).toContain("color: #6a4bd8;");
     expect(blockFor(".metis-brand-wordmark-s")).toContain("font-family: ui-rounded");

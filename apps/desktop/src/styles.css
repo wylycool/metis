@@ -7142,26 +7142,6 @@ textarea {
   font-weight: 800;
 }
 
-.metis-brand-wordmark-i::after {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  top: -0.06em;
-  left: 51%;
-  width: 0.26em;
-  height: 0.26em;
-  border-radius: 999px;
-  transform: translateX(-50%);
-  background: radial-gradient(
-    circle at 35% 30%,
-    #d4fbff 0%,
-    #7ceaf2 24%,
-    #43d7e8 52%,
-    #3e7bfa 100%
-  );
-  box-shadow: 0 1px 3px rgba(49, 84, 223, 0.18);
-}
-
 .metis-brand-wordmark-s {
   display: inline-block;
   padding-right: 0.1em;
@@ -7189,9 +7169,6 @@ textarea {
     -webkit-text-fill-color: CanvasText;
   }
 
-  .metis-brand-wordmark-i::after {
-    display: none;
-  }
 }
 
 .redesign-logo-mark {
