@@ -799,19 +799,30 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #8a4b0f;");
   });
 
-  test("refines the Metis wordmark i and s without changing the crystal logo", () => {
+  test("keeps the Metis wordmark i and s rounded without clipping the s edge", () => {
+    expect(latestBlockFor(".redesign-brand .metis-brand-wordmark")).toContain(
+      "letter-spacing: -0.02em;",
+    );
     expect(latestBlockFor(".metis-brand-wordmark-base")).toContain("color: #172033;");
     expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("position: relative;");
     expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("color: #3154df;");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("font-family: ui-rounded");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("font-weight: 800;");
     expect(blockFor(".metis-brand-wordmark-i::after")).toContain('content: "";');
     expect(blockFor(".metis-brand-wordmark-i::after")).toContain(
-      "transform: translateX(-50%) rotate(45deg);",
+      "transform: translateX(-50%);",
     );
+    expect(blockFor(".metis-brand-wordmark-i::after")).toContain("border-radius: 999px;");
     expect(blockFor(".metis-brand-wordmark-i::after")).toContain(
-      "background: linear-gradient(135deg, #43d7e8 0%, #3e7bfa 100%);",
+      "background: radial-gradient(",
     );
     expect(blockFor(".metis-brand-wordmark-s")).toContain("background: linear-gradient(");
     expect(blockFor(".metis-brand-wordmark-s")).toContain("color: #6a4bd8;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("font-family: ui-rounded");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("font-weight: 800;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("display: inline-block;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("padding-right: 0.1em;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("margin-right: -0.1em;");
     expect(blockFor(".metis-brand-wordmark-s")).toContain("#6a4bd8 52%");
     expect(blockFor(".metis-brand-wordmark-s")).toContain("#0b7788 100%");
     expect(blockFor(".metis-brand-wordmark-s")).toContain(

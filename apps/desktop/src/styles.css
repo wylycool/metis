@@ -7127,7 +7127,7 @@ textarea {
   width: fit-content;
   color: #172033;
   font-weight: 900;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
   isolation: isolate;
 }
 
@@ -7138,24 +7138,37 @@ textarea {
 .metis-brand-wordmark-i {
   position: relative;
   color: #3154df;
+  font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", sans-serif;
+  font-weight: 800;
 }
 
 .metis-brand-wordmark-i::after {
   content: "";
   position: absolute;
   z-index: 1;
-  top: -0.04em;
+  top: -0.06em;
   left: 51%;
-  width: 0.22em;
-  height: 0.22em;
-  border-radius: 0.055em;
-  transform: translateX(-50%) rotate(45deg);
-  background: linear-gradient(135deg, #43d7e8 0%, #3e7bfa 100%);
-  box-shadow: 0 1px 4px rgba(49, 84, 223, 0.24);
+  width: 0.26em;
+  height: 0.26em;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    circle at 35% 30%,
+    #d4fbff 0%,
+    #7ceaf2 24%,
+    #43d7e8 52%,
+    #3e7bfa 100%
+  );
+  box-shadow: 0 1px 3px rgba(49, 84, 223, 0.18);
 }
 
 .metis-brand-wordmark-s {
+  display: inline-block;
+  padding-right: 0.1em;
+  margin-right: -0.1em;
   color: #6a4bd8;
+  font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", sans-serif;
+  font-weight: 800;
   background: linear-gradient(135deg, #3154df 0%, #6a4bd8 52%, #0b7788 100%);
   -webkit-background-clip: text;
   background-clip: text;
