@@ -1055,8 +1055,13 @@ describe("Phase 6 light workspace contrast", () => {
       /\.skill-list\.redesign-skill-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
     );
     expect(stylesheet).toMatch(
-      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*88px;/,
+      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*80px;/,
     );
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card")).toContain(
+      "grid-template-columns: minmax(0, 1fr) 34px;",
+    );
+    expect(exactBlockFor(".dashboard-stat-icon")).toContain("opacity: 0.72;");
+    expect(exactBlockFor(".dashboard-stat-icon svg")).toContain("stroke-width: 1.8;");
     expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
       "font-weight: 720;",
     );
