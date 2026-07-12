@@ -1269,7 +1269,6 @@ describe("Metis desktop GUI main flow", () => {
       },
     });
     expect(scenario.appliedSkillIds()).toEqual(["trusted-skill", "trusted-skill-claude"]);
-
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
     await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));
 
@@ -2161,6 +2160,24 @@ describe("Metis desktop GUI main flow", () => {
 
     expect((await screen.findAllByText("待更新")).length).toBeGreaterThanOrEqual(1);
     expect(scenario.checkedSkillIds()).toEqual([["codex-planner", "claude-writer"]]);
+  });
+
+  test("home bulk check uses deduplicated dashboard stats without a duplicate toast", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario({ duplicateTrustedAgentInstall: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-dashboard-stats");
+    await user.click(screen.getByTestId("check-all-updates"));
+
+    await waitFor(() => expect(statValue("待更新")).toBe("2"));
+    expect(statValue("已最新")).toBe("0");
+    expect(screen.queryByTestId("redesign-toast")).toBeNull();
+    expect(screen.queryByText(/检查完成：.*个 (skill|Agent).*更新/)).toBeNull();
   });
 
   test("local search stays global while showing each result agent", async () => {

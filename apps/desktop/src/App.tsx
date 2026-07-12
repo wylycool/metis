@@ -869,8 +869,6 @@ function MetisApp() {
         return next;
       });
       setDiffError({});
-      const updateCount = results.filter((result) => result.status === "UpdateAvailable").length;
-      setActionMessage(`检查完成：${updateCount} 个 skill 待更新`);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
