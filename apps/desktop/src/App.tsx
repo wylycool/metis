@@ -1828,6 +1828,8 @@ function MetisApp() {
   const openSettingsWorkspace = useCallback(() => {
     setSoftwareUpdateCheckMessage(null);
     setSoftwareUpdateCheckError(null);
+    setGitEnvironmentResult(null);
+    setGitEnvironmentError(null);
     setActiveWorkspace("settings");
   }, []);
   const openSkillsHome = useCallback(() => {

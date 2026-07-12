@@ -1137,7 +1137,6 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByText("只会更新已加入自动更新列表、且本地没有修改的 Skill。")).toBeTruthy();
     expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
     expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
-    const autoUpdateSection = screen.getByTestId("settings-section-auto-update");
     const autoUpdateList = within(screen.getByTestId("auto-update-source-list"));
     expect(autoUpdateList.getByText("Trusted Skill")).toBeTruthy();
     expect(autoUpdateList.getByText("已信任")).toBeTruthy();
@@ -1175,6 +1174,16 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText(/clone\/fetch/)).toBeNull();
     expect(screen.queryByText(/github\.com/)).toBeNull();
     expect(invokeMock).toHaveBeenCalledWith("test_git_environment");
+
+    await user.click(screen.getByTestId("workspace-tab-skills"));
+    expect(screen.queryByTestId("workspace-settings")).toBeNull();
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+    const reopenedGitHealthSection = within(
+      await screen.findByTestId("settings-section-git-health"),
+    );
+    expect(reopenedGitHealthSection.queryByText("Git 可用")).toBeNull();
+    expect(reopenedGitHealthSection.queryByText("git version 2.45.0")).toBeNull();
+    expect(reopenedGitHealthSection.queryByTestId("git-environment-notice")).toBeNull();
 
     await user.click(screen.getByTestId("run-auto-update"));
 
@@ -1218,8 +1227,9 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
     await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));
     await waitFor(() => expect(screen.queryByTestId("auto-update-source-row-trusted-skill")).toBeNull());
-    expect(within(autoUpdateSection).queryByTestId("auto-update-empty-state")).toBeTruthy();
-    expect(within(autoUpdateSection).getAllByText("立即更新")).toHaveLength(1);
+    const currentAutoUpdateSection = within(screen.getByTestId("settings-section-auto-update"));
+    expect(currentAutoUpdateSection.queryByTestId("auto-update-empty-state")).toBeTruthy();
+    expect(currentAutoUpdateSection.getAllByText("立即更新")).toHaveLength(1);
     expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
       request: expect.objectContaining({
         skill_id: "trusted-skill",
@@ -1304,6 +1314,11 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByTestId("git-environment-error")).toBeNull();
     expect(screen.queryByText("无法使用 Git")).toBeNull();
     expect(screen.queryByText("调试详情")).toBeNull();
+
+    await user.click(screen.getByTestId("workspace-tab-skills"));
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+    expect(screen.queryByTestId("git-environment-notice")).toBeNull();
+    expect(screen.queryByText("本机未安装Git")).toBeNull();
   });
 
   test("shows a compact notice when local Git clone self-check fails", async () => {
