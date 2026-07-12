@@ -1143,7 +1143,23 @@ describe("Metis desktop GUI main flow", () => {
     expect(autoUpdateList.getByText("已信任")).toBeTruthy();
     expect(autoUpdateList.getByText("file:///tmp/metis-trusted-repo")).toBeTruthy();
     expect(autoUpdateList.queryByText("Untrusted Skill")).toBeNull();
-    expect(screen.getByTestId("run-auto-update").textContent).toBe("立刻检查并更新");
+    const runAutoUpdate = screen.getByTestId("run-auto-update");
+    expect(runAutoUpdate.textContent).toBe("立即更新受信任 Skill");
+    expect(runAutoUpdate.className).toContain("metis-action-button");
+    expect(runAutoUpdate.className).toContain("metis-action-button--primary");
+    expect(runAutoUpdate.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByTestId("test-git-environment").className).toContain(
+      "metis-action-button",
+    );
+    expect(screen.getByTestId("settings-save").className).toContain(
+      "metis-action-button--primary",
+    );
+    expect(screen.getByTestId("agent-path-edit-codex").className).toContain(
+      "metis-action-button--compact",
+    );
+    expect(screen.getByTestId("custom-monitor-add").className).toContain(
+      "metis-action-button--compact",
+    );
     expect(screen.queryByText("团队清单合规")).toBeNull();
     expect(screen.queryByText("企业网络")).toBeNull();
     expect(screen.queryByText("凭据引用")).toBeNull();
@@ -1203,7 +1219,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));
     await waitFor(() => expect(screen.queryByTestId("auto-update-source-row-trusted-skill")).toBeNull());
     expect(within(autoUpdateSection).queryByTestId("auto-update-empty-state")).toBeTruthy();
-    expect(within(autoUpdateSection).getAllByText("立刻检查并更新")).toHaveLength(1);
+    expect(within(autoUpdateSection).getAllByText("立即更新受信任 Skill")).toHaveLength(1);
     expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
       request: expect.objectContaining({
         skill_id: "trusted-skill",
@@ -1336,7 +1352,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(
       emptyState.getByText("去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。"),
     ).toBeTruthy();
-    expect(autoUpdateSection.getAllByText("立刻检查并更新")).toHaveLength(1);
+    expect(autoUpdateSection.getAllByText("立即更新受信任 Skill")).toHaveLength(1);
 
     await user.click(screen.getByTestId("run-auto-update"));
 
@@ -1733,7 +1749,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("skill-search-input")).toBeTruthy();
     expectTextAssistanceDisabled(screen.getByTestId("skill-search-input"));
     expect(screen.queryByText(/\d+ results/)).toBeNull();
-    expect(screen.getByTestId("check-all-updates")).toBeTruthy();
+    expect(screen.getByTestId("check-all-updates").textContent).toBe("检查全部 Skill");
     expect(screen.getByTestId("scan-skills")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Skills" })).toBeTruthy();
     expect(screen.queryByText("本机 Skill 工作台")).toBeNull();
@@ -1764,7 +1780,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("workspace-topbar")).toBeTruthy();
     expect(screen.getByTestId("workspace-topbar-middle")).toBeTruthy();
     expect(screen.getByTestId("workspace-topbar-actions")).toBeTruthy();
-    expect(screen.getByTestId("check-all-updates").className).toContain("topbar-secondary-action");
+    expect(screen.queryByTestId("check-all-updates")).toBeNull();
     expect(screen.getByTestId("scan-skills").className).toContain("scan-button");
     expect(screen.getByTestId("settings-agent-path-table")).toBeTruthy();
     expect(screen.getByTestId("settings-agent-path-table").className).toContain(
@@ -1802,8 +1818,8 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("workspace-tab-settings"));
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
     expect(screen.getByTestId("workspace-topbar-middle").className).toContain("is-empty");
-    expect(screen.getByTestId("workspace-topbar-actions").children).toHaveLength(2);
-    expect(screen.getByTestId("check-all-updates").className).toContain("topbar-secondary-action");
+    expect(screen.getByTestId("workspace-topbar-actions").children).toHaveLength(1);
+    expect(screen.queryByTestId("check-all-updates")).toBeNull();
     expect(screen.getByTestId("scan-skills").className).toContain("scan-button");
   });
 
@@ -3534,6 +3550,38 @@ describe("Metis software update flow", () => {
     expect(await screen.findByTestId("skill-row-software-update-skill")).toBeTruthy();
     await waitFor(() => expect(scenario.commandCalls("get_desktop_settings")).toBe(1));
     expect(scenario.commandCalls("check_software_update")).toBe(0);
+  });
+
+  test("uses one button-level busy state for manual software update checks", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: false,
+      slowCheck: true,
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-software-update-skill");
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+    const softwareSection = within(await screen.findByTestId("settings-section-software-update"));
+    const checkButton = softwareSection.getByTestId("check-software-update");
+    const feedbackSlot = softwareSection.getByTestId("software-update-settings-feedback");
+
+    await user.click(checkButton);
+
+    expect(checkButton.getAttribute("aria-busy")).toBe("true");
+    expect((checkButton as HTMLButtonElement).disabled).toBe(true);
+    expect(checkButton.querySelector(".metis-action-spinner")).toBeTruthy();
+    expect(feedbackSlot.childElementCount).toBe(0);
+
+    scenario.resolveCheck(null);
+
+    expect(await softwareSection.findByText("当前已是最新版")).toBeTruthy();
+    expect(checkButton.getAttribute("aria-busy")).toBe("false");
+    expect(checkButton.querySelector(".metis-action-spinner")).toBeNull();
   });
 
   test("keeps startup failures silent and exposes manual retry errors", async () => {

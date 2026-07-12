@@ -2024,7 +2024,9 @@ function MetisApp() {
                     <div className="agent-path-row-actions">
                       {isDirty && <small className="agent-path-pending-badge">待保存</small>}
                       <button
-                        className="ghost-button compact agent-path-edit-button"
+                        className={`ghost-button compact agent-path-edit-button metis-action-button metis-action-button--compact${
+                          isEditing ? " metis-action-button--neutral" : ""
+                        }`}
                         data-testid={`agent-path-${isEditing ? "cancel" : "edit"}-${row.agent_id}`}
                         onClick={() =>
                           isEditing
@@ -2105,7 +2107,11 @@ function MetisApp() {
                         }
                       />
                       <button
-                        className="ghost-button compact custom-monitor-remove"
+                        className={`ghost-button compact custom-monitor-remove metis-action-button metis-action-button--compact ${
+                          isPendingRemoval
+                            ? "metis-action-button--neutral"
+                            : "metis-action-button--danger"
+                        }`}
                         onClick={() =>
                           isPendingRemoval
                             ? restoreCustomMonitor(path.id)
@@ -2146,7 +2152,7 @@ function MetisApp() {
                 onChange={(event) => setNewCustomMonitorPath(event.target.value)}
               />
               <button
-                className="ghost-button compact custom-monitor-add"
+                className="ghost-button compact custom-monitor-add metis-action-button metis-action-button--compact"
                 data-testid="custom-monitor-add"
                 disabled={!newCustomMonitorName.trim() || !newCustomMonitorPath.trim()}
                 onClick={addCustomMonitorDraft}
@@ -2191,13 +2197,13 @@ function MetisApp() {
                         data-testid={`auto-update-remove-actions-${skill.id}`}
                       >
                         <button
-                          className="auto-update-remove"
+                          className="auto-update-remove metis-action-button metis-action-button--compact metis-action-button--danger"
                           data-testid={`remove-auto-update-${skill.id}`}
                           disabled={removeBusy}
                           onClick={() => setPendingAutoUpdateRemovalSourceKey(group.sourceKey)}
                           type="button"
                         >
-                          {removeBusy ? "移除中" : "移除"}
+                          移除
                         </button>
                       </div>
                       {removalOpen ? (
@@ -2211,7 +2217,7 @@ function MetisApp() {
                           </div>
                           <div className="auto-update-remove-confirm-actions">
                             <button
-                              className="auto-update-cancel"
+                              className="auto-update-cancel metis-action-button metis-action-button--compact metis-action-button--neutral"
                               data-testid={`cancel-remove-auto-update-${skill.id}`}
                               disabled={removeBusy}
                               onClick={() => setPendingAutoUpdateRemovalSourceKey(null)}
@@ -2220,13 +2226,23 @@ function MetisApp() {
                               取消
                             </button>
                             <button
-                              className="auto-update-confirm"
+                              aria-busy={removeBusy}
+                              className={`auto-update-confirm metis-action-button metis-action-button--compact metis-action-button--danger${
+                                removeBusy ? " is-busy" : ""
+                              }`}
                               data-testid={`confirm-remove-auto-update-${skill.id}`}
                               disabled={removeBusy}
                               onClick={() => handleRemoveAutoUpdateSkill(group)}
                               type="button"
                             >
-                              {removeBusy ? "移出中" : "确认移出"}
+                              {removeBusy ? (
+                                <>
+                                  <span className="metis-action-spinner" aria-hidden="true" />
+                                  正在移出
+                                </>
+                              ) : (
+                                "确认移出"
+                              )}
                             </button>
                           </div>
                         </div>
@@ -2237,18 +2253,21 @@ function MetisApp() {
               )}
             </div>
             <button
-              className={`auto-update-run${actionBusy === "auto-update" ? " is-busy" : ""}`}
+              aria-busy={actionBusy === "auto-update"}
+              className={`auto-update-run metis-action-button metis-action-button--primary${
+                actionBusy === "auto-update" ? " is-busy" : ""
+              }`}
               data-testid="run-auto-update"
               disabled={actionBusy === "auto-update" || skills.length === 0}
               onClick={handleRunAutoUpdate}
             >
               {actionBusy === "auto-update" ? (
                 <>
-                  <span className="auto-update-run-spinner" aria-hidden="true" />
+                  <span className="metis-action-spinner" aria-hidden="true" />
                   正在检查并更新
                 </>
               ) : (
-                "立刻检查并更新"
+                "立即更新受信任 Skill"
               )}
             </button>
           </section>
@@ -2258,13 +2277,23 @@ function MetisApp() {
             <div className="settings-git-health-card">
               <div className="settings-git-health-action">
                 <button
-                  className="settings-git-test-button"
+                  aria-busy={actionBusy === "git-environment"}
+                  className={`settings-git-test-button metis-action-button${
+                    actionBusy === "git-environment" ? " is-busy" : ""
+                  }`}
                   data-testid="test-git-environment"
                   disabled={actionBusy === "git-environment"}
                   onClick={handleTestGitEnvironment}
                   type="button"
                 >
-                  {actionBusy === "git-environment" ? "检测中" : "检测"}
+                  {actionBusy === "git-environment" ? (
+                    <>
+                      <span className="metis-action-spinner" aria-hidden="true" />
+                      正在检测
+                    </>
+                  ) : (
+                    "检测"
+                  )}
                 </button>
                 {gitEnvironmentResult && (
                   <div className="settings-git-health-result success" data-testid="git-environment-result">
@@ -2309,7 +2338,10 @@ function MetisApp() {
                 <span>启动时检查</span>
               </label>
               <button
-                className="software-update-check-button"
+                aria-busy={softwareUpdateCheckBusy}
+                className={`software-update-check-button metis-action-button${
+                  softwareUpdateCheckBusy ? " is-busy" : ""
+                }`}
                 data-testid="check-software-update"
                 disabled={
                   softwareUpdateCheckBusy ||
@@ -2320,22 +2352,25 @@ function MetisApp() {
                 onClick={() => void handleCheckSoftwareUpdate("manual")}
                 type="button"
               >
-                {softwareUpdateCheckBusy ? "检查中" : "检查更新"}
+                {softwareUpdateCheckBusy ? (
+                  <>
+                    <span className="metis-action-spinner" aria-hidden="true" />
+                    正在检查
+                  </>
+                ) : (
+                  "检查更新"
+                )}
               </button>
             </div>
             <div
               className="software-update-settings-feedback"
               data-testid="software-update-settings-feedback"
             >
-              {softwareUpdateCheckBusy ? (
-                <div className="software-update-check-progress" role="status">
-                  <span aria-hidden="true" />
-                  正在检查更新
-                </div>
-              ) : softwareUpdateCheckError ? (
+              {softwareUpdateCheckBusy ? null : softwareUpdateCheckError ? (
                 <div className="software-update-check-error" role="alert">
                   <span>{softwareUpdateCheckError}</span>
                   <button
+                    className="metis-action-button metis-action-button--compact metis-action-button--danger metis-action-button--context"
                     onClick={() => void handleCheckSoftwareUpdate("manual")}
                     type="button"
                   >
@@ -2352,12 +2387,22 @@ function MetisApp() {
 
           <div className="form-actions settings-save-actions">
             <button
-              className="settings-save-button"
+              aria-busy={actionBusy === "settings"}
+              className={`settings-save-button metis-action-button metis-action-button--primary${
+                actionBusy === "settings" ? " is-busy" : ""
+              }`}
               data-testid="settings-save"
               disabled={actionBusy === "settings" || !hasSettingsDraftChanges}
               onClick={() => handleSaveSettings(true)}
             >
-              {actionBusy === "settings" ? "保存中" : "保存"}
+              {actionBusy === "settings" ? (
+                <>
+                  <span className="metis-action-spinner" aria-hidden="true" />
+                  正在保存
+                </>
+              ) : (
+                "保存"
+              )}
             </button>
           </div>
         </section>
@@ -2940,21 +2985,41 @@ function WorkspaceTopbar({
           )}
         </div>
         <div className="redesign-top-actions" data-testid="workspace-topbar-actions">
+          {activeWorkspace === "skills" && (
+            <button
+              aria-busy={actionBusy === "check-updates"}
+              className={`ghost-button topbar-secondary-action metis-action-button${
+                actionBusy === "check-updates" ? " is-busy" : ""
+              }`}
+              data-testid="check-all-updates"
+              disabled={isLoading || actionBusy === "check-updates" || skillCount === 0}
+              onClick={onCheckAllUpdates}
+            >
+              {actionBusy === "check-updates" ? (
+                <>
+                  <span className="metis-action-spinner" aria-hidden="true" />
+                  正在检查
+                </>
+              ) : (
+                "检查全部 Skill"
+              )}
+            </button>
+          )}
           <button
-            className="ghost-button topbar-secondary-action"
-            data-testid="check-all-updates"
-            disabled={isLoading || actionBusy === "check-updates" || skillCount === 0}
-            onClick={onCheckAllUpdates}
-          >
-            {actionBusy === "check-updates" ? "检查中" : "检查更新"}
-          </button>
-          <button
-            className="scan-button"
+            aria-busy={isLoading}
+            className={`scan-button metis-action-button${isLoading ? " is-busy" : ""}`}
             data-testid="scan-skills"
             disabled={isLoading}
             onClick={onScan}
           >
-            {isLoading ? "扫描中" : "重新扫描"}
+            {isLoading ? (
+              <>
+                <span className="metis-action-spinner" aria-hidden="true" />
+                正在扫描
+              </>
+            ) : (
+              "重新扫描"
+            )}
           </button>
         </div>
         <button

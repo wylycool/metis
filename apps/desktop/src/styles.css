@@ -2467,13 +2467,8 @@ textarea:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .remote-preview-card::after,
-  .settings-section.auto-update-section > button.is-busy::after {
+  .remote-preview-card::after {
     display: none;
-    animation: none;
-  }
-
-  .auto-update-run-spinner {
     animation: none;
   }
 
@@ -3597,20 +3592,6 @@ button,
   background: var(--command-selected);
 }
 
-.scan-button {
-  min-height: 32px;
-  border-color: var(--command-accent-border);
-  color: var(--command-accent);
-  background: var(--command-accent-soft);
-  font-size: 12px;
-}
-
-.scan-button:hover:not(:disabled) {
-  color: var(--command-accent);
-  border-color: #8bd8bf;
-  background: #ddf7ee;
-}
-
 .settings-icon-button {
   border-color: var(--command-border);
   background: var(--command-surface);
@@ -3835,6 +3816,197 @@ textarea {
   }
 }
 
+/* Task 374: one semantic action-button system for workspace and Settings operations. */
+.metis-shell.redesign-app-window button.metis-action-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d8e7ff;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #3154df;
+  background: #eef4ff;
+  font-size: 13px;
+  font-weight: 760;
+  white-space: nowrap;
+  box-shadow: none;
+  transform: none;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    background 180ms ease;
+}
+
+.metis-shell.redesign-app-window button.topbar-secondary-action {
+  min-width: 120px;
+}
+
+.metis-shell.redesign-app-window button.scan-button {
+  min-width: 108px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button:focus-visible {
+  border-color: #c8dafa;
+  color: #2749cf;
+  background: #e3edff;
+  box-shadow: none;
+  transform: none;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:focus-visible {
+  outline: 3px solid rgba(49, 84, 223, 0.16);
+  outline-offset: 2px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:active:not(:disabled) {
+  border-color: #b8cef6;
+  color: #213fae;
+  background: #dce9ff;
+  transform: none;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--primary {
+  border-color: #3154df;
+  color: #ffffff;
+  background: #3154df;
+  box-shadow: none;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--primary:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--primary:focus-visible {
+  border-color: #2749cf;
+  color: #ffffff;
+  background: #2749cf;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--compact {
+  min-height: 32px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--neutral {
+  border-color: #d8e1ec;
+  color: #475569;
+  background: #ffffff;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--neutral:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--neutral:focus-visible {
+  border-color: #c7d2e0;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--danger {
+  border-color: #ffc7bd;
+  color: #b42318;
+  background: #fff1ed;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--danger:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--danger:focus-visible {
+  border-color: #fda29b;
+  color: #991b1b;
+  background: #ffe7df;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--context {
+  min-height: 28px;
+  border-radius: 7px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:disabled:not(.is-busy) {
+  border-color: #e1e8f1;
+  color: #8290a7;
+  background: #f3f6fa;
+  box-shadow: none;
+  cursor: default;
+  opacity: 1;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.is-busy {
+  cursor: wait;
+  opacity: 1;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: -42% auto -42% -86%;
+  width: 72%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 32%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.18) 68%,
+    transparent 100%
+  );
+  transform: translateX(0) skewX(-16deg);
+  animation: metisActionSweep 1450ms ease-in-out infinite;
+}
+
+.metis-action-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  position: relative;
+  z-index: 1;
+  border: 2px solid rgba(49, 84, 223, 0.18);
+  border-top-color: #3154df;
+  border-right-color: #2db8a0;
+  border-radius: 999px;
+  animation: metisActionSpin 820ms linear infinite;
+}
+
+.metis-action-button--primary .metis-action-spinner {
+  border-color: rgba(255, 255, 255, 0.34);
+  border-top-color: #ffffff;
+  border-right-color: #7ef0dc;
+}
+
+.metis-action-button--danger .metis-action-spinner {
+  border-color: rgba(180, 35, 24, 0.18);
+  border-top-color: #b42318;
+  border-right-color: #f97362;
+}
+
+@keyframes metisActionSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes metisActionSweep {
+  0% {
+    transform: translateX(0) skewX(-16deg);
+  }
+  55%,
+  100% {
+    transform: translateX(330%) skewX(-16deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metis-shell.redesign-app-window button.metis-action-button.is-busy::after,
+  .metis-action-spinner {
+    animation: none;
+  }
+
+  .metis-shell.redesign-app-window button.metis-action-button {
+    transition: none;
+  }
+}
+
 /* Metis software update */
 .software-update-notice {
   position: fixed;
@@ -3910,8 +4082,7 @@ textarea {
 }
 
 .software-update-notice-actions button,
-.software-update-dialog-actions button,
-.software-update-check-button {
+.software-update-dialog-actions button {
   min-height: 42px;
   border-radius: 11px;
   padding: 0 14px;
@@ -3932,8 +4103,7 @@ textarea {
 }
 
 .software-update-download,
-.software-update-primary-action,
-.software-update-check-button {
+.software-update-primary-action {
   border-color: #315fa8;
   color: #ffffff;
   background: #315fa8;
@@ -3948,8 +4118,7 @@ textarea {
 }
 
 .software-update-download:hover:not(:disabled),
-.software-update-primary-action:hover:not(:disabled),
-.software-update-check-button:hover:not(:disabled) {
+.software-update-primary-action:hover:not(:disabled) {
   border-color: #284f8d;
   color: #ffffff;
   background: #284f8d;
@@ -4309,32 +4478,7 @@ textarea {
 }
 
 .software-update-check-button {
-  min-width: 92px;
-  min-height: 34px;
-  border: 1px solid #d8e7ff;
-  border-radius: 8px;
-  padding: 0 14px;
-  color: #3154df;
-  background: #eef4ff;
-  font-size: 13px;
-  font-weight: 760;
-  box-shadow: none;
-}
-
-.software-update-check-button:hover:not(:disabled),
-.software-update-check-button:focus-visible {
-  border-color: #c8dafa;
-  color: #2749cf;
-  background: #e3edff;
-  box-shadow: none;
-  transform: none;
-}
-
-.software-update-check-button:disabled {
-  border-color: #e1e8f1;
-  color: #8290a7;
-  background: #f3f6fa;
-  box-shadow: none;
+  min-width: 108px;
 }
 
 .software-update-settings-feedback {
@@ -4376,45 +4520,6 @@ textarea {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
-}
-
-.software-update-check-error > button {
-  min-height: 28px;
-  border: 0;
-  border-radius: 7px;
-  padding: 0 9px;
-  color: #b42318;
-  background: #fde8e4;
-  font-size: 11.5px;
-  font-weight: 780;
-  box-shadow: none;
-}
-
-.software-update-check-error > button:hover:not(:disabled),
-.software-update-check-error > button:focus-visible {
-  color: #991b1b;
-  background: #fbd9d3;
-  box-shadow: none;
-  transform: none;
-}
-
-.software-update-check-progress {
-  min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #52657e;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.software-update-check-progress > span {
-  width: 14px;
-  height: 14px;
-  border: 2px solid #cbd8ea;
-  border-top-color: #3154df;
-  border-radius: 999px;
-  animation: softwareUpdateSpin 800ms linear infinite;
 }
 
 @keyframes softwareUpdateNoticeIn {
@@ -4521,11 +4626,9 @@ textarea {
   .software-update-dialog,
   .software-update-progress > span,
   .software-update-verifying > span,
-  .software-update-check-progress > span,
   .software-update-notice-actions button,
   .software-update-dialog-actions button,
-  .software-update-check-button,
-  .software-update-check-error button {
+  .software-update-check-error {
     animation: none;
     transition: none;
   }
@@ -5947,65 +6050,12 @@ textarea {
   line-height: 1.55;
 }
 
-.settings-section.auto-update-section > button {
-  position: relative;
-  overflow: hidden;
+.auto-update-run {
   grid-column: 2;
   grid-row: 1;
   justify-self: end;
   align-self: start;
-  min-height: 36px;
-  border: 1px solid #c9d6e7;
-  border-radius: 8px;
-  padding: 0 14px;
-  color: #142033;
-  background: #ffffff;
-  font-size: 13px;
-  font-weight: 750;
-  white-space: nowrap;
-  box-shadow: none;
-}
-
-.settings-section.auto-update-section > button.is-busy {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.settings-section.auto-update-section > button.is-busy::after {
-  content: "";
-  position: absolute;
-  inset: -42% auto -42% -86%;
-  width: 72%;
-  pointer-events: none;
-  background: linear-gradient(105deg, transparent 0%, rgba(255, 255, 255, 0.18) 32%, rgba(255, 255, 255, 0.82) 50%, rgba(255, 255, 255, 0.22) 68%, transparent 100%);
-  transform: translateX(0) skewX(-16deg);
-  animation: remotePreviewSunSweep 1450ms ease-in-out infinite;
-}
-
-.auto-update-run-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(49, 84, 223, 0.18);
-  border-top-color: #3154df;
-  border-right-color: #2db8a0;
-  border-radius: 999px;
-  animation: remoteTargetLoadingSpin 820ms linear infinite;
-}
-
-.settings-section.auto-update-section > button:hover:not(:disabled) {
-  border-color: #b9c7dc;
-  color: #142033;
-  background: #f7faff;
-  transform: none;
-  box-shadow: none;
-}
-
-.settings-section.auto-update-section > button:disabled {
-  color: #64708a;
-  background: #f8fafc;
-  cursor: default;
+  min-width: 160px;
 }
 
 .settings-agent-path-row.redesign-agent-path-row input,
@@ -6034,7 +6084,6 @@ textarea {
 .custom-monitor-add {
   justify-self: end;
   min-width: 78px;
-  background: #ffffff;
 }
 
 .settings-muted {
@@ -6049,43 +6098,7 @@ textarea {
 }
 
 .settings-save-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  min-width: 104px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 0 18px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #3154df, #4b7df0);
-  font-size: 12px;
-  font-weight: 900;
-  white-space: nowrap;
-  box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);
-}
-
-.settings-save-button:hover:not(:disabled) {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-save-button:focus-visible {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-save-button:disabled {
-  border-color: #d9e4ef;
-  color: #64708a;
-  background: #f8fafc;
-  box-shadow: none;
+  min-width: 108px;
 }
 
 .detail-status-strip {
@@ -7090,25 +7103,8 @@ textarea {
 }
 
 :root {
-  --command-purple-soft: #f4efff;
-  --command-purple-border: #ddd1ff;
-  --command-purple-fg: #6d28d9;
   --skill-marker-start: #c4b5fd;
   --skill-marker-end: #f0abfc;
-}
-
-.scan-button {
-  min-height: 32px;
-  border-color: var(--command-purple-border);
-  color: var(--command-purple-fg);
-  background: var(--command-purple-soft);
-  font-size: 12px;
-}
-
-.scan-button:hover:not(:disabled) {
-  color: var(--command-purple-fg);
-  border-color: #c7b7ff;
-  background: #eee7ff;
 }
 
 /* Reference-dashboard mock route for the 2026-06-30 UI preview. */
@@ -9087,43 +9083,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .settings-git-test-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  min-width: 76px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 0 14px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #3154df, #4b7df0);
-  font-size: 13px;
-  font-weight: 750;
-  white-space: nowrap;
-  box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);
-}
-
-.settings-git-test-button:hover:not(:disabled) {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-git-test-button:focus-visible {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-git-test-button:disabled {
-  border-color: #d9e4ef;
-  color: #64708a;
-  background: #f8fafc;
-  box-shadow: none;
+  min-width: 108px;
 }
 
 .settings-git-health-result {
@@ -9377,6 +9337,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .auto-update-confirm {
   min-height: 36px;
+  min-width: 104px;
   border-radius: 11px;
   padding: 0 13px;
   color: #b42318;
@@ -9407,7 +9368,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
     grid-template-columns: 1fr;
   }
 
-  .settings-section.auto-update-section > button {
+  .auto-update-run {
     grid-column: 1;
     grid-row: auto;
     justify-self: stretch;
