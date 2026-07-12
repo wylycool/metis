@@ -1772,6 +1772,11 @@ describe("Metis desktop GUI main flow", () => {
     expect(metisWordmark.querySelector(".metis-brand-wordmark-s")?.textContent).toBe("s");
     expect(screen.queryByText("Local library")).toBeNull();
     expect(screen.queryByText(/trusted sources/)).toBeNull();
+    const skillsIcon = screen.getByTestId("sidebar-skills-icon");
+    const settingsIcon = screen.getByTestId("sidebar-settings-icon");
+    expect(skillsIcon.querySelectorAll("path")).toHaveLength(3);
+    expect(skillsIcon.querySelector("rect")).toBeNull();
+    expect(settingsIcon.querySelectorAll("path")).toHaveLength(9);
     expect(screen.getByTestId("metis-github-link").getAttribute("aria-label")).toBe(
       "打开 Metis GitHub 仓库",
     );

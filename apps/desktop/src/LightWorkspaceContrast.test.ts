@@ -742,7 +742,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-github-link")).toContain("width: 48px;");
     expect(latestBlockFor(".redesign-github-link")).toContain("height: 48px;");
     expect(latestBlockFor(".redesign-github-link")).toContain("border-radius: 14px;");
-    expect(latestBlockFor(".redesign-github-link svg")).toContain("width: 20px;");
+    expect(latestBlockFor(".redesign-github-link svg")).toContain("width: 19px;");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("position: fixed");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("right: 0");
     expect(stylesheet).toMatch(/\.redesign-diff-viewer\s*\{[\s\S]*font-family:/);
@@ -1001,7 +1001,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".metis-sidebar-github")).toContain("box-shadow: none;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("align-self: center;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("justify-self: start;");
-    expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
+    expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 19px;");
     const emptyAction = latestBlockFor(
       ".metis-shell.redesign-app-window .empty-actions button.empty-state-action",
     );

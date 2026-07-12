@@ -1909,7 +1909,7 @@ function MetisApp() {
               data-testid="workspace-tab-skills"
               onClick={openSkillsHome}
             >
-              <GridIcon />
+              <LayersIcon />
               Skills
             </button>
             <button
@@ -1918,7 +1918,7 @@ function MetisApp() {
               data-testid="workspace-tab-settings-sidebar"
               onClick={openSettingsWorkspace}
             >
-              <GearIcon />
+              <SlidersIcon />
               Settings
             </button>
           </nav>
@@ -3094,22 +3094,40 @@ function WorkspaceTopbar({
   );
 }
 
-function GridIcon() {
+function LayersIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <rect x="4" y="4" width="6" height="6" rx="1.4" />
-      <rect x="14" y="4" width="6" height="6" rx="1.4" />
-      <rect x="4" y="14" width="6" height="6" rx="1.4" />
-      <rect x="14" y="14" width="6" height="6" rx="1.4" />
+    <svg
+      aria-hidden="true"
+      data-testid="sidebar-skills-icon"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+    >
+      <path d="m12 3-8 4.5 8 4.5 8-4.5L12 3Z" />
+      <path d="m4 12 8 4.5 8-4.5" />
+      <path d="m4 16.5 8 4.5 8-4.5" />
     </svg>
   );
 }
 
-function GearIcon() {
+function SlidersIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M12 8.4a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Z" />
-      <path d="M12 3.4 14 5l2.5-.5 1.2 2.1-1.6 2 .4 1.4 2.2 1v2.4l-2.2 1-.4 1.4 1.6 2-1.2 2.1-2.5-.5-2 1.6-2-1.6-2.5.5-1.2-2.1 1.6-2-.4-1.4-2.2-1V11l2.2-1 .4-1.4-1.6-2 1.2-2.1L10 5l2-1.6Z" />
+    <svg
+      aria-hidden="true"
+      data-testid="sidebar-settings-icon"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+    >
+      <path d="M21 4h-7" />
+      <path d="M10 4H3" />
+      <path d="M14 2v4" />
+      <path d="M21 12h-9" />
+      <path d="M8 12H3" />
+      <path d="M8 10v4" />
+      <path d="M21 20h-5" />
+      <path d="M12 20H3" />
+      <path d="M16 18v4" />
     </svg>
   );
 }
