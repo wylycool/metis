@@ -780,6 +780,10 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-toast.info-toast")).toContain("background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);");
     expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
     expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("border-color: rgba(214, 139, 38, 0.28);");
+    expect(latestBlockFor(".skill-dashboard-stats.is-check-complete .dashboard-stat-card")).toContain("animation: dashboardCheckPulse");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).toContain("position: absolute;");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).toContain("color: #ffffff;");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).toContain("background: #173b2d;");
     expect(latestBlockFor(".source-required-toast")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
     expect(latestBlockFor(".source-required-toast")).not.toContain("background:");
     expect(latestBlockFor(".source-required-toast")).not.toContain("box-shadow:");

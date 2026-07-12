@@ -114,6 +114,7 @@ function MetisApp() {
   const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
   const [backupError, setBackupError] = useState<Record<string, DesktopError>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [homeCheckCompletionKey, setHomeCheckCompletionKey] = useState<number | null>(null);
   const [sourceRequiredSkillId, setSourceRequiredSkillId] = useState<string | null>(null);
   const [settings, setSettings] = useState<DesktopSettings>({
     custom_scan_paths: [],
@@ -218,6 +219,16 @@ function MetisApp() {
     }, guidanceToastVisible ? 6000 : 3000);
     return () => window.clearTimeout(toastTimer);
   }, [actionMessage, guidanceToastVisible]);
+
+  useEffect(() => {
+    if (homeCheckCompletionKey === null) {
+      return;
+    }
+    const completionTimer = window.setTimeout(() => {
+      setHomeCheckCompletionKey(null);
+    }, 3000);
+    return () => window.clearTimeout(completionTimer);
+  }, [homeCheckCompletionKey]);
 
   useEffect(() => {
     if (!editingAgentPathId) {
@@ -858,6 +869,7 @@ function MetisApp() {
     setActionBusy(busyKey);
     setActionError(null);
     setActionMessage(null);
+    setHomeCheckCompletionKey(null);
 
     try {
       const results = await checkSkillUpdates({ skill_ids: skillIds });
@@ -869,7 +881,7 @@ function MetisApp() {
         return next;
       });
       setDiffError({});
-      setActionMessage("检查完成");
+      setHomeCheckCompletionKey((current) => (current ?? 0) + 1);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -2465,6 +2477,7 @@ function MetisApp() {
           remoteTargets={remoteTargets}
           selectedRemoteTargetIds={selectedRemoteTargetIds}
           homeNavigationKey={skillsHomeNavigationKey}
+          homeCheckCompletionKey={homeCheckCompletionKey}
           skillAuditEvents={skillAuditEvents}
           skillSearchQuery={skillSearchQuery}
           skillSizes={skillSizes}

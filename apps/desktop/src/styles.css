@@ -5563,6 +5563,7 @@ textarea {
 }
 
 .skill-dashboard-stats.redesign-home-stats {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -5589,6 +5590,107 @@ textarea {
 .dashboard-stat-card.redesign-stat-card small {
   font-size: 11px;
   font-weight: 620;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card {
+  animation: dashboardCheckPulse 720ms ease-out both;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card:nth-of-type(2) {
+  animation-delay: 55ms;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card:nth-of-type(3) {
+  animation-delay: 110ms;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card:nth-of-type(4) {
+  animation-delay: 165ms;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card strong {
+  animation: dashboardCheckValue 520ms ease-out both;
+}
+
+.skill-dashboard-check-complete {
+  position: absolute;
+  top: -13px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #ffffff;
+  background: #173b2d;
+  box-shadow: 0 8px 20px rgba(23, 59, 45, 0.22);
+  font-size: 11px;
+  font-weight: 820;
+  pointer-events: none;
+  animation: dashboardCheckBadgeIn 220ms ease-out both;
+}
+
+.skill-dashboard-check-complete span {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  color: #173b2d;
+  background: #b8f0d2;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+@keyframes dashboardCheckPulse {
+  0% {
+    border-color: rgba(223, 232, 242, 0.7);
+    box-shadow: none;
+    transform: translateY(0);
+  }
+  42% {
+    border-color: rgba(45, 184, 160, 0.72);
+    box-shadow: 0 0 0 3px rgba(45, 184, 160, 0.13), 0 12px 26px rgba(38, 112, 91, 0.1);
+    transform: translateY(-2px);
+  }
+  100% {
+    border-color: rgba(223, 232, 242, 0.7);
+    box-shadow: none;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboardCheckValue {
+  from {
+    opacity: 0.48;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboardCheckBadgeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-dashboard-stats.is-check-complete .dashboard-stat-card,
+  .skill-dashboard-stats.is-check-complete .dashboard-stat-card strong,
+  .skill-dashboard-check-complete {
+    animation: none;
+  }
 }
 
 .skill-list.redesign-skill-grid {
