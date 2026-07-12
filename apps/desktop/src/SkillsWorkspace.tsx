@@ -531,8 +531,15 @@ function EmptyState({
       <h3>还没有发现 skills</h3>
       <p>默认目录中暂时没有可索引的 SKILL.md。可以重新扫描，或到 Settings 添加自定义路径。</p>
       <div className="empty-actions">
-        <button onClick={onScan}>重新扫描</button>
-        <button className="ghost-button" onClick={onOpenSettings}>添加扫描路径</button>
+        <button
+          className="empty-state-action metis-action-button metis-action-button--primary"
+          onClick={onScan}
+        >
+          重新扫描
+        </button>
+        <button className="empty-state-action metis-action-button" onClick={onOpenSettings}>
+          添加扫描路径
+        </button>
       </div>
     </div>
   );

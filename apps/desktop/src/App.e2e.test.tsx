@@ -2147,8 +2147,12 @@ describe("Metis desktop GUI main flow", () => {
     const emptyState = await screen.findByTestId("skills-empty-state");
     expect(emptyState).toBeTruthy();
     expect(within(emptyState).getByText("还没有发现 skills")).toBeTruthy();
-    expect(within(emptyState).getByText("重新扫描")).toBeTruthy();
-    await user.click(within(emptyState).getByText("添加扫描路径"));
+    const rescanButton = within(emptyState).getByText("重新扫描");
+    const addPathButton = within(emptyState).getByText("添加扫描路径");
+    expect(rescanButton.className).toContain("metis-action-button--primary");
+    expect(addPathButton.className).toContain("metis-action-button");
+    expect(addPathButton.className).not.toContain("ghost-button");
+    await user.click(addPathButton);
 
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
     expect(screen.getByText("内置 Agent 路径管理")).toBeTruthy();

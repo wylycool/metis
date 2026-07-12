@@ -1002,6 +1002,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".metis-sidebar-github")).toContain("align-self: center;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("justify-self: start;");
     expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
+    const emptyAction = latestBlockFor(
+      ".metis-shell.redesign-app-window .empty-actions button.empty-state-action",
+    );
+    expect(emptyAction).toContain("min-height: 44px;");
+    expect(emptyAction).toContain("border-radius: 12px;");
+    expect(emptyAction).toContain("padding: 0 22px;");
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
       /\.topbar\.redesign-page-topbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(120px,\s*0\.42fr\) minmax\(0,\s*1fr\) auto;/,

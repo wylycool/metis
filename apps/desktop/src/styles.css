@@ -3923,6 +3923,14 @@ textarea {
   font-size: 11.5px;
 }
 
+.metis-shell.redesign-app-window .empty-actions button.empty-state-action {
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 0 22px;
+  font-size: 14px;
+  font-weight: 760;
+}
+
 .metis-shell.redesign-app-window button.metis-action-button:disabled:not(.is-busy) {
   border-color: #e1e8f1;
   color: #8290a7;
