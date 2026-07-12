@@ -2310,35 +2310,35 @@ function MetisApp() {
           </section>
 
           <section className="settings-section git-health-section" data-testid="settings-section-git-health">
-            <h3>本机Git 检测</h3>
-            <div className="settings-git-health-card">
-              <div className="settings-git-health-action">
-                {gitEnvironmentResult && (
-                  <div className="settings-git-health-result success" data-testid="git-environment-result">
-                    <strong>{gitEnvironmentResult.message}</strong>
-                    <span>{gitEnvironmentResult.version}</span>
-                  </div>
+            <div className="settings-git-health-heading">
+              <h3>本机Git 检测</h3>
+              <button
+                aria-busy={actionBusy === "git-environment"}
+                className={`settings-git-test-button metis-action-button${
+                  actionBusy === "git-environment" ? " is-busy" : ""
+                }`}
+                data-testid="test-git-environment"
+                disabled={actionBusy === "git-environment"}
+                onClick={handleTestGitEnvironment}
+                type="button"
+              >
+                {actionBusy === "git-environment" ? (
+                  <>
+                    <span className="metis-action-spinner" aria-hidden="true" />
+                    正在检测
+                  </>
+                ) : (
+                  "检测"
                 )}
-                <button
-                  aria-busy={actionBusy === "git-environment"}
-                  className={`settings-git-test-button metis-action-button${
-                    actionBusy === "git-environment" ? " is-busy" : ""
-                  }`}
-                  data-testid="test-git-environment"
-                  disabled={actionBusy === "git-environment"}
-                  onClick={handleTestGitEnvironment}
-                  type="button"
-                >
-                  {actionBusy === "git-environment" ? (
-                    <>
-                      <span className="metis-action-spinner" aria-hidden="true" />
-                      正在检测
-                    </>
-                  ) : (
-                    "检测"
-                  )}
-                </button>
-              </div>
+              </button>
+            </div>
+            <div className="settings-git-health-card">
+              {gitEnvironmentResult && (
+                <div className="settings-git-health-result success" data-testid="git-environment-result">
+                  <strong>{gitEnvironmentResult.message}</strong>
+                  <span>{gitEnvironmentResult.version}</span>
+                </div>
+              )}
               {gitEnvironmentError && (
                 <div
                   className="settings-git-health-notice"

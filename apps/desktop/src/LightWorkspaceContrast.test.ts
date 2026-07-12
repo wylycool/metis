@@ -438,13 +438,12 @@ describe("Phase 6 light workspace contrast", () => {
     expect(previewDisabledBlock).not.toContain("cursor: wait;");
     expect(latestBlockFor(".settings-section.git-health-section")).toContain("min-height: auto;");
     expect(latestBlockFor(".settings-section.git-health-section")).toContain("grid-template-rows: auto auto;");
-    expect(latestBlockFor(".settings-git-health-card")).toContain("display: flex;");
+    expect(latestBlockFor(".settings-git-health-heading")).toContain("justify-content: space-between;");
+    expect(latestBlockFor(".settings-git-health-card")).toContain("display: grid;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("border: 0;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("padding: 0;");
-    expect(latestBlockFor(".settings-git-health-action")).toContain("justify-content: space-between;");
-    expect(latestBlockFor(".settings-git-health-action")).toContain("width: 100%;");
+    expect(latestBlockFor(".settings-git-health-card:empty")).toContain("display: none;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 108px;");
-    expect(latestBlockFor(".settings-git-test-button")).toContain("margin-left: auto;");
     expect(exactBlockFor(".auto-update-run")).toContain("min-width: 108px;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("background: #fff7ed;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("border: 1px solid #fed7aa;");

@@ -9058,13 +9058,16 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .settings-git-health-card {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  display: grid;
+  gap: 8px;
   border: 0;
   border-radius: 0;
   padding: 0;
   background: transparent;
+}
+
+.settings-git-health-card:empty {
+  display: none;
 }
 
 .settings-section.git-health-section {
@@ -9074,13 +9077,16 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   padding: 12px 14px;
 }
 
-.settings-git-health-action {
+.settings-git-health-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
+}
+
+.settings-git-health-heading h3 {
+  margin: 0;
 }
 
 .topbar.redesign-page-topbar.settings-topbar .topbar-middle-slot {
@@ -9096,7 +9102,6 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .settings-git-test-button {
-  margin-left: auto;
   min-width: 108px;
 }
 
