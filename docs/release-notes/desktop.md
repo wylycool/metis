@@ -11,25 +11,31 @@ Metis 是一个跨平台、本地优先的 Agent Skill 管理器。桌面安装�
 
 当前发布目标、推荐版本和直接下载地址以 [README](https://github.com/wylycool/metis#readme) 为准；全部历史版本见 [GitHub Releases](https://github.com/wylycool/metis/releases)。
 
-## 未签名说明
+从首个携带软件更新能力的版本开始，Metis 可以在启动后后台检查稳定版更新。发现新版后，由用户确认下载当前平台的标准 DMG、NSIS EXE 或 AppImage；安装包通过 Metis 内置的 Tauri 更新公钥校验后，保留 macOS / Windows 的系统下载来源标记并保存到系统 Downloads，安装仍由用户手动完成。用户可以在 Settings 关闭启动检查，也可以随时手动检查。
 
-当前安装包未做 macOS Developer ID 签名、公证或 Windows Authenticode 签名。macOS 可能需要右键打开或在系统设置中允许；Windows SmartScreen 可能提示未知发布者，需要选择继续运行。
+## 操作系统代码签名说明
+
+应用内下载使用免费的 Tauri 更新签名确认安装包来自 Metis 更新通道且内容未被篡改，但这不等同于操作系统代码签名。当前安装包仍未做 macOS Developer ID 签名、公证或 Windows Authenticode 签名。macOS 可能需要右键打开或在系统设置中允许；Windows SmartScreen 可能提示未知发布者，需要选择继续运行。
 
 ## 当前能力
 
 - 在 `Skills` 和 `Settings` 两个工作区管理本机 Agent skills 与安装路径。
 - 扫描 Codex、Claude Code、OpenClaw、Hermes、opencode 和自定义路径中的 `SKILL.md`。
-- 为已安装 Skill 绑定 Git 来源，按需检查更新、查看文件差异、手动更新、备份和回滚。
+- 为已安装 Skill 绑定 Git 来源，按需检查 Skill 更新、查看文件差异、手动更新、备份和回滚。
 - 在“添加 Skill”页面预览远端 Git Skill，再安装或更新到用户选择的 Agent 或自定义路径。
 - 在 Skill 详情页展开安装位置后，将当前本地 Skill 复制到尚未安装的 Agent 或自定义路径；本地复制不检查远端更新，也不覆盖已有目录。
-- 在 Settings 中管理内置 Agent 路径、自定义路径、受控自动更新列表，并检测本机 Git 环境。
+- 在 Settings 中管理内置 Agent 路径、自定义路径、Skill 自动更新列表，并检测本机 Git 环境。
+- 在 Settings 中查看当前 Metis 版本、控制启动检查并手动检查软件更新；发现新版后可下载通过 Tauri 签名校验的标准安装包到系统 Downloads。
 
 ## 远端交互边界
 
-进入 Skill 详情页或展开安装位置不会访问远端 Git。只有用户主动预览远端来源、测试来源连接、检查更新、查看差异或执行来源更新时，Metis 才会发起 Git 交互。
+进入 Skill 详情页或展开安装位置不会访问远端 Git。只有用户主动预览远端来源、测试来源连接、检查 Skill 更新、查看差异或执行来源更新时，Metis 才会发起 Git 交互。
+
+启用“启动时检查软件更新”时，Metis 会在现有启动加载完成后访问固定 GitHub Releases 元数据地址；检查失败不会阻塞 Skills 首屏。安装包下载、打开安装包和打开 Downloads 均需要用户明确操作，Metis 不自动安装、提权或重启。
 
 ## 当前限制
 
 - 不包含 marketplace、社区 registry、云同步、账号系统或托管式企业后台。
 - 不包含 AI 自动生成或改写 Skill。
 - 安装包尚未进行 macOS Developer ID 签名、公证或 Windows Authenticode 签名。
+- 软件版本更新不包含静默下载、自动安装、自动重启、差分下载或更新回滚。

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import desktopPackage from "../package.json";
 import {
   applySkillUpdate,
   bindSkillSource,
@@ -37,6 +38,18 @@ import {
   type DetailLocalInstallState,
 } from "./SkillDetailPage";
 import { InlineError, type BindDraft } from "./SkillRow";
+import {
+  checkSoftwareUpdate,
+  downloadSoftwareUpdate,
+  openDownloadsDirectory,
+  openSoftwareUpdateInstaller,
+} from "./software-update/api";
+import { SoftwareUpdateSurface } from "./software-update/SoftwareUpdateSurface";
+import {
+  emptySoftwareUpdateDownloadState,
+  type SoftwareUpdateDownloadEvent,
+  type SoftwareUpdateInfo,
+} from "./software-update/types";
 import { UiRedesignPreview } from "./UiRedesignPreview";
 import type {
   DesktopAgentStatus,
@@ -102,7 +115,20 @@ function MetisApp() {
     custom_monitored_paths: [],
     team_policy_path: null,
     enterprise_network: emptyEnterpriseNetworkSettings(),
+    software_update: { check_on_startup: true },
   });
+  const [softwareUpdateCheckOnStartupDraft, setSoftwareUpdateCheckOnStartupDraft] =
+    useState(true);
+  const [softwareUpdateInfo, setSoftwareUpdateInfo] = useState<SoftwareUpdateInfo | null>(null);
+  const [softwareUpdateDismissed, setSoftwareUpdateDismissed] = useState(false);
+  const [softwareUpdateDialogOpen, setSoftwareUpdateDialogOpen] = useState(false);
+  const [softwareUpdateDownloadState, setSoftwareUpdateDownloadState] = useState(
+    emptySoftwareUpdateDownloadState,
+  );
+  const [softwareUpdateCheckBusy, setSoftwareUpdateCheckBusy] = useState(false);
+  const [softwareUpdateCheckMessage, setSoftwareUpdateCheckMessage] = useState<string | null>(null);
+  const [softwareUpdateCheckError, setSoftwareUpdateCheckError] = useState<string | null>(null);
+  const [softwareUpdateOpenError, setSoftwareUpdateOpenError] = useState<string | null>(null);
   const [agentPathOverrideDrafts, setAgentPathOverrideDrafts] = useState<Record<string, string>>({});
   const [editingAgentPathId, setEditingAgentPathId] = useState<string | null>(null);
   const [customMonitorDrafts, setCustomMonitorDrafts] = useState<DesktopCustomMonitoredPath[]>([]);
@@ -161,6 +187,7 @@ function MetisApp() {
   const guidanceToastVisible = Boolean(sourceRequiredSkill || autoUpdateUnavailable);
   const didBootstrap = useRef(false);
   const detailLocalInstallRequestSequenceRef = useRef(0);
+  const softwareUpdateCheckSequenceRef = useRef(0);
   const detailLocalInstallRequestTokensRef = useRef<Record<string, number>>({});
   const detailLocalInstallPendingRef = useRef<Record<string, DetailLocalInstallPending>>({});
   const agentPathInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -212,6 +239,7 @@ function MetisApp() {
         setSkills(indexedResult);
         setWarnings([]);
         setState("loaded");
+        startStartupSoftwareUpdateCheck(settingsResult);
         return;
       }
 
@@ -220,6 +248,7 @@ function MetisApp() {
       setWarnings(scanResult.warnings);
       setState("loaded");
       setActionMessage("已重新扫描本机 skill 路径");
+      startStartupSoftwareUpdateCheck(settingsResult);
     } catch (caught) {
       setError(desktopError(caught));
       setState("error");
@@ -228,6 +257,12 @@ function MetisApp() {
 
   function hasMissingLocalUpdatedAt(indexedSkills: DesktopSkill[]) {
     return indexedSkills.some((skill) => skill.local_updated_at === null);
+  }
+
+  function startStartupSoftwareUpdateCheck(nextSettings: DesktopSettings) {
+    if (nextSettings.software_update?.check_on_startup ?? true) {
+      void handleCheckSoftwareUpdate("startup");
+    }
   }
 
   function settingsRequestFromDrafts(): DesktopSettings {
@@ -242,14 +277,18 @@ function MetisApp() {
       });
     }
     return {
-      custom_scan_paths: [],
+      ...settings,
+      custom_scan_paths: settings.custom_scan_paths ?? [],
       agent_path_overrides: Object.entries(agentPathOverrideDrafts).map(([agent_id, path]) => ({
         agent_id,
         path,
       })),
       custom_monitored_paths: nextCustomMonitors,
-      team_policy_path: null,
-      enterprise_network: emptyEnterpriseNetworkSettings(),
+      team_policy_path: settings.team_policy_path ?? null,
+      enterprise_network: settings.enterprise_network ?? emptyEnterpriseNetworkSettings(),
+      software_update: {
+        check_on_startup: softwareUpdateCheckOnStartupDraft,
+      },
     };
   }
 
@@ -265,6 +304,125 @@ function MetisApp() {
     setCustomMonitorPathStatuses({});
     setNewCustomMonitorName("");
     setNewCustomMonitorPath("");
+    setSoftwareUpdateCheckOnStartupDraft(
+      nextSettings.software_update?.check_on_startup ?? true,
+    );
+  }
+
+  async function handleCheckSoftwareUpdate(mode: "startup" | "manual") {
+    const requestToken = softwareUpdateCheckSequenceRef.current + 1;
+    softwareUpdateCheckSequenceRef.current = requestToken;
+    setSoftwareUpdateCheckBusy(true);
+    if (mode === "manual") {
+      setSoftwareUpdateCheckMessage(null);
+      setSoftwareUpdateCheckError(null);
+    }
+
+    try {
+      const update = await checkSoftwareUpdate();
+      if (requestToken !== softwareUpdateCheckSequenceRef.current) {
+        return;
+      }
+      setSoftwareUpdateInfo(update);
+      if (update) {
+        setSoftwareUpdateDismissed(false);
+        if (mode === "manual") {
+          setSoftwareUpdateCheckMessage(`发现 Metis ${update.version}`);
+        }
+      } else if (mode === "manual") {
+        setSoftwareUpdateCheckMessage("当前已是最新版");
+      }
+    } catch (caught) {
+      if (mode === "manual" && requestToken === softwareUpdateCheckSequenceRef.current) {
+        setSoftwareUpdateCheckError(desktopError(caught).message);
+      }
+    } finally {
+      if (requestToken === softwareUpdateCheckSequenceRef.current) {
+        setSoftwareUpdateCheckBusy(false);
+      }
+    }
+  }
+
+  function handleSoftwareUpdateDownloadEvent(event: SoftwareUpdateDownloadEvent) {
+    setSoftwareUpdateDownloadState((current) => {
+      switch (event.event) {
+        case "started":
+          return {
+            phase: "downloading",
+            downloaded: 0,
+            contentLength: event.content_length ?? null,
+            result: null,
+            error: null,
+          };
+        case "progress":
+          return {
+            ...current,
+            phase: "downloading",
+            downloaded: event.downloaded,
+            contentLength: event.content_length ?? current.contentLength,
+          };
+        case "verifying":
+          return { ...current, phase: "verifying" };
+        case "saving":
+        case "finished":
+          return { ...current, phase: "saving" };
+      }
+    });
+  }
+
+  async function handleDownloadSoftwareUpdate() {
+    if (!softwareUpdateInfo || softwareUpdateCheckBusy) {
+      return;
+    }
+    softwareUpdateCheckSequenceRef.current += 1;
+    setSoftwareUpdateDialogOpen(true);
+    setSoftwareUpdateOpenError(null);
+    setSoftwareUpdateDownloadState({
+      ...emptySoftwareUpdateDownloadState(),
+      phase: "downloading",
+    });
+    try {
+      const result = await downloadSoftwareUpdate(handleSoftwareUpdateDownloadEvent);
+      setSoftwareUpdateDownloadState((current) => ({
+        ...current,
+        phase: "saved",
+        downloaded: current.contentLength ?? current.downloaded,
+        result,
+        error: null,
+      }));
+    } catch (caught) {
+      setSoftwareUpdateDownloadState((current) => ({
+        ...current,
+        phase: "error",
+        error: desktopError(caught).message,
+      }));
+    }
+  }
+
+  async function handleOpenSoftwareUpdateInstaller() {
+    setSoftwareUpdateOpenError(null);
+    try {
+      await openSoftwareUpdateInstaller();
+    } catch (caught) {
+      setSoftwareUpdateOpenError(desktopError(caught).message);
+    }
+  }
+
+  async function handleOpenDownloadsDirectory() {
+    setSoftwareUpdateOpenError(null);
+    try {
+      await openDownloadsDirectory();
+    } catch (caught) {
+      setSoftwareUpdateOpenError(desktopError(caught).message);
+    }
+  }
+
+  function closeSoftwareUpdateDialog() {
+    if (softwareUpdateDownloadState.phase === "saved") {
+      setSoftwareUpdateDismissed(true);
+    }
+    setSoftwareUpdateDialogOpen(false);
+    setSoftwareUpdateOpenError(null);
   }
 
   async function handleScan() {
@@ -1602,8 +1760,13 @@ function MetisApp() {
     Boolean(newCustomMonitorName.trim() && newCustomMonitorPath.trim()) ||
     JSON.stringify(customMonitorDrafts) !==
       JSON.stringify(settings.custom_monitored_paths ?? []);
+  const hasSoftwareUpdateDraftChanges =
+    softwareUpdateCheckOnStartupDraft !==
+    (settings.software_update?.check_on_startup ?? true);
   const hasSettingsDraftChanges =
-    hasUnsavedAgentPathChanges || hasCustomMonitorDraftChanges;
+    hasUnsavedAgentPathChanges ||
+    hasCustomMonitorDraftChanges ||
+    hasSoftwareUpdateDraftChanges;
   const isSkillDetailView = activeWorkspace === "skills" && skillsViewKind === "detail";
   const handleSkillsRouteKindChange = useCallback((kind: SkillsViewKind) => {
     setSkillsViewKind(kind);
@@ -1779,6 +1942,20 @@ function MetisApp() {
             {actionMessage}
           </div>
         ))}
+
+      <SoftwareUpdateSurface
+        dismissed={softwareUpdateDismissed}
+        dialogOpen={softwareUpdateDialogOpen}
+        downloadDisabled={softwareUpdateCheckBusy}
+        downloadState={softwareUpdateDownloadState}
+        info={softwareUpdateInfo}
+        openError={softwareUpdateOpenError}
+        onCloseDialog={closeSoftwareUpdateDialog}
+        onDismiss={() => setSoftwareUpdateDismissed(true)}
+        onDownload={() => void handleDownloadSoftwareUpdate()}
+        onOpenDownloads={() => void handleOpenDownloadsDirectory()}
+        onOpenInstaller={() => void handleOpenSoftwareUpdateInstaller()}
+      />
 
       {activeWorkspace === "settings" && (
         <section className="settings-panel workspace-pane redesign-settings-page" aria-label="配置" data-testid="workspace-settings">
@@ -1973,9 +2150,71 @@ function MetisApp() {
             </div>
           </section>
 
+          <section
+            className="settings-section software-update-settings-section"
+            data-testid="settings-section-software-update"
+          >
+            <div className="software-update-settings-copy">
+              <span className="software-update-settings-icon" aria-hidden="true">
+                <SoftwareUpdateSettingsIcon />
+              </span>
+              <div>
+                <h3>Metis 软件更新</h3>
+                <p>启动时在后台检查 Metis 新版本；发现新版后由你确认下载，安装仍由你手动完成。</p>
+              </div>
+            </div>
+            <div className="software-update-settings-controls">
+              <span className="software-update-current-version">
+                当前版本 <strong>{desktopPackage.version}</strong>
+              </span>
+              <label className="software-update-startup-toggle">
+                <input
+                  checked={softwareUpdateCheckOnStartupDraft}
+                  data-testid="software-update-check-on-startup"
+                  onChange={(event) =>
+                    setSoftwareUpdateCheckOnStartupDraft(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>启动时检查软件更新</span>
+              </label>
+              <button
+                className="software-update-check-button"
+                data-testid="check-software-update"
+                disabled={
+                  softwareUpdateCheckBusy ||
+                  ["downloading", "verifying", "saving"].includes(
+                    softwareUpdateDownloadState.phase,
+                  )
+                }
+                onClick={() => void handleCheckSoftwareUpdate("manual")}
+                type="button"
+              >
+                {softwareUpdateCheckBusy ? "检查中" : "检查更新"}
+              </button>
+            </div>
+            {softwareUpdateCheckMessage && (
+              <div className="software-update-check-result" role="status">
+                {softwareUpdateCheckMessage}
+              </div>
+            )}
+            {softwareUpdateCheckError && (
+              <div className="software-update-check-error" role="alert">
+                <span>{softwareUpdateCheckError}</span>
+                <button
+                  disabled={softwareUpdateCheckBusy}
+                  onClick={() => void handleCheckSoftwareUpdate("manual")}
+                  type="button"
+                >
+                  重试
+                </button>
+              </div>
+            )}
+          </section>
+
           <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
             <div className="auto-update-copy">
-              <h3>自动更新</h3>
+              <h3>Skill 自动更新</h3>
               <p>只会更新已加入自动更新列表、且本地没有修改的 Skill。</p>
             </div>
             <div className="auto-update-source-list" data-testid="auto-update-source-list">
@@ -2607,7 +2846,7 @@ type WorkspaceTopbarProps = {
 
 const workspaceTopbarCopy: Record<WorkspaceKey, { eyebrow: string; title: string }> = {
   skills: { eyebrow: "Skill Dashboard", title: "Skills" },
-  settings: { eyebrow: "Settings", title: "Agent 路径设置" },
+  settings: { eyebrow: "Settings", title: "应用设置" },
 };
 
 function WorkspaceTopbar({
@@ -2677,6 +2916,16 @@ function WorkspaceTopbar({
         </button>
       </div>
     </header>
+  );
+}
+
+function SoftwareUpdateSettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <path d="M12 3v10" />
+      <path d="m8 9.5 4 4 4-4" />
+      <path d="M5 17.5v2h14v-2" />
+    </svg>
   );
 }
 

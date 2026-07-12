@@ -120,16 +120,19 @@ jobs:
             artifact: metis-desktop-macos-universal
             build_args: --target universal-apple-darwin --bundles dmg
             bundle: target/universal-apple-darwin/release/bundle
+            updater_package: target/universal-apple-darwin/release/bundle/dmg/Metis_*_universal.dmg
           - name: Windows
             os: windows-latest
             artifact: metis-desktop-windows
             build_args: --bundles nsis
             bundle: target/release/bundle
+            updater_package: target/release/bundle/nsis/Metis_*_x64-setup.exe
           - name: Linux
             os: ubuntu-22.04
             artifact: metis-desktop-linux
             build_args: --bundles deb,appimage
             bundle: target/release/bundle
+            updater_package: target/release/bundle/appimage/Metis_*_amd64.AppImage
 
     steps:
       - name: Checkout
@@ -176,6 +179,30 @@ jobs:
         working-directory: apps/desktop
         run: pnpm tauri build ${{ matrix.platform.build_args }}
 
+      - name: Sign updater package
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          updater_packages=(${{ matrix.platform.updater_package }})
+          if [[ "${#updater_packages[@]}" -ne 1 ]]; then
+            echo "Expected exactly one updater package for ${{ matrix.platform.name }}."
+            find "${{ matrix.platform.bundle }}" -maxdepth 3 -type f -print
+            exit 1
+          fi
+          pnpm --dir apps/desktop tauri signer sign "${updater_packages[0]}"
+          if [[ ! -s "${updater_packages[0]}.sig" ]]; then
+            echo "Updater signature was not created: ${updater_packages[0]}.sig"
+            exit 1
+          fi
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/software_update/validate_signature_key.py
+          cargo test -p metis-desktop \
+            ci_updater_signatures_verify_against_configured_public_key \
+            -- --ignored
+
       - name: Upload desktop package
         uses: actions/upload-artifact@v4
         with:
@@ -211,7 +238,8 @@ jobs:
             -name "*.exe" -o \
             -name "*.msi" -o \
             -name "*.deb" -o \
-            -name "*.AppImage" \
+            -name "*.AppImage" -o \
+            -name "*.sig" \
           \) -print0 | while IFS= read -r -d '' file; do
             artifact_dir="$(basename "$(dirname "$(dirname "$file")")")"
             parent_dir="$(basename "$(dirname "$file")")"
@@ -235,6 +263,9 @@ jobs:
             "Metis_${release_version}_x64-setup.exe"
             "Metis_${release_version}_amd64.deb"
             "Metis_${release_version}_amd64.AppImage"
+            "Metis_${release_version}_universal.dmg.sig"
+            "Metis_${release_version}_x64-setup.exe.sig"
+            "Metis_${release_version}_amd64.AppImage.sig"
           )
           for expected_asset in "${expected_assets[@]}"; do
             if [[ ! -f "release-assets/$expected_asset" ]]; then
@@ -243,6 +274,8 @@ jobs:
               exit 1
             fi
           done
+
+          python3 tools/software_update/generate_latest_json.py
 
           (
             cd release-assets
@@ -265,23 +298,93 @@ jobs:
             exit 1
           fi
 
-          release_flags=(--prerelease=false --latest)
-          version_without_build="${release_version%%+*}"
-          if [[ "$version_without_build" == *-* ]]; then
-            release_flags=(--prerelease --latest=false)
+          release_assets=()
+          while IFS= read -r -d '' asset; do
+            release_assets+=("$asset")
+          done < <(find release-assets -maxdepth 1 -type f ! -name latest.json -print0 | sort -z)
+          if [[ "${#release_assets[@]}" -eq 0 ]]; then
+            echo "No non-manifest release assets are available."
+            exit 1
           fi
 
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
-            gh release edit "$GITHUB_REF_NAME" \
-              --title "Metis ${release_version}" \
-              --notes-file docs/release-notes/desktop.md \
-              --draft=false \
-              "${release_flags[@]}"
+            gh release edit "$GITHUB_REF_NAME" --draft=true
+            gh release upload "$GITHUB_REF_NAME" "${release_assets[@]}" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release-assets/* \
+            gh release create "$GITHUB_REF_NAME" "${release_assets[@]}" \
               --title "Metis ${release_version}" \
               --notes-file docs/release-notes/desktop.md \
-              "${release_flags[@]}" \
+              --draft \
               --verify-tag
           fi
+
+      - name: Upload latest updater manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "$GITHUB_REF_NAME" release-assets/latest.json --clobber
+
+      - name: Finalize GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_version="${GITHUB_REF_NAME#desktop-v}"
+          if [[ -z "$release_version" || "$release_version" == "$GITHUB_REF_NAME" ]]; then
+            echo "Invalid desktop release tag: $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+          release_flags=(--prerelease=false --latest=false)
+          version_without_build="${release_version%%+*}"
+          if [[ "$version_without_build" == *-* ]]; then
+            release_flags=(--prerelease --latest=false)
+          else
+            latest_tag="$(
+              gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name 2>/dev/null || true
+            )"
+            if [[ -z "$latest_tag" ]]; then
+              release_flags=(--prerelease=false --latest)
+            elif [[ "$latest_tag" != desktop-v* ]]; then
+              echo "Latest stable release has an unexpected tag: $latest_tag"
+              exit 1
+            else
+              latest_version="${latest_tag#desktop-v}"
+              if python3 - "$release_version" "$latest_version" <<'PY'
+          import re
+          import sys
+
+          pattern = re.compile(
+              r"(0|[1-9][0-9]*)\."
+              r"(0|[1-9][0-9]*)\."
+              r"(0|[1-9][0-9]*)"
+              r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+              r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+          )
+
+          def stable_core(version: str) -> tuple[int, int, int]:
+              match = pattern.fullmatch(version)
+              if match is None or "-" in version.split("+", 1)[0]:
+                  raise SystemExit(f"Expected stable SemVer: {version}")
+              return tuple(int(match.group(index)) for index in range(1, 4))
+
+          current_core = stable_core(sys.argv[1])
+          latest_core = stable_core(sys.argv[2])
+          raise SystemExit(0 if current_core >= latest_core else 1)
+          PY
+              then
+                release_flags=(--prerelease=false --latest)
+              else
+                echo "Keeping newer stable release $latest_tag as GitHub latest."
+              fi
+            fi
+          fi
+
+          gh release edit "$GITHUB_REF_NAME" \
+            --title "Metis ${release_version}" \
+            --notes-file docs/release-notes/desktop.md \
+            --draft=false \
+            "${release_flags[@]}"

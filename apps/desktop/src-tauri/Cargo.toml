@@ -15,11 +15,21 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2.5.4"
+tauri-plugin-updater = "2.10.1"
 serde.workspace = true
 serde_json.workspace = true
 dirs.workspace = true
+sha2.workspace = true
+base64 = "0.22"
 
 metis-core = { path = "../../../crates/core" }
 metis-git-provider = { path = "../../../crates/git-provider" }
 metis-security = { path = "../../../crates/security" }
 metis-storage = { path = "../../../crates/storage" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+xattr = "1.6.1"
+
+[dev-dependencies]
+minisign-verify = "0.2.5"

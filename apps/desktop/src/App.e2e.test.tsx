@@ -16,12 +16,24 @@ import type {
 } from "./types";
 
 const invokeMock = vi.hoisted(() => vi.fn());
+const channelMocks = vi.hoisted(
+  () => [] as Array<{ onmessage: (response: unknown) => void }>,
+);
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: invokeMock,
+  Channel: class<T = unknown> {
+    onmessage: (response: T) => void;
+
+    constructor(onmessage?: (response: T) => void) {
+      this.onmessage = onmessage ?? (() => undefined);
+      channelMocks.push(this as { onmessage: (response: unknown) => void });
+    }
+  },
 }));
 
 afterEach(() => {
+  channelMocks.length = 0;
   vi.useRealTimers();
 });
 
@@ -1121,7 +1133,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("Updates")).toBeNull();
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
-    expect(await screen.findByText("自动更新")).toBeTruthy();
+    expect(await screen.findByText("Skill 自动更新")).toBeTruthy();
     expect(screen.getByText("只会更新已加入自动更新列表、且本地没有修改的 Skill。")).toBeTruthy();
     expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
     expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
@@ -1266,7 +1278,7 @@ describe("Metis desktop GUI main flow", () => {
     render(<App />);
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
-    expect(await screen.findByText("自动更新")).toBeTruthy();
+    expect(await screen.findByText("Skill 自动更新")).toBeTruthy();
     expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
     expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
     const autoUpdateSection = within(screen.getByTestId("settings-section-auto-update"));
@@ -1704,7 +1716,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("settings-agent-path-codex")).toBeTruthy();
     expect(screen.getByText("内置 Agent 路径管理")).toBeTruthy();
     expect(screen.getByText("自定义路径管理")).toBeTruthy();
-    expect(screen.getByText("自动更新")).toBeTruthy();
+    expect(screen.getByText("Skill 自动更新")).toBeTruthy();
     expect(screen.queryByText("企业网络")).toBeNull();
     expect(screen.queryByText("团队清单合规")).toBeNull();
 
@@ -3419,6 +3431,511 @@ describe("Metis desktop GUI error paths", () => {
   });
 });
 
+describe("Metis software update flow", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    channelMocks.length = 0;
+  });
+
+  test("checks for software updates after bootstrap without blocking the workspace", async () => {
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      slowCheck: true,
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId("skill-row-software-update-skill")).toBeTruthy();
+    await waitFor(() => expect(scenario.commandCalls("check_software_update")).toBe(1));
+    expect(screen.queryByTestId("software-update-notice")).toBeNull();
+
+    scenario.resolveCheck(null);
+  });
+
+  test("respects the disabled startup software update setting", async () => {
+    const scenario = createSoftwareUpdateScenario({ checkOnStartup: false });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId("skill-row-software-update-skill")).toBeTruthy();
+    await waitFor(() => expect(scenario.commandCalls("get_desktop_settings")).toBe(1));
+    expect(scenario.commandCalls("check_software_update")).toBe(0);
+  });
+
+  test("keeps startup failures silent and exposes manual retry errors", async () => {
+    const user = userEvent.setup();
+    const startupScenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      checkError: "暂时无法连接 GitHub Releases",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      startupScenario.invoke(command, args),
+    );
+    const { unmount } = render(<App />);
+
+    expect(await screen.findByTestId("skill-row-software-update-skill")).toBeTruthy();
+    await waitFor(() => expect(startupScenario.commandCalls("check_software_update")).toBe(1));
+    expect(screen.queryByText("暂时无法连接 GitHub Releases")).toBeNull();
+    unmount();
+
+    const manualScenario = createSoftwareUpdateScenario({
+      checkOnStartup: false,
+      checkError: "暂时无法连接 GitHub Releases",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      manualScenario.invoke(command, args),
+    );
+    render(<App />);
+
+    await screen.findByTestId("skill-row-software-update-skill");
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+    await user.click(screen.getByTestId("check-software-update"));
+    const error = await screen.findByRole("alert");
+    expect(within(error).getByText("暂时无法连接 GitHub Releases")).toBeTruthy();
+    await user.click(within(error).getByText("重试"));
+    await waitFor(() => expect(manualScenario.commandCalls("check_software_update")).toBe(2));
+  });
+
+  test("keeps an available software update notice visible across workspace navigation", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      availableUpdate: softwareUpdateInfo(),
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    const notice = await screen.findByTestId("software-update-notice");
+    expect(within(notice).getByText("Metis 1.5.1 已发布")).toBeTruthy();
+    expect(within(notice).getByText("稳定性改进与软件更新体验优化")).toBeTruthy();
+    expect(within(notice).getByTestId("software-update-download")).toBeTruthy();
+    expect(screen.queryByTestId("redesign-toast")).toBeNull();
+
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+    expect(screen.getByTestId("software-update-notice")).toBeTruthy();
+
+    await user.click(screen.getByTestId("software-update-dismiss"));
+    expect(screen.queryByTestId("software-update-notice")).toBeNull();
+    expect(scenario.savedSettings()).toHaveLength(0);
+  });
+
+  test("shows download progress, verification, saved path, and trusted open actions", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      availableUpdate: softwareUpdateInfo(),
+      pauseDownload: true,
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(
+      within(await screen.findByTestId("software-update-notice")).getByTestId(
+        "software-update-download",
+      ),
+    );
+
+    const dialogElement = await screen.findByTestId("software-update-dialog");
+    const dialog = within(dialogElement);
+    await waitFor(() => expect(document.activeElement).toBe(dialogElement));
+    await user.keyboard("{Escape}");
+    expect(screen.getByTestId("software-update-dialog")).toBeTruthy();
+    const progress = await dialog.findByTestId("software-update-progress");
+    expect(progress.getAttribute("role")).toBe("progressbar");
+    expect(progress.getAttribute("aria-valuenow")).toBe("40");
+    expect(dialog.getByText("40%")).toBeTruthy();
+    expect(dialog.getByText("正在下载 Metis 1.5.1")).toBeTruthy();
+    expect(channelMocks).toHaveLength(1);
+    expect(invokeMock).toHaveBeenCalledWith("download_software_update", {
+      progressChannel: expect.anything(),
+    });
+
+    scenario.emitDownloadEvent({ event: "verifying" });
+    expect(await dialog.findByText("正在校验安装包")).toBeTruthy();
+    expect(dialog.queryByText("Metis 1.5.1 已下载")).toBeNull();
+
+    scenario.completeDownload();
+
+    expect(await dialog.findByText("Metis 1.5.1 已下载")).toBeTruthy();
+    expect(dialog.getByText("Metis_1.5.1_universal.dmg")).toBeTruthy();
+    expect(dialog.getByText(/已经过 Metis 更新签名校验/)).toBeTruthy();
+
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(dialog.getByTestId("software-update-open-installer"));
+    await user.tab();
+    expect(document.activeElement).toBe(dialog.getByLabelText("关闭软件更新窗口"));
+
+    await user.click(dialog.getByTestId("software-update-open-installer"));
+    expect(invokeMock).toHaveBeenCalledWith("open_software_update_installer");
+
+    await user.click(dialog.getByTestId("software-update-open-folder"));
+    expect(invokeMock).toHaveBeenCalledWith("open_downloads_directory");
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByTestId("software-update-dialog")).toBeNull());
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId("workspace-tab-settings")),
+    );
+  });
+
+  test("preserves software update settings while saving paths and renames Skill auto update", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({ checkOnStartup: false });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-software-update-skill");
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+
+    expect(await screen.findByText("Metis 软件更新")).toBeTruthy();
+    expect(screen.getByText("Skill 自动更新")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /^自动更新$/ })).toBeNull();
+    const startupCheck = screen.getByTestId(
+      "software-update-check-on-startup",
+    ) as HTMLInputElement;
+    expect(startupCheck.checked).toBe(false);
+
+    await user.click(screen.getByTestId("agent-path-edit-codex"));
+    const codexPath = screen.getByTestId("agent-path-codex") as HTMLInputElement;
+    await user.clear(codexPath);
+    await user.type(codexPath, "/tmp/software-update-codex-skills");
+    await user.click(screen.getByTestId("settings-save"));
+    await screen.findByText("设置已保存");
+
+    expect(scenario.lastSavedSettings()?.software_update).toEqual({
+      check_on_startup: false,
+    });
+    expect(scenario.lastSavedSettings()?.custom_scan_paths).toEqual([
+      "/tmp/preserved-custom-scan",
+    ]);
+    expect(scenario.lastSavedSettings()?.team_policy_path).toBe(
+      "/tmp/preserved-team-policy.json",
+    );
+    expect(scenario.lastSavedSettings()?.enterprise_network).toEqual({
+      proxy_url: "http://proxy.example:8080",
+      no_proxy: "localhost",
+      certificate_authority_bundle_path: "/tmp/preserved-ca.pem",
+    });
+
+    await user.click(startupCheck);
+    expect((screen.getByTestId("settings-save") as HTMLButtonElement).disabled).toBe(false);
+    await user.click(screen.getByTestId("settings-save"));
+    await waitFor(() => expect(scenario.savedSettings()).toHaveLength(2));
+    expect(scenario.lastSavedSettings()?.software_update).toEqual({
+      check_on_startup: true,
+    });
+  });
+
+  test("recovers from a failed software update download", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      availableUpdate: softwareUpdateInfo(),
+      downloadErrorOnce: "下载连接已中断，请重试",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(
+      within(await screen.findByTestId("software-update-notice")).getByTestId(
+        "software-update-download",
+      ),
+    );
+
+    const dialog = within(await screen.findByTestId("software-update-dialog"));
+    const alert = await dialog.findByRole("alert");
+    expect(within(alert).getByText("下载连接已中断，请重试")).toBeTruthy();
+    expect(scenario.commandCalls("download_software_update")).toBe(1);
+
+    await user.click(dialog.getByText("重新下载"));
+    expect(await dialog.findByText("Metis 1.5.1 已下载")).toBeTruthy();
+    expect(scenario.commandCalls("download_software_update")).toBe(2);
+  });
+
+  test("shows recoverable errors when opening a saved installer or Downloads", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      availableUpdate: softwareUpdateInfo(),
+      openDownloadsError: "无法打开 Downloads 目录",
+      openInstallerError: "安装包已被移动，请重新下载",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(
+      within(await screen.findByTestId("software-update-notice")).getByTestId(
+        "software-update-download",
+      ),
+    );
+
+    const dialog = within(await screen.findByTestId("software-update-dialog"));
+    await dialog.findByText("Metis 1.5.1 已下载");
+
+    await user.click(dialog.getByTestId("software-update-open-installer"));
+    expect(await dialog.findByText("安装包已被移动，请重新下载")).toBeTruthy();
+
+    await user.click(dialog.getByTestId("software-update-open-folder"));
+    expect(await dialog.findByText("无法打开 Downloads 目录")).toBeTruthy();
+    expect(dialog.queryByText("安装包已被移动，请重新下载")).toBeNull();
+  });
+});
+
+interface SoftwareUpdateSettingsFixture {
+  check_on_startup: boolean;
+}
+
+type DesktopSettingsWithSoftwareUpdate = DesktopSettings & {
+  software_update?: SoftwareUpdateSettingsFixture;
+};
+
+interface SoftwareUpdateInfoFixture {
+  current_version: string;
+  version: string;
+  notes?: string | null;
+  published_at?: string | null;
+}
+
+type SoftwareUpdateProgressFixture =
+  | { event: "started"; content_length?: number | null }
+  | {
+      event: "progress";
+      chunk_length: number;
+      downloaded: number;
+      content_length?: number | null;
+    }
+  | { event: "verifying" }
+  | { event: "saving" }
+  | { event: "finished"; file_path: string };
+
+function softwareUpdateInfo(): SoftwareUpdateInfoFixture {
+  return {
+    current_version: "1.5.0",
+    version: "1.5.1",
+    notes: "稳定性改进与软件更新体验优化",
+    published_at: "2026-07-12T08:00:00Z",
+  };
+}
+
+function createSoftwareUpdateScenario(
+  options: {
+    availableUpdate?: SoftwareUpdateInfoFixture | null;
+    checkError?: string;
+    checkOnStartup: boolean;
+    downloadErrorOnce?: string;
+    openDownloadsError?: string;
+    openInstallerError?: string;
+    pauseDownload?: boolean;
+    slowCheck?: boolean;
+  },
+) {
+  const calls = new Map<string, number>();
+  const savedSettingsHistory: DesktopSettingsWithSoftwareUpdate[] = [];
+  const downloadResult = {
+    version: "1.5.1",
+    file_name: "Metis_1.5.1_universal.dmg",
+    file_path: "/Users/me/Downloads/Metis_1.5.1_universal.dmg",
+  };
+  let settings: DesktopSettingsWithSoftwareUpdate = {
+    custom_scan_paths: ["/tmp/preserved-custom-scan"],
+    agent_path_overrides: [],
+    custom_monitored_paths: [],
+    team_policy_path: "/tmp/preserved-team-policy.json",
+    enterprise_network: {
+      proxy_url: "http://proxy.example:8080",
+      no_proxy: "localhost",
+      certificate_authority_bundle_path: "/tmp/preserved-ca.pem",
+    },
+    software_update: {
+      check_on_startup: options.checkOnStartup,
+    },
+  };
+  const agents: DesktopAgentStatus[] = [
+    {
+      agent_id: "codex",
+      agent_name: "Codex",
+      enabled: true,
+      paths: [
+        {
+          path: "/Users/me/.codex/skills",
+          scope: "user",
+          exists: true,
+          readable: true,
+          writable: true,
+        },
+      ],
+    },
+  ];
+  const skills: DesktopSkill[] = [
+    {
+      id: "software-update-skill",
+      agent_id: "codex",
+      agent_name: "Codex",
+      name: "software-update-skill",
+      description: "Software update test fixture",
+      install_path: "/Users/me/.codex/skills/software-update-skill",
+      metadata_path: "/Users/me/.codex/skills/software-update-skill/SKILL.md",
+      metadata_status: "found",
+      metadata_error: null,
+      source_id: null,
+      source: null,
+      local_modified: false,
+      last_scanned_at: "2026-07-12T08:00:00Z",
+      local_updated_at: "2026-07-12T08:00:00Z",
+    },
+  ];
+  let checkResolver: (result: SoftwareUpdateInfoFixture | null) => void = () => undefined;
+  const slowCheck = new Promise<SoftwareUpdateInfoFixture | null>((resolve) => {
+    checkResolver = resolve;
+  });
+  let downloadResolver: (result: typeof downloadResult) => void = () => undefined;
+  const pendingDownload = new Promise<typeof downloadResult>((resolve) => {
+    downloadResolver = resolve;
+  });
+  let downloadChannel: { onmessage: (response: SoftwareUpdateProgressFixture) => void } | null =
+    null;
+
+  return {
+    commandCalls: (command: string) => calls.get(command) ?? 0,
+    completeDownload() {
+      if (!downloadChannel) {
+        throw new Error("software update download channel is not connected");
+      }
+      downloadChannel.onmessage({ event: "saving" });
+      downloadChannel.onmessage({
+        event: "finished",
+        file_path: downloadResult.file_path,
+      });
+      downloadResolver(downloadResult);
+    },
+    emitDownloadEvent(event: SoftwareUpdateProgressFixture) {
+      if (!downloadChannel) {
+        throw new Error("software update download channel is not connected");
+      }
+      downloadChannel.onmessage(event);
+    },
+    lastSavedSettings() {
+      return savedSettingsHistory[savedSettingsHistory.length - 1];
+    },
+    resolveCheck(result: SoftwareUpdateInfoFixture | null) {
+      checkResolver(result);
+    },
+    savedSettings: () => savedSettingsHistory,
+    async invoke(command: string, args?: unknown) {
+      calls.set(command, (calls.get(command) ?? 0) + 1);
+      switch (command) {
+        case "list_agents":
+          return agents;
+        case "list_indexed_skills":
+          return skills;
+        case "get_desktop_settings":
+          return settings;
+        case "save_desktop_settings": {
+          const request = args as { settings: DesktopSettingsWithSoftwareUpdate };
+          settings = {
+            ...request.settings,
+            agent_path_overrides: request.settings.agent_path_overrides ?? [],
+            custom_monitored_paths: request.settings.custom_monitored_paths ?? [],
+          };
+          savedSettingsHistory.push(settings);
+          const codexOverride = settings.agent_path_overrides?.find(
+            (overridePath) => overridePath.agent_id === "codex",
+          );
+          if (codexOverride) {
+            agents[0].paths[0].path = codexOverride.path.trim();
+            settings.agent_path_overrides = [
+              { agent_id: "codex", path: codexOverride.path.trim() },
+            ];
+          }
+          return settings;
+        }
+        case "scan_skills":
+          return { skills, warnings: [] };
+        case "get_skill_size":
+          return {
+            skill_id: "software-update-skill",
+            file_count: 1,
+            total_size_bytes: 1024,
+          };
+        case "check_software_update":
+          if (options.checkError) {
+            throw new Error(options.checkError);
+          }
+          return options.slowCheck ? slowCheck : (options.availableUpdate ?? null);
+        case "download_software_update": {
+          const request = args as {
+            progressChannel: {
+              onmessage: (response: SoftwareUpdateProgressFixture) => void;
+            };
+          };
+          downloadChannel = request.progressChannel;
+          downloadChannel.onmessage({
+            event: "started",
+            content_length: 1000,
+          });
+          downloadChannel.onmessage({
+            event: "progress",
+            chunk_length: 400,
+            downloaded: 400,
+            content_length: 1000,
+          });
+          if (
+            options.downloadErrorOnce &&
+            (calls.get("download_software_update") ?? 0) === 1
+          ) {
+            throw new Error(options.downloadErrorOnce);
+          }
+          if (options.pauseDownload) {
+            return pendingDownload;
+          }
+          downloadChannel.onmessage({ event: "verifying" });
+          downloadChannel.onmessage({ event: "saving" });
+          downloadChannel.onmessage({
+            event: "finished",
+            file_path: downloadResult.file_path,
+          });
+          return downloadResult;
+        }
+        case "open_software_update_installer":
+          if (options.openInstallerError) {
+            throw new Error(options.openInstallerError);
+          }
+          return null;
+        case "open_downloads_directory":
+          if (options.openDownloadsError) {
+            throw new Error(options.openDownloadsError);
+          }
+          return null;
+        case "open_external_url":
+          return null;
+        default:
+          throw new Error(`Unexpected invoke command: ${command} ${JSON.stringify(args)}`);
+      }
+    },
+  };
+}
+
 function createMainFlowScenario(
   options: {
     auditAfterUpdateCheck?: boolean;
@@ -3619,6 +4136,8 @@ function createMainFlowScenario(
           return indexedSkills;
         case "get_desktop_settings":
           return settings;
+        case "check_software_update":
+          return null;
         case "open_external_url":
           return null;
         case "save_desktop_settings": {
@@ -4209,6 +4728,8 @@ function createBetaReadinessScenario(
           return skills;
         case "get_desktop_settings":
           return { custom_scan_paths: ["/tmp/metis-beta/skills"] };
+        case "check_software_update":
+          return null;
         case "export_environment_report":
           return {
             generated_at: "2026-06-20T10:02:00Z",
@@ -4500,6 +5021,8 @@ function createEmptyWorkspaceScenario() {
           return [];
         case "get_desktop_settings":
           return { custom_scan_paths: [] };
+        case "check_software_update":
+          return null;
         case "scan_skills":
           return { skills: [], warnings: [] };
         default:
@@ -4661,6 +5184,8 @@ function createAgentDetailScenario(
         }
         case "get_desktop_settings":
           return { custom_scan_paths: [] };
+        case "check_software_update":
+          return null;
         case "scan_skills":
           return {
             skills: options.staleIndexedRefreshAfterCopy
@@ -4966,6 +5491,8 @@ function createSearchDedupeScenario() {
           return skills;
         case "get_desktop_settings":
           return { custom_scan_paths: [] };
+        case "check_software_update":
+          return null;
         default:
           throw new Error(`Unexpected invoke command: ${command}`);
       }
@@ -5043,6 +5570,8 @@ function createPartialSourceDedupeScenario() {
           return skills;
         case "get_desktop_settings":
           return { custom_scan_paths: [] };
+        case "check_software_update":
+          return null;
         default:
           throw new Error(`Unexpected invoke command: ${command}`);
       }
@@ -5110,6 +5639,8 @@ function createHomeSortScenario() {
           return skills;
         case "get_desktop_settings":
           return { custom_scan_paths: [] };
+        case "check_software_update":
+          return null;
         default:
           throw new Error(`Unexpected invoke command: ${command}`);
       }
@@ -5173,6 +5704,8 @@ function createMissingLocalUpdatedAtScenario() {
           return { skills: scannedSkills, warnings: [] };
         case "get_desktop_settings":
           return { custom_scan_paths: [] };
+        case "check_software_update":
+          return null;
         default:
           throw new Error(`Unexpected invoke command: ${command}`);
       }

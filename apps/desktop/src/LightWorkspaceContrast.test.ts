@@ -1145,4 +1145,26 @@ describe("Phase 6 light workspace contrast", () => {
       "background: var(--source-help-code-bg);",
     );
   });
+
+  test("keeps software update motion meaningful and removable", () => {
+    expect(latestBlockFor(".software-update-progress > span")).toContain(
+      "transform-origin: left center;",
+    );
+    expect(latestBlockFor(".software-update-progress > span")).toContain(
+      "transition: transform 200ms ease-out;",
+    );
+    const reducedMotion = mediaBlocksFor("(prefers-reduced-motion: reduce)").join("\n");
+    expect(reducedMotion).toContain(".software-update-notice");
+    expect(reducedMotion).toContain(".software-update-dialog");
+    expect(reducedMotion).toContain(".software-update-verifying > span");
+    expect(reducedMotion).toContain("animation: none;");
+    expect(reducedMotion).toContain("transition: none;");
+    expect(exactBlockFor(".software-update-dialog")).toContain(
+      "max-height: calc(100dvh - 32px);",
+    );
+    expect(exactBlockFor(".software-update-dialog")).toContain("overflow-y: auto;");
+    expect(stylesheet).toContain(
+      ".redesign-preview-shell:has(.software-update-notice) .redesign-toast",
+    );
+  });
 });

@@ -3954,6 +3954,568 @@ textarea {
   }
 }
 
+/* Metis software update */
+.software-update-notice {
+  position: fixed;
+  top: 30px;
+  right: 34px;
+  z-index: 70;
+  width: min(500px, calc(100vw - 48px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid rgba(49, 95, 168, 0.22);
+  border-radius: 18px;
+  padding: 14px;
+  color: #1f365b;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);
+  box-shadow: 0 20px 46px rgba(49, 84, 146, 0.16);
+  animation: softwareUpdateNoticeIn 220ms ease-out;
+}
+
+.software-update-notice-icon,
+.software-update-settings-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #4477bf, #315fa8);
+  box-shadow: 0 10px 22px rgba(49, 95, 168, 0.24);
+}
+
+.software-update-notice-icon svg,
+.software-update-settings-icon svg,
+.software-update-hero svg,
+.software-update-saved-file svg,
+.software-update-dialog-close svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.software-update-notice-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.software-update-notice-copy strong {
+  color: #1d3558;
+  font-size: 14px;
+  font-weight: 820;
+}
+
+.software-update-notice-copy small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #58708f;
+  font-size: 12.5px;
+  font-weight: 560;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.software-update-notice-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.software-update-notice-actions button,
+.software-update-dialog-actions button,
+.software-update-check-button,
+.software-update-check-error button {
+  min-height: 42px;
+  border-radius: 11px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 780;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.software-update-dismiss,
+.software-update-secondary-action {
+  border-color: #d4dfed;
+  color: #475d79;
+  background: #ffffff;
+}
+
+.software-update-download,
+.software-update-primary-action,
+.software-update-check-button {
+  border-color: #315fa8;
+  color: #ffffff;
+  background: #315fa8;
+  box-shadow: 0 9px 20px rgba(49, 95, 168, 0.18);
+}
+
+.software-update-dismiss:hover:not(:disabled),
+.software-update-secondary-action:hover:not(:disabled) {
+  border-color: #b9cbe1;
+  color: #2d4768;
+  background: #f7faff;
+}
+
+.software-update-download:hover:not(:disabled),
+.software-update-primary-action:hover:not(:disabled),
+.software-update-check-button:hover:not(:disabled) {
+  border-color: #284f8d;
+  color: #ffffff;
+  background: #284f8d;
+  box-shadow: 0 12px 24px rgba(49, 95, 168, 0.24);
+}
+
+.software-update-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(7px);
+  animation: softwareUpdateBackdropIn 180ms ease-out;
+}
+
+.software-update-dialog {
+  position: relative;
+  width: min(540px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: grid;
+  gap: 20px;
+  border: 1px solid rgba(203, 216, 233, 0.92);
+  border-radius: 24px;
+  padding: 30px;
+  color: #17253a;
+  background: linear-gradient(155deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 34px 90px rgba(15, 23, 42, 0.26);
+  overflow-y: auto;
+  animation: softwareUpdateDialogIn 240ms ease-out;
+}
+
+.software-update-dialog-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  border-color: transparent;
+  border-radius: 12px;
+  padding: 0;
+  color: #64748b;
+  background: transparent;
+}
+
+.software-update-dialog-close:hover:not(:disabled) {
+  color: #334155;
+  background: #eef4fb;
+  transform: none;
+}
+
+.software-update-hero {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  color: #315fa8;
+  background: #eaf2ff;
+  box-shadow: inset 0 0 0 1px rgba(49, 95, 168, 0.12);
+}
+
+.software-update-hero.phase-saved {
+  color: #08775f;
+  background: #e4f8f1;
+  box-shadow: inset 0 0 0 1px rgba(8, 119, 95, 0.12);
+}
+
+.software-update-hero svg {
+  width: 30px;
+  height: 30px;
+}
+
+.software-update-dialog-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.software-update-dialog-eyebrow {
+  color: #315fa8;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.software-update-dialog-copy h2 {
+  color: #17253a;
+  font-size: 25px;
+  line-height: 1.2;
+}
+
+.software-update-dialog-copy > p:last-child {
+  max-width: 62ch;
+  color: #5d6d82;
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.65;
+}
+
+.software-update-progress-block {
+  display: grid;
+  gap: 9px;
+}
+
+.software-update-progress-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #334c6d;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+}
+
+.software-update-progress-copy small {
+  color: #586a82;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.software-update-progress {
+  position: relative;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e3ebf5;
+}
+
+.software-update-progress > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #315fa8, #61a6d9);
+  transform-origin: left center;
+  transition: transform 200ms ease-out;
+}
+
+.software-update-progress.indeterminate > span {
+  width: 42%;
+  animation: softwareUpdateIndeterminate 1.1s ease-in-out infinite;
+}
+
+.software-update-verifying,
+.software-update-saved-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #dce7f4;
+  border-radius: 15px;
+  padding: 13px 15px;
+  color: #38536f;
+  background: #f6f9fd;
+}
+
+.software-update-verifying > span {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2px solid #bed0e5;
+  border-top-color: #315fa8;
+  border-radius: 999px;
+  animation: softwareUpdateSpin 800ms linear infinite;
+}
+
+.software-update-verifying strong {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.software-update-saved-file > span:first-child {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #08775f;
+  background: #e4f8f1;
+}
+
+.software-update-saved-file > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.software-update-saved-file strong,
+.software-update-saved-file small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.software-update-saved-file strong {
+  color: #1d3c35;
+  font-size: 13.5px;
+}
+
+.software-update-saved-file small {
+  color: #506c64;
+  font-size: 11.5px;
+}
+
+.software-update-error {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #f1c0b9;
+  border-radius: 13px;
+  padding: 12px 14px;
+  color: #9b2c20;
+  background: #fff5f3;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.software-update-error.compact {
+  padding: 9px 12px;
+}
+
+.software-update-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settings-section.software-update-settings-section {
+  min-height: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px 28px;
+  align-items: center;
+  border: 1px solid #cfddee;
+  border-radius: 22px;
+  padding: 26px 30px;
+  background: linear-gradient(145deg, rgba(244, 249, 255, 0.96), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 18px 46px rgba(37, 73, 122, 0.1);
+}
+
+.software-update-settings-copy {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.software-update-settings-copy > div {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.software-update-settings-copy h3 {
+  color: #1c2a3d;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.software-update-settings-copy p {
+  max-width: 62ch;
+  color: #536178;
+  font-size: 14px;
+  font-weight: 620;
+  line-height: 1.65;
+}
+
+.software-update-settings-controls {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.software-update-current-version {
+  color: #67768a;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.software-update-current-version strong {
+  color: #2d4668;
+  font-variant-numeric: tabular-nums;
+}
+
+.software-update-startup-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #344a67;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.software-update-startup-toggle input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: #315fa8;
+}
+
+.software-update-check-button {
+  min-width: 104px;
+}
+
+.software-update-check-result,
+.software-update-check-error {
+  grid-column: 1 / -1;
+}
+
+.software-update-check-result {
+  border-radius: 11px;
+  padding: 9px 12px;
+  color: #25527e;
+  background: #eaf3ff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.software-update-check-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.software-update-check-error button {
+  min-height: 34px;
+  border-color: #e1aaa1;
+  color: #9b2c20;
+  background: #ffffff;
+}
+
+@keyframes softwareUpdateNoticeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes softwareUpdateBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes softwareUpdateDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes softwareUpdateIndeterminate {
+  from {
+    transform: translateX(-115%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
+@keyframes softwareUpdateSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .software-update-notice {
+    top: auto;
+    right: 18px;
+    bottom: 18px;
+    left: 18px;
+    width: auto;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .software-update-notice-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .redesign-preview-shell:has(.software-update-notice) .redesign-toast {
+    bottom: 154px;
+  }
+
+  .settings-section.software-update-settings-section {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .software-update-settings-controls {
+    justify-items: stretch;
+  }
+
+  .software-update-startup-toggle {
+    min-height: 44px;
+  }
+
+  .software-update-dialog {
+    padding: 26px 22px 22px;
+  }
+
+  .software-update-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .software-update-dialog-actions button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .software-update-notice,
+  .software-update-dialog-backdrop,
+  .software-update-dialog,
+  .software-update-progress > span,
+  .software-update-verifying > span,
+  .software-update-notice-actions button,
+  .software-update-dialog-actions button,
+  .software-update-check-button,
+  .software-update-check-error button {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* Formal reference-dashboard migration for the real desktop UI. */
 :root {
   --reference-canvas: #eef3f7;

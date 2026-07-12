@@ -60,6 +60,11 @@ export interface DesktopSettings {
   custom_monitored_paths?: DesktopCustomMonitoredPath[];
   team_policy_path?: string | null;
   enterprise_network?: DesktopEnterpriseNetworkSettings | null;
+  software_update?: DesktopSoftwareUpdateSettings;
+}
+
+export interface DesktopSoftwareUpdateSettings {
+  check_on_startup: boolean;
 }
 
 export interface DesktopAgentPathOverride {
