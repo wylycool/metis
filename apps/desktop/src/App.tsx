@@ -2247,13 +2247,13 @@ function MetisApp() {
                         data-testid={`auto-update-remove-actions-${skill.id}`}
                       >
                         <button
-                          className="auto-update-remove metis-action-button metis-action-button--compact"
+                          className="auto-update-remove"
                           data-testid={`remove-auto-update-${skill.id}`}
                           disabled={removeBusy}
                           onClick={() => setPendingAutoUpdateRemovalSourceKey(group.sourceKey)}
                           type="button"
                         >
-                          移除
+                          移出列表
                         </button>
                       </div>
                       {removalOpen ? (

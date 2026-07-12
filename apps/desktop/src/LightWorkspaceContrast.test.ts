@@ -509,7 +509,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(exactBlockFor(".auto-update-remove-actions")).not.toContain("grid-column: 1 / -1;");
     expect(exactBlockFor(".auto-update-remove")).toContain("min-width: auto;");
     expect(exactBlockFor(".auto-update-remove")).toContain("min-height: 30px;");
-    expect(exactBlockFor(".auto-update-remove")).toContain("border-color: transparent;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("border: 0;");
     expect(exactBlockFor(".auto-update-remove")).toContain("color: #7a8799;");
     expect(exactBlockFor(".auto-update-remove")).toContain("background: transparent;");
     expect(exactBlockFor(".auto-update-remove:hover:not(:disabled)")).toContain("color: #a23b32;");

@@ -9333,9 +9333,13 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .auto-update-remove {
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: auto;
   min-height: 30px;
-  border-color: transparent;
+  appearance: none;
+  border: 0;
   border-radius: 8px;
   padding: 0 8px;
   color: #7a8799;
@@ -9346,7 +9350,6 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .auto-update-remove:hover:not(:disabled) {
-  border-color: #f0d2ce;
   color: #a23b32;
   background: #fff7f5;
   transform: none;
@@ -9354,10 +9357,10 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .auto-update-remove:focus-visible {
-  border-color: #e8bdb7;
   color: #a23b32;
   background: #fff7f5;
-  box-shadow: 0 0 0 3px rgba(162, 59, 50, 0.12);
+  outline: 3px solid rgba(162, 59, 50, 0.14);
+  outline-offset: 1px;
 }
 
 .auto-update-remove:disabled {
@@ -9515,16 +9518,16 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   }
 
   .auto-update-remove {
-    justify-self: stretch;
+    justify-self: end;
   }
 
   .auto-update-remove-actions {
     display: inline-flex;
-    justify-self: stretch;
+    justify-self: end;
   }
 
   .auto-update-remove-actions button {
-    width: 100%;
+    width: auto;
   }
 
   .auto-update-remove-confirm-actions {
