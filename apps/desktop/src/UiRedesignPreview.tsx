@@ -3,6 +3,7 @@ import { AgentBadge, AgentBadgeStack, normalizeAgentId, type AgentIdentity } fro
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { GitHubIcon } from "./GitHubIcon";
 import { textInputAssistanceProps } from "./inputAssistance";
+import { MetisBrandWordmark } from "./MetisBrandWordmark";
 import { METIS_GITHUB_URL } from "./projectLinks";
 
 type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string } | { kind: "settings" };
@@ -291,7 +292,7 @@ function RedesignSidebar({
             <CrystalSkillLogo testId="redesign-brand-crystal-logo" />
           </span>
           <span>
-            <strong>Metis</strong>
+            <MetisBrandWordmark testId="redesign-brand-wordmark" />
             <small>Skill Manager</small>
           </span>
         </a>

@@ -799,6 +799,30 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #8a4b0f;");
   });
 
+  test("refines the Metis wordmark i and s without changing the crystal logo", () => {
+    expect(latestBlockFor(".metis-brand-wordmark-base")).toContain("color: #172033;");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("position: relative;");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("color: #3154df;");
+    expect(blockFor(".metis-brand-wordmark-i::after")).toContain('content: "";');
+    expect(blockFor(".metis-brand-wordmark-i::after")).toContain(
+      "transform: translateX(-50%) rotate(45deg);",
+    );
+    expect(blockFor(".metis-brand-wordmark-i::after")).toContain(
+      "background: linear-gradient(135deg, #43d7e8 0%, #3e7bfa 100%);",
+    );
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("background: linear-gradient(");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("color: #6a4bd8;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("#6a4bd8 52%");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("#0b7788 100%");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain(
+      "-webkit-background-clip: text;",
+    );
+    expect(blockFor(".metis-brand-wordmark-s")).toContain(
+      "-webkit-text-fill-color: transparent;",
+    );
+    expect(latestBlockFor(".redesign-logo-mark img")).toContain("width: 50px;");
+  });
+
   test("brands overlapping agent letter badges by agent identity", () => {
     expect(latestBlockFor(".skill-agent-stack > .agent-badge")).toContain(
       "background: var(--agent-badge-background, linear-gradient(135deg, #3e7bfa, #2dd4bf));",

@@ -31,6 +31,7 @@ import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { normalizeRemoteSyncDraft } from "./gitWebUrl";
 import { GitHubIcon } from "./GitHubIcon";
 import { textInputAssistanceProps } from "./inputAssistance";
+import { MetisBrandWordmark } from "./MetisBrandWordmark";
 import { METIS_GITHUB_URL } from "./projectLinks";
 import { isRemoteTargetSelectable, remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
 import {
@@ -1824,7 +1825,7 @@ function MetisApp() {
                 <CrystalSkillLogo testId="metis-brand-crystal-logo" />
               </span>
               <span>
-                <strong>Metis</strong>
+                <MetisBrandWordmark testId="metis-brand-wordmark" />
                 <small>Skill Manager</small>
               </span>
             </button>

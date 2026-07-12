@@ -1664,6 +1664,11 @@ describe("Metis desktop GUI main flow", () => {
     );
     expect(screen.getByTestId("metis-brand-crystal-logo")).toBeTruthy();
     expect(screen.queryByTestId("metis-brand-letter-logo")).toBeNull();
+    const metisWordmark = screen.getByTestId("metis-brand-wordmark");
+    expect(metisWordmark.textContent).toBe("Metis");
+    expect(metisWordmark.querySelector(".metis-brand-wordmark-base")?.textContent).toBe("Met");
+    expect(metisWordmark.querySelector(".metis-brand-wordmark-i")?.textContent).toBe("i");
+    expect(metisWordmark.querySelector(".metis-brand-wordmark-s")?.textContent).toBe("s");
     expect(screen.queryByText("Local library")).toBeNull();
     expect(screen.queryByText(/trusted sources/)).toBeNull();
     expect(screen.getByTestId("metis-github-link").getAttribute("aria-label")).toBe(
@@ -1799,6 +1804,11 @@ describe("Metis desktop GUI main flow", () => {
     );
     expect(screen.getByTestId("redesign-brand-crystal-logo")).toBeTruthy();
     expect(screen.queryByTestId("redesign-brand-letter-logo")).toBeNull();
+    const redesignWordmark = screen.getByTestId("redesign-brand-wordmark");
+    expect(redesignWordmark.textContent).toBe("Metis");
+    expect(redesignWordmark.querySelector(".metis-brand-wordmark-base")?.textContent).toBe("Met");
+    expect(redesignWordmark.querySelector(".metis-brand-wordmark-i")?.textContent).toBe("i");
+    expect(redesignWordmark.querySelector(".metis-brand-wordmark-s")?.textContent).toBe("s");
     expect(screen.queryByText("Local library")).toBeNull();
     expect(screen.queryByText(/trusted sources/)).toBeNull();
     expect(screen.getByTestId("redesign-github-link").getAttribute("href")).toBe(
