@@ -10,8 +10,6 @@ metis/
   LICENSE                   # MIT 许可证
   SECURITY.md              # 安全策略
   CONTRIBUTING.md          # 本文件
-  ARCHITECTURE.md          # 架构文档
-  ROADMAP.md              # 路线图
   docs/
     en/                    # English user documentation
     zh-CN/                 # 简体中文用户文档
@@ -47,7 +45,7 @@ metis/
 
 ### 提出新功能
 
-1. 先检查 [ROADMAP.md](ROADMAP.md) 确认是否已在规划中。
+1. 在 GitHub Issues 中搜索是否已有相同或相近提案。
 2. 在 Issue 中描述：
    - 这个功能解决什么问题
    - 建议的实现方式
@@ -60,12 +58,11 @@ metis/
 3. **遵循 SDD + TDD**：
    - SDD：任何新功能、行为改动、架构调整或较大修复前，先在 Issue 或 PR 中明确目标、边界、涉及文件、数据结构和验证方式。
    - TDD：设计明确后，先写失败测试并运行确认红灯，再写最小实现，测试绿灯后再重构。
-   - 项目级 agent 规则见 [AGENTS.md](AGENTS.md)。
 4. **记录轻量计划**：
    - 较大功能先通过 Issue 或 Draft PR 讨论方案；不要在公开文档中追加逐步命令流水。
 5. **按风险验证并收口进度**：
    - 开发过程中只更新关键状态；完成后将结果压缩为 1–3 行，并链接长期设计或 commit。
-   - 文案/纯样式、普通功能、Core/Git/安全/跨层功能使用不同验证范围，具体以 [AGENTS.md](AGENTS.md) 为准。
+   - 根据改动风险选择聚焦测试或完整回归，避免与改动无关的验证。
    - 每个任务结束时独立 commit、push，避免多个已完成任务长期堆积在工作区。
 6. **遵循代码风格**：
    - Rust：`cargo fmt` + `cargo clippy`
@@ -74,7 +71,7 @@ metis/
    - Core Engine 的改动必须有单元测试
    - 新增 adapter 必须覆盖路径发现和元数据解析
    - 桌面交互按实际风险运行聚焦测试、完整 E2E 或真实窗口验收
-8. **完成对应验证**：验证范围以 [AGENTS.md](AGENTS.md) 的 A/B/C 分级为准
+8. **完成对应验证**：至少运行与本次改动直接相关的测试和构建检查
 9. **提交 Pull Request**：
    - 清楚描述改动内容和原因
    - 关联相关 Issue
@@ -91,7 +88,7 @@ Adapter 是最适合外部贡献的模块。新增 Agent 支持时：
 5. 在 adapter 注册表中注册。
 6. 更新文档说明新增支持。
 
-当前模块边界见 [ARCHITECTURE.md](ARCHITECTURE.md)，具体接口以 `crates/adapters` 中的 trait 和测试为准。
+具体接口以 `crates/adapters` 中的 trait 和测试为准。
 
 ## 开发环境设置
 

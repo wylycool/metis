@@ -11,6 +11,5 @@ Metis is a local-first Agent Skill manager for discovering, installing, updating
 - [Troubleshooting](troubleshooting.md): resolve startup, Git, path, and installation issues.
 - [Security Policy](../../SECURITY.md): credentials, local files, and vulnerability reporting.
 - [Contributing](../../CONTRIBUTING.md): build the project and contribute changes.
-- [Public Roadmap](../../ROADMAP.md): project direction and planned work.
 
 See the [project README](../../README.md) for downloads and a current feature overview.
