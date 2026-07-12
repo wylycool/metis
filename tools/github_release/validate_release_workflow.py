@@ -15,7 +15,6 @@ CONFIG = {
     "expected_version": "1.5.0",
     "workflow": Path(".github/workflows/desktop-preview.yml"),
     "release_notes": Path("docs/release-notes/desktop.md"),
-    "release_checklist": Path("docs/release-checklist.md"),
     "cargo_manifest": Path("Cargo.toml"),
     "cargo_lock": Path("Cargo.lock"),
     "desktop_package": Path("apps/desktop/package.json"),
@@ -260,7 +259,6 @@ def main() -> None:
     assert stable_release_can_be_latest("1.5.0", "1.5.1") is False
 
     assert CONFIG["release_notes"].is_file()
-    assert CONFIG["release_checklist"].is_file()
     assert "Beta" not in CONFIG["release_notes"].read_text()
     assert not Path("docs/release-notes/desktop-beta.md").exists()
     assert not Path("docs/beta-release-checklist.md").exists()

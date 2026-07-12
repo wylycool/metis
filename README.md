@@ -113,12 +113,15 @@ Metis 以本地工作为主：
 - [快速开始](docs/zh-CN/getting-started.md)
 - [用户指南](docs/zh-CN/user-guide.md)
 - [故障排查](docs/zh-CN/troubleshooting.md)
+- [常见问题](docs/zh-CN/faq.md)
 
 ## 参与贡献
 
 Metis 使用 Tauri、React、TypeScript、Rust 和 SQLite 构建。欢迎报告问题、完善文档、添加 Agent 支持或提交代码改进。
 
 开发环境、测试命令和 Pull Request 要求请查看 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请不要创建公开 Issue，应按照 [SECURITY.md](SECURITY.md) 中的方式报告。
+
+普通使用问题请先查看[故障排查](docs/zh-CN/troubleshooting.md)和[支持说明](SUPPORT.md)。
 
 ## License
 
