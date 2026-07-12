@@ -2447,7 +2447,8 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("target-checkbox-claude-code"));
     await user.click(screen.getByTestId("install-selected-targets"));
 
-    expect(await screen.findByText("indexed refresh failed")).toBeTruthy();
+    expect(await screen.findByText("操作没有完成，请稍后重试。")).toBeTruthy();
+    expect(screen.queryByText("indexed refresh failed")).toBeNull();
     expect(screen.queryByTestId("target-row-claude-code")).toBeNull();
     expect(
       screen.queryByTestId("skill-detail-agent-path-codex-planner-claude-code"),
@@ -2460,7 +2461,7 @@ describe("Metis desktop GUI main flow", () => {
       await screen.findByTestId("skill-detail-agent-path-codex-planner-claude-code"),
     ).toBeTruthy();
     expect(scenario.commandCalls("list_indexed_skills")).toBe(3);
-    expect(screen.queryByText("indexed refresh failed")).toBeNull();
+    expect(screen.queryByText("操作没有完成，请稍后重试。")).toBeNull();
     expectNoDetailRemoteCommands(scenario);
   });
 
@@ -2584,7 +2585,8 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("skill-row-codex-planner"));
     await user.click(screen.getByTestId("skill-detail-agent-toggle-codex-planner"));
 
-    expect(await screen.findByText("target lookup failed")).toBeTruthy();
+    expect(await screen.findByText("操作没有完成，请稍后重试。")).toBeTruthy();
+    expect(screen.queryByText("target lookup failed")).toBeNull();
     expect(screen.getByTestId("skill-detail-agent-path-codex-planner-codex")).toBeTruthy();
     await user.click(screen.getByTestId("retry-detail-targets-codex-planner"));
     expect(await screen.findByTestId("target-row-claude-code")).toBeTruthy();
@@ -2605,7 +2607,8 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(await screen.findByTestId("target-checkbox-claude-code"));
     await user.click(screen.getByTestId("install-selected-targets"));
 
-    expect(await screen.findByText("install command failed")).toBeTruthy();
+    expect(await screen.findByText("操作没有完成，请稍后重试。")).toBeTruthy();
+    expect(screen.queryByText("install command failed")).toBeNull();
     expect((screen.getByTestId("target-checkbox-claude-code") as HTMLInputElement).checked).toBe(
       true,
     );
@@ -3485,7 +3488,7 @@ describe("Metis software update flow", () => {
     const user = userEvent.setup();
     const startupScenario = createSoftwareUpdateScenario({
       checkOnStartup: true,
-      checkError: "暂时无法连接 GitHub Releases",
+      checkError: "检查软件更新失败：Could not fetch a valid release JSON from the remote",
     });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
       startupScenario.invoke(command, args),
@@ -3494,12 +3497,12 @@ describe("Metis software update flow", () => {
 
     expect(await screen.findByTestId("skill-row-software-update-skill")).toBeTruthy();
     await waitFor(() => expect(startupScenario.commandCalls("check_software_update")).toBe(1));
-    expect(screen.queryByText("暂时无法连接 GitHub Releases")).toBeNull();
+    expect(screen.queryByText(/Could not fetch|release JSON|remote/)).toBeNull();
     unmount();
 
     const manualScenario = createSoftwareUpdateScenario({
       checkOnStartup: false,
-      checkError: "暂时无法连接 GitHub Releases",
+      checkError: "检查软件更新失败：Could not fetch a valid release JSON from the remote",
     });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
       manualScenario.invoke(command, args),
@@ -3510,9 +3513,32 @@ describe("Metis software update flow", () => {
     await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
     await user.click(screen.getByTestId("check-software-update"));
     const error = await screen.findByRole("alert");
-    expect(within(error).getByText("暂时无法连接 GitHub Releases")).toBeTruthy();
+    expect(within(error).getByText("暂时无法获取更新信息，请稍后重试。")).toBeTruthy();
+    expect(within(error).queryByText(/Could not fetch|release JSON|remote/)).toBeNull();
     await user.click(within(error).getByText("重试"));
     await waitFor(() => expect(manualScenario.commandCalls("check_software_update")).toBe(2));
+  });
+
+  test("places compact software update settings after the other settings sections", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({ checkOnStartup: false });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await screen.findByTestId("skill-row-software-update-skill");
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+    const settings = await screen.findByTestId("workspace-settings");
+    const gitSection = within(settings).getByTestId("settings-section-git-health");
+    const softwareSection = within(settings).getByTestId("settings-section-software-update");
+    const sections = Array.from(settings.querySelectorAll(".settings-section"));
+
+    expect(
+      Boolean(gitSection.compareDocumentPosition(softwareSection) & Node.DOCUMENT_POSITION_FOLLOWING),
+    ).toBe(true);
+    expect(sections[sections.length - 1]).toBe(softwareSection);
   });
 
   test("keeps an available software update notice visible across workspace navigation", async () => {
@@ -3659,7 +3685,7 @@ describe("Metis software update flow", () => {
     const scenario = createSoftwareUpdateScenario({
       checkOnStartup: true,
       availableUpdate: softwareUpdateInfo(),
-      downloadErrorOnce: "下载连接已中断，请重试",
+      downloadErrorOnce: "request failed: connection reset by peer while reading response body",
     });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
       scenario.invoke(command, args),
@@ -3675,7 +3701,8 @@ describe("Metis software update flow", () => {
 
     const dialog = within(await screen.findByTestId("software-update-dialog"));
     const alert = await dialog.findByRole("alert");
-    expect(within(alert).getByText("下载连接已中断，请重试")).toBeTruthy();
+    expect(within(alert).getByText("更新没有下载完成，请检查网络后重试。")).toBeTruthy();
+    expect(within(alert).queryByText(/request failed|connection reset|response body/)).toBeNull();
     expect(scenario.commandCalls("download_software_update")).toBe(1);
 
     await user.click(dialog.getByText("重新下载"));
@@ -3683,13 +3710,40 @@ describe("Metis software update flow", () => {
     expect(scenario.commandCalls("download_software_update")).toBe(2);
   });
 
+  test("preserves the security warning when the downloaded update fails signature verification", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      availableUpdate: softwareUpdateInfo(),
+      downloadErrorOnce: "安装包校验失败，已停止下载，请勿安装该文件。",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(
+      within(await screen.findByTestId("software-update-notice")).getByTestId(
+        "software-update-download",
+      ),
+    );
+
+    const dialog = within(await screen.findByTestId("software-update-dialog"));
+    const alert = await dialog.findByRole("alert");
+    expect(
+      within(alert).getByText("安装包校验失败，已停止下载，请勿安装该文件。"),
+    ).toBeTruthy();
+    expect(within(alert).queryByText("更新没有下载完成，请检查网络后重试。")).toBeNull();
+  });
+
   test("shows recoverable errors when opening a saved installer or Downloads", async () => {
     const user = userEvent.setup();
     const scenario = createSoftwareUpdateScenario({
       checkOnStartup: true,
       availableUpdate: softwareUpdateInfo(),
-      openDownloadsError: "无法打开 Downloads 目录",
-      openInstallerError: "安装包已被移动，请重新下载",
+      openDownloadsError: "open_path failed: No such file or directory (os error 2)",
+      openInstallerError: "failed to spawn process for /Users/demo/Downloads/Metis.dmg",
     });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
       scenario.invoke(command, args),
@@ -3707,11 +3761,72 @@ describe("Metis software update flow", () => {
     await dialog.findByText("Metis 1.5.1 已下载");
 
     await user.click(dialog.getByTestId("software-update-open-installer"));
-    expect(await dialog.findByText("安装包已被移动，请重新下载")).toBeTruthy();
+    expect(await dialog.findByText("暂时无法打开安装包，请稍后重试。")).toBeTruthy();
+    expect(dialog.queryByText(/spawn process|\/Users\/demo/)).toBeNull();
 
     await user.click(dialog.getByTestId("software-update-open-folder"));
-    expect(await dialog.findByText("无法打开 Downloads 目录")).toBeTruthy();
-    expect(dialog.queryByText("安装包已被移动，请重新下载")).toBeNull();
+    expect(await dialog.findByText("暂时无法打开下载目录，请稍后重试。")).toBeTruthy();
+    expect(dialog.queryByText(/open_path|os error|No such file/)).toBeNull();
+    expect(dialog.queryByText("暂时无法打开安装包，请稍后重试。")).toBeNull();
+  });
+
+  test("warns the user when a saved installer changes before it is opened", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      availableUpdate: softwareUpdateInfo(),
+      openInstallerError: "安装包内容已发生变化，请删除该文件并重新下载。",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(
+      within(await screen.findByTestId("software-update-notice")).getByTestId(
+        "software-update-download",
+      ),
+    );
+
+    const dialog = within(await screen.findByTestId("software-update-dialog"));
+    await dialog.findByText("Metis 1.5.1 已下载");
+    await user.click(dialog.getByTestId("software-update-open-installer"));
+
+    expect(
+      await dialog.findByText("安装包内容已发生变化，请删除该文件并重新下载。"),
+    ).toBeTruthy();
+    expect(dialog.queryByText("暂时无法打开安装包，请稍后重试。")).toBeNull();
+  });
+
+  test("uses a friendly security warning when the saved installer is no longer a regular file", async () => {
+    const user = userEvent.setup();
+    const scenario = createSoftwareUpdateScenario({
+      checkOnStartup: true,
+      availableUpdate: softwareUpdateInfo(),
+      openInstallerError: "已下载的安装包不是普通文件。",
+    });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(
+      within(await screen.findByTestId("software-update-notice")).getByTestId(
+        "software-update-download",
+      ),
+    );
+
+    const dialog = within(await screen.findByTestId("software-update-dialog"));
+    await dialog.findByText("Metis 1.5.1 已下载");
+    await user.click(dialog.getByTestId("software-update-open-installer"));
+
+    expect(
+      await dialog.findByText("安装包安全检查未通过，请删除该文件并重新下载。"),
+    ).toBeTruthy();
+    expect(dialog.queryByText("已下载的安装包不是普通文件。")).toBeNull();
+    expect(dialog.queryByText("暂时无法打开安装包，请稍后重试。")).toBeNull();
   });
 });
 

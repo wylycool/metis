@@ -504,19 +504,19 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
-    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("gap: 16px 28px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("gap: 10px 20px;");
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain("align-items: start;");
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border: 1px solid #d9e1ee;");
-    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border-radius: 22px;");
-    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("padding: 28px 30px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border-radius: 14px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("padding: 14px;");
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
-      "background: rgba(255, 255, 255, 0.9);",
+      "background: #ffffff;",
     );
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
-      "box-shadow: 0 18px 46px rgba(23, 32, 51, 0.12);",
+      "box-shadow: none;",
     );
-    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("min-height: 42px;");
-    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("border-radius: 12px;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("min-height: 36px;");
+    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("border-radius: 8px;");
     expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("color: #142033;");
     expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("background: #ffffff;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");
@@ -1218,6 +1218,35 @@ describe("Phase 6 light workspace contrast", () => {
     expect(exactBlockFor(".software-update-dialog")).toContain("overflow-y: auto;");
     expect(stylesheet).toContain(
       ".redesign-preview-shell:has(.software-update-notice) .redesign-toast",
+    );
+  });
+
+  test("keeps software and Skill update settings compact and shadowless", () => {
+    const softwareSection = exactBlockFor(".settings-section.software-update-settings-section");
+    const autoUpdateSection = exactBlockFor(".settings-section.auto-update-section");
+    const settingsHeadingSize = declaredPx(latestBlockFor(".settings-section h3"), "font-size");
+    const compactViewport = mediaBlocksFor("(max-width: 760px)").join("\n");
+    const narrowViewport = mediaBlocksFor("(max-width: 520px)").join("\n");
+
+    expect(softwareSection).toContain("padding: 14px;");
+    expect(softwareSection).toContain("border-radius: 14px;");
+    expect(softwareSection).toContain("box-shadow: none;");
+    expect(autoUpdateSection).toContain("padding: 14px;");
+    expect(autoUpdateSection).toContain("border-radius: 14px;");
+    expect(autoUpdateSection).toContain("box-shadow: none;");
+    expect(declaredPx(latestBlockFor(".software-update-settings-copy h3"), "font-size")).toBe(
+      settingsHeadingSize,
+    );
+    expect(declaredPx(latestBlockFor(".auto-update-copy h3"), "font-size")).toBe(
+      settingsHeadingSize,
+    );
+    expect(exactBlockFor(".software-update-settings-controls")).toContain("display: flex;");
+    expect(exactBlockFor(".software-update-settings-controls")).toContain("flex-wrap: wrap;");
+    expect(compactViewport).toMatch(
+      /\.settings-section\.software-update-settings-section\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
+    );
+    expect(narrowViewport).toMatch(
+      /\.settings-section\.auto-update-section\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
     );
   });
 });

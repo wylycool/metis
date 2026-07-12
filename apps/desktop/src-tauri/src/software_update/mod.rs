@@ -55,7 +55,6 @@ pub enum SoftwareUpdateDownloadEvent {
 
 #[derive(Debug, Clone)]
 struct DownloadedSoftwareUpdate {
-    version: String,
     path: PathBuf,
     sha256: [u8; 32],
 }
@@ -95,11 +94,11 @@ pub async fn check_software_update(
         .updater_builder()
         .timeout(UPDATE_CHECK_TIMEOUT)
         .build()
-        .map_err(|error| format!("初始化软件更新检查失败：{error}"))?;
+        .map_err(|_| software_update_check_error())?;
     let update = updater
         .check()
         .await
-        .map_err(|error| format!("检查软件更新失败：{error}"))?;
+        .map_err(|_| software_update_check_error())?;
 
     let mut pending = state
         .pending
@@ -150,7 +149,7 @@ pub async fn download_software_update(
     let downloads_dir = app
         .path()
         .download_dir()
-        .map_err(|error| format!("无法定位系统 Downloads 目录：{error}"))?;
+        .map_err(|_| "暂时无法使用下载目录，请稍后重试。".to_string())?;
     validate_downloads_directory(&downloads_dir)?;
 
     let _ = progress_channel.send(SoftwareUpdateDownloadEvent::Started {
@@ -186,7 +185,7 @@ pub async fn download_software_update(
         save_verified_installer(&save_dir, &save_name, &bytes, current_platform())
     })
     .await
-    .map_err(|error| format!("保存安装包任务失败：{error}"))??;
+    .map_err(|_| "安装包保存失败，请稍后重试。".to_string())??;
     let saved_path = saved.path;
     let saved_path_text = saved_path.to_string_lossy().to_string();
 
@@ -195,7 +194,6 @@ pub async fn download_software_update(
         .lock()
         .map_err(|_| "软件更新状态暂时不可用，请重启 Metis 后重试。".to_string())? =
         Some(DownloadedSoftwareUpdate {
-            version: version.clone(),
             path: saved_path.clone(),
             sha256: saved.sha256,
         });
@@ -233,7 +231,7 @@ pub async fn open_software_update_installer(
     let downloads_dir = app
         .path()
         .download_dir()
-        .map_err(|error| format!("无法定位系统 Downloads 目录：{error}"))?;
+        .map_err(|_| "暂时无法使用下载目录，请稍后重试。".to_string())?;
     let verification_downloads = downloads_dir.clone();
     let verification_downloaded = downloaded.clone();
     if let Err(error) = tauri::async_runtime::spawn_blocking(move || {
@@ -245,7 +243,7 @@ pub async fn open_software_update_installer(
         )
     })
     .await
-    .map_err(|error| format!("校验已下载安装包任务失败：{error}"))?
+    .map_err(|_| "安装包校验失败，请重新下载。".to_string())?
     {
         *state
             .downloaded
@@ -254,7 +252,7 @@ pub async fn open_software_update_installer(
         return Err(error);
     }
     tauri_plugin_opener::open_path(&downloaded.path, None::<&str>)
-        .map_err(|error| format!("打开 Metis {} 安装包失败：{error}", downloaded.version))
+        .map_err(|_| "暂时无法打开安装包，请稍后重试。".to_string())
 }
 
 #[tauri::command]
@@ -262,10 +260,10 @@ pub fn open_downloads_directory(app: AppHandle) -> Result<(), String> {
     let downloads_dir = app
         .path()
         .download_dir()
-        .map_err(|error| format!("无法定位系统 Downloads 目录：{error}"))?;
+        .map_err(|_| "暂时无法使用下载目录，请稍后重试。".to_string())?;
     validate_downloads_directory(&downloads_dir)?;
     tauri_plugin_opener::open_path(&downloads_dir, None::<&str>)
-        .map_err(|error| format!("打开 Downloads 目录失败：{error}"))
+        .map_err(|_| "暂时无法打开下载目录，请稍后重试。".to_string())
 }
 
 fn software_update_info(update: &Update) -> Result<SoftwareUpdateInfo, String> {
@@ -278,12 +276,16 @@ fn software_update_info(update: &Update) -> Result<SoftwareUpdateInfo, String> {
     })
 }
 
+fn software_update_check_error() -> String {
+    "暂时无法获取更新信息，请稍后重试。".to_string()
+}
+
 fn software_update_download_error(error: UpdaterError) -> String {
     match error {
         UpdaterError::Minisign(_) | UpdaterError::Base64(_) | UpdaterError::SignatureUtf8(_) => {
             "安装包校验失败，已停止下载，请勿安装该文件。".to_string()
         }
-        other => format!("下载软件更新失败：{other}"),
+        _ => "更新没有下载完成，请检查网络后重试。".to_string(),
     }
 }
 
@@ -411,7 +413,7 @@ fn validate_installer_file_name(file_name: &str, platform: &str) -> Result<(), S
 
 fn validate_downloads_directory(downloads_dir: &Path) -> Result<(), String> {
     let metadata = fs::metadata(downloads_dir)
-        .map_err(|error| format!("系统 Downloads 目录不可用：{error}"))?;
+        .map_err(|_| "暂时无法使用下载目录，请稍后重试。".to_string())?;
     if !metadata.is_dir() {
         return Err("系统 Downloads 路径不是目录。".to_string());
     }
@@ -425,7 +427,7 @@ fn validate_downloaded_installer_path(
 ) -> Result<(), String> {
     validate_downloads_directory(downloads_dir)?;
     let metadata = fs::symlink_metadata(installer_path)
-        .map_err(|error| format!("已下载的安装包不可用：{error}"))?;
+        .map_err(|_| "安装包已被移动或删除，请重新下载。".to_string())?;
     if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
         return Err("已下载的安装包不是普通文件。".to_string());
     }
@@ -437,12 +439,12 @@ fn validate_downloaded_installer_path(
 
     let canonical_downloads = downloads_dir
         .canonicalize()
-        .map_err(|error| format!("无法确认 Downloads 目录：{error}"))?;
+        .map_err(|_| "暂时无法使用下载目录，请稍后重试。".to_string())?;
     let canonical_parent = installer_path
         .parent()
         .ok_or_else(|| "已下载的安装包没有父目录。".to_string())?
         .canonicalize()
-        .map_err(|error| format!("无法确认安装包目录：{error}"))?;
+        .map_err(|_| "安装包已被移动或删除，请重新下载。".to_string())?;
     if canonical_parent != canonical_downloads {
         return Err("拒绝打开 Downloads 目录之外的文件。".to_string());
     }
@@ -456,13 +458,13 @@ fn verify_downloaded_installer(
     expected_sha256: &[u8; 32],
 ) -> Result<(), String> {
     validate_downloaded_installer_path(downloads_dir, installer_path, platform)?;
-    let actual_sha256 = sha256_file(installer_path)
-        .map_err(|error| format!("重新校验已下载安装包失败：{error}"))?;
+    let actual_sha256 =
+        sha256_file(installer_path).map_err(|_| "安装包校验失败，请重新下载。".to_string())?;
     if &actual_sha256 != expected_sha256 {
         return Err("安装包内容已发生变化，请删除该文件并重新下载。".to_string());
     }
     set_installer_download_origin(installer_path, platform)
-        .map_err(|error| format!("恢复系统下载安全标记失败：{error}"))?;
+        .map_err(|_| "安装包安全检查未完成，请重新下载。".to_string())?;
     Ok(())
 }
 
@@ -479,12 +481,12 @@ fn save_verified_installer(
     temp_file
         .write_all(bytes)
         .and_then(|_| temp_file.sync_all())
-        .map_err(|error| pending.fail(format!("写入安装包失败：{error}")))?;
+        .map_err(|_| pending.fail("安装包保存失败，请稍后重试。".to_string()))?;
     set_installer_permissions(&temp_path, platform)
-        .map_err(|error| pending.fail(format!("设置安装包权限失败：{error}")))?;
+        .map_err(|_| pending.fail("安装包保存失败，请稍后重试。".to_string()))?;
     drop(temp_file);
     set_installer_download_origin(&temp_path, platform)
-        .map_err(|error| pending.fail(format!("保留系统下载安全标记失败：{error}")))?;
+        .map_err(|_| pending.fail("安装包安全检查未完成，请重新下载。".to_string()))?;
 
     for index in 0..MAX_INSTALLER_NAME_ATTEMPTS {
         let destination = installer_destination(downloads_dir, file_name, index);
@@ -504,8 +506,8 @@ fn save_verified_installer(
             {
                 continue;
             }
-            Err(error) => {
-                return Err(pending.fail(format!("保存安装包到 Downloads 失败：{error}")));
+            Err(_) => {
+                return Err(pending.fail("安装包保存失败，请稍后重试。".to_string()));
             }
         }
     }
@@ -549,7 +551,7 @@ fn create_unique_temp_file(
         match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => return Ok((path, file)),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(format!("无法在 Downloads 创建临时安装包：{error}")),
+            Err(_) => return Err("安装包保存失败，请稍后重试。".to_string()),
         }
     }
     Err("无法在 Downloads 创建唯一临时安装包。".to_string())
@@ -636,12 +638,7 @@ impl PendingFile {
         match fs::remove_file(&self.path) {
             Ok(()) => self.armed = false,
             Err(error) if error.kind() == io::ErrorKind::NotFound => self.armed = false,
-            Err(error) => {
-                return format!(
-                    "{message}；同时清理临时文件 {} 失败：{error}",
-                    self.path.to_string_lossy()
-                );
-            }
+            Err(_) => return format!("{message} 请稍后重试。"),
         }
         message
     }
@@ -779,6 +776,19 @@ mod tests {
     use base64::Engine;
     use minisign_verify::{PublicKey, Signature};
     use std::fs;
+
+    #[test]
+    fn updater_errors_never_expose_internal_messages() {
+        let check_message = software_update_check_error();
+        assert_eq!(check_message, "暂时无法获取更新信息，请稍后重试。");
+        assert!(!check_message.contains("JSON"));
+        assert!(!check_message.contains("remote"));
+
+        let download_message =
+            software_update_download_error(UpdaterError::Network("connection reset".to_string()));
+        assert_eq!(download_message, "更新没有下载完成，请检查网络后重试。");
+        assert!(!download_message.contains("connection reset"));
+    }
 
     #[test]
     fn installer_file_name_only_accepts_safe_platform_package() {

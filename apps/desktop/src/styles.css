@@ -3850,8 +3850,7 @@ textarea {
   animation: softwareUpdateNoticeIn 220ms ease-out;
 }
 
-.software-update-notice-icon,
-.software-update-settings-icon {
+.software-update-notice-icon {
   display: grid;
   place-items: center;
   width: 38px;
@@ -3864,7 +3863,6 @@ textarea {
 }
 
 .software-update-notice-icon svg,
-.software-update-settings-icon svg,
 .software-update-hero svg,
 .software-update-saved-file svg,
 .software-update-dialog-close svg {
@@ -4183,46 +4181,42 @@ textarea {
   min-height: auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px 28px;
-  align-items: center;
-  border: 1px solid #cfddee;
-  border-radius: 22px;
-  padding: 26px 30px;
-  background: linear-gradient(145deg, rgba(244, 249, 255, 0.96), rgba(255, 255, 255, 0.95));
-  box-shadow: 0 18px 46px rgba(37, 73, 122, 0.1);
+  gap: 10px 20px;
+  align-items: start;
+  border: 1px solid #d9e1ee;
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .software-update-settings-copy {
   min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.software-update-settings-copy > div {
-  min-width: 0;
   display: grid;
-  gap: 7px;
+  gap: 4px;
 }
 
 .software-update-settings-copy h3 {
+  margin: 0;
   color: #1c2a3d;
-  font-size: 20px;
-  line-height: 1.25;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .software-update-settings-copy p {
   max-width: 62ch;
   color: #536178;
-  font-size: 14px;
-  font-weight: 620;
-  line-height: 1.65;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
 }
 
 .software-update-settings-controls {
-  display: grid;
-  justify-items: end;
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 .software-update-current-version {
@@ -4254,7 +4248,10 @@ textarea {
 }
 
 .software-update-check-button {
-  min-width: 104px;
+  min-width: 92px;
+  min-height: 36px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 .software-update-check-result,
@@ -4352,11 +4349,11 @@ textarea {
 
   .settings-section.software-update-settings-section {
     grid-template-columns: 1fr;
-    padding: 22px;
+    padding: 14px;
   }
 
   .software-update-settings-controls {
-    justify-items: stretch;
+    justify-content: flex-start;
   }
 
   .software-update-startup-toggle {
@@ -5768,52 +5765,52 @@ textarea {
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: auto;
   display: grid;
-  gap: 16px 28px;
+  gap: 10px 20px;
   align-items: start;
   border: 1px solid #d9e1ee;
-  border-radius: 22px;
-  padding: 28px 30px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 18px 46px rgba(23, 32, 51, 0.12);
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .auto-update-copy {
   grid-column: 1;
   display: grid;
-  gap: 7px;
+  gap: 4px;
 }
 
 .auto-update-copy h3 {
   margin: 0;
   color: #1c2a3d;
-  font-size: 20px;
-  line-height: 1.25;
+  font-size: 14px;
+  line-height: 1.4;
   letter-spacing: 0;
 }
 
 .auto-update-copy p {
   margin: 0;
   color: #536178;
-  font-size: 14px;
-  font-weight: 650;
-  line-height: 1.7;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
 }
 
 .settings-section.auto-update-section > button {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1;
   justify-self: end;
-  align-self: center;
-  min-height: 42px;
+  align-self: start;
+  min-height: 36px;
   border: 1px solid #c9d6e7;
-  border-radius: 12px;
-  padding: 0 18px;
+  border-radius: 8px;
+  padding: 0 14px;
   color: #142033;
   background: #ffffff;
-  font-size: 14px;
-  font-weight: 850;
+  font-size: 13px;
+  font-weight: 750;
   white-space: nowrap;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  box-shadow: none;
 }
 
 .settings-section.auto-update-section > button:hover:not(:disabled) {
@@ -5821,7 +5818,7 @@ textarea {
   color: #142033;
   background: #f7faff;
   transform: none;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  box-shadow: none;
 }
 
 .settings-section.auto-update-section > button:disabled {

@@ -333,9 +333,9 @@ function MetisApp() {
       } else if (mode === "manual") {
         setSoftwareUpdateCheckMessage("当前已是最新版");
       }
-    } catch (caught) {
+    } catch {
       if (mode === "manual" && requestToken === softwareUpdateCheckSequenceRef.current) {
-        setSoftwareUpdateCheckError(desktopError(caught).message);
+        setSoftwareUpdateCheckError("暂时无法获取更新信息，请稍后重试。");
       }
     } finally {
       if (requestToken === softwareUpdateCheckSequenceRef.current) {
@@ -395,7 +395,10 @@ function MetisApp() {
       setSoftwareUpdateDownloadState((current) => ({
         ...current,
         phase: "error",
-        error: desktopError(caught).message,
+        error: softwareUpdateErrorMessage(
+          caught,
+          "更新没有下载完成，请检查网络后重试。",
+        ),
       }));
     }
   }
@@ -405,7 +408,9 @@ function MetisApp() {
     try {
       await openSoftwareUpdateInstaller();
     } catch (caught) {
-      setSoftwareUpdateOpenError(desktopError(caught).message);
+      setSoftwareUpdateOpenError(
+        softwareUpdateErrorMessage(caught, "暂时无法打开安装包，请稍后重试。"),
+      );
     }
   }
 
@@ -413,8 +418,8 @@ function MetisApp() {
     setSoftwareUpdateOpenError(null);
     try {
       await openDownloadsDirectory();
-    } catch (caught) {
-      setSoftwareUpdateOpenError(desktopError(caught).message);
+    } catch {
+      setSoftwareUpdateOpenError("暂时无法打开下载目录，请稍后重试。");
     }
   }
 
@@ -2135,68 +2140,6 @@ function MetisApp() {
             </div>
           </section>
 
-          <section
-            className="settings-section software-update-settings-section"
-            data-testid="settings-section-software-update"
-          >
-            <div className="software-update-settings-copy">
-              <span className="software-update-settings-icon" aria-hidden="true">
-                <SoftwareUpdateSettingsIcon />
-              </span>
-              <div>
-                <h3>Metis 软件更新</h3>
-                <p>启动时在后台检查 Metis 新版本；发现新版后由你确认下载，安装仍由你手动完成。</p>
-              </div>
-            </div>
-            <div className="software-update-settings-controls">
-              <span className="software-update-current-version">
-                当前版本 <strong>{desktopPackage.version}</strong>
-              </span>
-              <label className="software-update-startup-toggle">
-                <input
-                  checked={softwareUpdateCheckOnStartupDraft}
-                  data-testid="software-update-check-on-startup"
-                  onChange={(event) =>
-                    setSoftwareUpdateCheckOnStartupDraft(event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <span>启动时检查软件更新</span>
-              </label>
-              <button
-                className="software-update-check-button"
-                data-testid="check-software-update"
-                disabled={
-                  softwareUpdateCheckBusy ||
-                  ["downloading", "verifying", "saving"].includes(
-                    softwareUpdateDownloadState.phase,
-                  )
-                }
-                onClick={() => void handleCheckSoftwareUpdate("manual")}
-                type="button"
-              >
-                {softwareUpdateCheckBusy ? "检查中" : "检查更新"}
-              </button>
-            </div>
-            {softwareUpdateCheckMessage && (
-              <div className="software-update-check-result" role="status">
-                {softwareUpdateCheckMessage}
-              </div>
-            )}
-            {softwareUpdateCheckError && (
-              <div className="software-update-check-error" role="alert">
-                <span>{softwareUpdateCheckError}</span>
-                <button
-                  disabled={softwareUpdateCheckBusy}
-                  onClick={() => void handleCheckSoftwareUpdate("manual")}
-                  type="button"
-                >
-                  重试
-                </button>
-              </div>
-            )}
-          </section>
-
           <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
             <div className="auto-update-copy">
               <h3>Skill 自动更新</h3>
@@ -2313,6 +2256,63 @@ function MetisApp() {
                 </div>
               )}
             </div>
+          </section>
+
+          <section
+            className="settings-section software-update-settings-section"
+            data-testid="settings-section-software-update"
+          >
+            <div className="software-update-settings-copy">
+              <h3>Metis 软件更新</h3>
+              <p>启动时自动检查新版本；发现新版后由你确认下载和安装。</p>
+            </div>
+            <div className="software-update-settings-controls">
+              <span className="software-update-current-version">
+                当前版本 <strong>{desktopPackage.version}</strong>
+              </span>
+              <label className="software-update-startup-toggle">
+                <input
+                  checked={softwareUpdateCheckOnStartupDraft}
+                  data-testid="software-update-check-on-startup"
+                  onChange={(event) =>
+                    setSoftwareUpdateCheckOnStartupDraft(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>启动时检查</span>
+              </label>
+              <button
+                className="software-update-check-button"
+                data-testid="check-software-update"
+                disabled={
+                  softwareUpdateCheckBusy ||
+                  ["downloading", "verifying", "saving"].includes(
+                    softwareUpdateDownloadState.phase,
+                  )
+                }
+                onClick={() => void handleCheckSoftwareUpdate("manual")}
+                type="button"
+              >
+                {softwareUpdateCheckBusy ? "检查中" : "检查更新"}
+              </button>
+            </div>
+            {softwareUpdateCheckMessage && (
+              <div className="software-update-check-result" role="status">
+                {softwareUpdateCheckMessage}
+              </div>
+            )}
+            {softwareUpdateCheckError && (
+              <div className="software-update-check-error" role="alert">
+                <span>{softwareUpdateCheckError}</span>
+                <button
+                  disabled={softwareUpdateCheckBusy}
+                  onClick={() => void handleCheckSoftwareUpdate("manual")}
+                  type="button"
+                >
+                  重试
+                </button>
+              </div>
+            )}
           </section>
 
           <div className="form-actions settings-save-actions">
@@ -2673,6 +2673,39 @@ function desktopError(caught: unknown): DesktopError {
   return unknownDesktopError("桌面后端返回了无法识别的错误");
 }
 
+const unsafeSavedInstallerMessage = "安装包安全检查未通过，请删除该文件并重新下载。";
+const softwareUpdateSecurityMessages = new Map<string, string>([
+  [
+    "安装包校验失败，已停止下载，请勿安装该文件。",
+    "安装包校验失败，已停止下载，请勿安装该文件。",
+  ],
+  ["安装包校验失败，请重新下载。", "安装包校验失败，请重新下载。"],
+  [
+    "安装包内容已发生变化，请删除该文件并重新下载。",
+    "安装包内容已发生变化，请删除该文件并重新下载。",
+  ],
+  ["安装包安全检查未完成，请重新下载。", "安装包安全检查未完成，请重新下载。"],
+  ["安装包已被移动或删除，请重新下载。", "安装包已被移动或删除，请重新下载。"],
+  ["已下载的安装包不是普通文件。", unsafeSavedInstallerMessage],
+  ["已下载的安装包文件名无效。", unsafeSavedInstallerMessage],
+  ["已下载的安装包没有父目录。", unsafeSavedInstallerMessage],
+  ["拒绝打开 Downloads 目录之外的文件。", unsafeSavedInstallerMessage],
+]);
+
+function softwareUpdateErrorMessage(caught: unknown, fallback: string): string {
+  const error = desktopError(caught);
+  for (const candidate of [error.message, error.debug_detail]) {
+    const message = candidate?.trim();
+    if (message) {
+      const securityMessage = softwareUpdateSecurityMessages.get(message);
+      if (securityMessage) {
+        return securityMessage;
+      }
+    }
+  }
+  return fallback;
+}
+
 function gitEnvironmentNoticeText(error: DesktopError): string {
   const detail = `${error.debug_detail ?? ""} ${error.message}`.toLowerCase();
   if (
@@ -2785,8 +2818,8 @@ function unknownDesktopError(detail: string): DesktopError {
   return {
     category: "unknown",
     title: "操作失败",
-    message: detail,
-    suggestion: "请确认目标目录、Git source 和本地数据库状态后重试。",
+    message: "操作没有完成，请稍后重试。",
+    suggestion: "如果仍然失败，请重新打开 Metis 后再试。",
     debug_detail: detail,
   };
 }
@@ -2875,16 +2908,6 @@ function WorkspaceTopbar({
         </button>
       </div>
     </header>
-  );
-}
-
-function SoftwareUpdateSettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24">
-      <path d="M12 3v10" />
-      <path d="m8 9.5 4 4 4-4" />
-      <path d="M5 17.5v2h14v-2" />
-    </svg>
   );
 }
 
