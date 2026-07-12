@@ -2247,7 +2247,7 @@ function MetisApp() {
                         data-testid={`auto-update-remove-actions-${skill.id}`}
                       >
                         <button
-                          className="auto-update-remove metis-action-button metis-action-button--compact metis-action-button--danger"
+                          className="auto-update-remove metis-action-button metis-action-button--compact"
                           data-testid={`remove-auto-update-${skill.id}`}
                           disabled={removeBusy}
                           onClick={() => setPendingAutoUpdateRemovalSourceKey(group.sourceKey)}

@@ -9333,29 +9333,36 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .auto-update-remove {
   justify-self: end;
-  min-width: 78px;
-  min-height: 38px;
-  border: 1px solid #cfd9e8;
-  border-radius: 12px;
-  padding: 0 14px;
-  color: #263247;
-  background: #ffffff;
-  font-size: 13px;
-  font-weight: 850;
+  min-width: auto;
+  min-height: 30px;
+  border-color: transparent;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: #7a8799;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .auto-update-remove:hover:not(:disabled) {
-  border-color: #b9c7dc;
-  color: #263247;
-  background: #f7faff;
+  border-color: #f0d2ce;
+  color: #a23b32;
+  background: #fff7f5;
   transform: none;
   box-shadow: none;
 }
 
+.auto-update-remove:focus-visible {
+  border-color: #e8bdb7;
+  color: #a23b32;
+  background: #fff7f5;
+  box-shadow: 0 0 0 3px rgba(162, 59, 50, 0.12);
+}
+
 .auto-update-remove:disabled {
   color: #65728a;
-  background: #f8fafc;
+  background: transparent;
   cursor: default;
 }
 

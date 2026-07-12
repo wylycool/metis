@@ -1207,6 +1207,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("remove-auto-update-trusted-skill").className).not.toContain(
       "ghost-button",
     );
+    expect(screen.getByTestId("remove-auto-update-trusted-skill").className).not.toContain(
+      "metis-action-button--danger",
+    );
     expect(removeActions.queryByTestId("confirm-remove-auto-update-trusted-skill")).toBeNull();
     expect(removeActions.queryByTestId("cancel-remove-auto-update-trusted-skill")).toBeNull();
     const confirmPanel = within(screen.getByTestId("auto-update-remove-confirm-trusted-skill"));
