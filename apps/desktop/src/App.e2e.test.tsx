@@ -1219,6 +1219,55 @@ describe("Metis desktop GUI main flow", () => {
     confirmSpy.mockRestore();
   });
 
+  test("shows one auto-update row for the same source installed in multiple Agents", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario({ duplicateTrustedAgentInstall: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
+    const autoUpdateList = within(screen.getByTestId("auto-update-source-list"));
+
+    expect(autoUpdateList.getAllByText("Trusted Skill")).toHaveLength(1);
+    expect(autoUpdateList.getAllByText("file:///tmp/metis-trusted-repo")).toHaveLength(1);
+    expect(autoUpdateList.getAllByText("已信任")).toHaveLength(1);
+
+    await user.click(screen.getByTestId("run-auto-update"));
+
+    expect(invokeMock).toHaveBeenCalledWith("check_skill_updates", {
+      request: {
+        skill_ids: ["trusted-skill", "trusted-skill-claude"],
+      },
+    });
+    expect(scenario.appliedSkillIds()).toEqual(["trusted-skill", "trusted-skill-claude"]);
+
+    await user.click(screen.getByTestId("remove-auto-update-trusted-skill"));
+    await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));
+
+    await waitFor(() => expect(autoUpdateList.queryByText("Trusted Skill")).toBeNull());
+    expect(autoUpdateList.getByTestId("auto-update-empty-state")).toBeTruthy();
+  });
+
+  test("keeps same-name auto-update entries separate when their sources differ", async () => {
+    const user = userEvent.setup();
+    const scenario = createBetaReadinessScenario({ distinctTrustedSameNameSource: true });
+    invokeMock.mockImplementation((command: string, args?: unknown) =>
+      scenario.invoke(command, args),
+    );
+
+    render(<App />);
+
+    await user.click(await screen.findByTestId("workspace-tab-settings"));
+    const autoUpdateList = within(screen.getByTestId("auto-update-source-list"));
+
+    expect(autoUpdateList.getAllByText("Trusted Skill")).toHaveLength(2);
+    expect(autoUpdateList.getByText("file:///tmp/metis-trusted-repo")).toBeTruthy();
+    expect(autoUpdateList.getByText("file:///tmp/metis-other-trusted-repo")).toBeTruthy();
+  });
+
   test("shows a compact notice when local Git is not installed", async () => {
     const user = userEvent.setup();
     const scenario = createBetaReadinessScenario({
@@ -4789,6 +4838,8 @@ function createMainFlowScenario(
 
 function createBetaReadinessScenario(
   options: {
+    distinctTrustedSameNameSource?: boolean;
+    duplicateTrustedAgentInstall?: boolean;
     trustedSources?: boolean;
     autoUpdateSources?: boolean;
     gitEnvironmentFailure?: "missing" | "self-check";
@@ -4826,6 +4877,24 @@ function createBetaReadinessScenario(
     betaSkill("trusted-skill", "Trusted Skill", trustedSource),
     betaSkill("untrusted-skill", "Untrusted Skill", untrustedSource),
   ];
+  if (options.duplicateTrustedAgentInstall) {
+    skills.splice(1, 0, {
+      ...betaSkill("trusted-skill-claude", "Trusted Skill", { ...trustedSource }),
+      agent_id: "claude-code",
+      agent_name: "Claude Code",
+      install_path: "/tmp/metis-beta/claude-skills/trusted-skill",
+      metadata_path: "/tmp/metis-beta/claude-skills/trusted-skill/SKILL.md",
+    });
+  }
+  if (options.distinctTrustedSameNameSource) {
+    const distinctSource: DesktopSource = {
+      ...trustedSource,
+      id: "source-other-trusted-skill",
+      url: "file:///tmp/metis-other-trusted-repo",
+      repo_path: "skills/other-trusted-skill",
+    };
+    skills.splice(1, 0, betaSkill("other-trusted-skill", "Trusted Skill", distinctSource));
+  }
   const applied: string[] = [];
   const exported: string[] = [];
   const agents: DesktopAgentStatus[] = [
@@ -4844,6 +4913,22 @@ function createBetaReadinessScenario(
       ],
     },
   ];
+  if (options.duplicateTrustedAgentInstall) {
+    agents.push({
+      agent_id: "claude-code",
+      agent_name: "Claude Code",
+      enabled: true,
+      paths: [
+        {
+          path: "/tmp/metis-beta/claude-skills",
+          scope: "user",
+          exists: true,
+          readable: true,
+          writable: true,
+        },
+      ],
+    });
+  }
 
   return {
     appliedSkillIds: () => applied,
@@ -5063,14 +5148,21 @@ function createBetaReadinessScenario(
         }
         case "apply_skill_update": {
           const request = args as { skillId: string };
+          const targetSkill = skills.find((skill) => skill.id === request.skillId);
+          const targetSource = targetSkill?.source;
+          if (!targetSource) {
+            throw new Error(`Missing source for ${request.skillId}`);
+          }
+          const previousCommit = targetSource.current_commit ?? "";
+          const newCommit = targetSource.remote_commit ?? previousCommit;
           applied.push(request.skillId);
           skills = skills.map((skill) =>
-            skill.id === request.skillId && skill.source
+            skill.source?.id === targetSource.id
               ? {
                   ...skill,
                   source: {
                     ...skill.source,
-                    current_commit: skill.source.remote_commit,
+                    current_commit: newCommit,
                   },
                 }
               : skill,
@@ -5078,8 +5170,8 @@ function createBetaReadinessScenario(
           return {
             ...applyResult(),
             skill_id: request.skillId,
-            previous_commit: request.skillId === "trusted-skill" ? "aaa111" : "ccc333",
-            new_commit: request.skillId === "trusted-skill" ? "bbb222" : "ddd444",
+            previous_commit: previousCommit,
+            new_commit: newCommit,
           };
         }
         case "bind_skill_source": {
@@ -5094,9 +5186,17 @@ function createBetaReadinessScenario(
               auto_update: boolean;
             };
           };
+          const targetSourceId = skills.find(
+            (skill) => skill.id === request.request.skill_id,
+          )?.source?.id;
           let updatedSource: DesktopSource | null = null;
           skills = skills.map((skill) => {
-            if (skill.id !== request.request.skill_id || !skill.source) {
+            if (
+              !skill.source ||
+              (targetSourceId
+                ? skill.source.id !== targetSourceId
+                : skill.id !== request.request.skill_id)
+            ) {
               return skill;
             }
             updatedSource = {

@@ -87,6 +87,11 @@ interface DetailLocalInstallPending {
   operation: DetailLocalInstallOperation;
   token: number;
 }
+interface AutoUpdateSourceGroup {
+  sourceKey: string;
+  representative: DesktopSkill;
+  members: DesktopSkill[];
+}
 
 function App() {
   if (isUiRedesignPreviewRoute()) {
@@ -169,16 +174,17 @@ function MetisApp() {
   const [detailLocalInstallStates, setDetailLocalInstallStates] = useState<
     Record<string, DetailLocalInstallState>
   >({});
-  const [pendingAutoUpdateRemovalSkillId, setPendingAutoUpdateRemovalSkillId] =
+  const [pendingAutoUpdateRemovalSourceKey, setPendingAutoUpdateRemovalSourceKey] =
     useState<string | null>(null);
   const [remoteInstallResult, setRemoteInstallResult] =
     useState<DesktopInstallRemoteSkillResult | null>(null);
   const builtinPathHealth = builtinPathHealthForAgents(agents);
   const customPathHealth = pathHealthForAgents(agents, "custom");
-  const autoUpdateSourceSkills = skills.filter(
+  const autoUpdateInstallationSkills = skills.filter(
     (skill) => skill.source?.trusted && skill.source.auto_update,
   );
-  const trustedAutoUpdateSkills = autoUpdateSourceSkills.filter(
+  const autoUpdateSourceGroups = groupAutoUpdateSkillsBySource(autoUpdateInstallationSkills);
+  const trustedAutoUpdateSkills = autoUpdateInstallationSkills.filter(
     (skill) => skill.local_modified !== true,
   );
   const sourceRequiredSkill = sourceRequiredSkillId
@@ -1385,12 +1391,13 @@ function MetisApp() {
     }
   }
 
-  async function handleRemoveAutoUpdateSkill(skill: DesktopSkill) {
+  async function handleRemoveAutoUpdateSkill(group: AutoUpdateSourceGroup) {
+    const skill = group.representative;
     if (!skill.source) {
       return;
     }
 
-    setActionBusy(`remove-auto-update:${skill.id}`);
+    setActionBusy(`remove-auto-update:${group.sourceKey}`);
     setActionError(null);
     setActionMessage(null);
 
@@ -1405,7 +1412,7 @@ function MetisApp() {
         auto_update: false,
       });
       await refreshIndexedSkills();
-      setPendingAutoUpdateRemovalSkillId(null);
+      setPendingAutoUpdateRemovalSourceKey(null);
       setActionMessage("已移出自动更新列表");
     } catch (caught) {
       setActionError(desktopError(caught));
@@ -2146,74 +2153,77 @@ function MetisApp() {
               <p>只会更新已加入自动更新列表、且本地没有修改的 Skill。</p>
             </div>
             <div className="auto-update-source-list" data-testid="auto-update-source-list">
-              {autoUpdateSourceSkills.length === 0 ? (
+              {autoUpdateSourceGroups.length === 0 ? (
                 <div className="auto-update-empty-state" data-testid="auto-update-empty-state">
                   <strong>暂无加入自动更新列表的 Skill</strong>
                   <span>去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。</span>
                 </div>
               ) : (
-                autoUpdateSourceSkills.map((skill) => (
-                  <div
-                    className={`auto-update-source-row${
-                      pendingAutoUpdateRemovalSkillId === skill.id ? " is-open" : ""
-                    }`}
-                    data-testid={`auto-update-source-row-${skill.id}`}
-                    key={skill.id}
-                  >
-                    <div className="auto-update-source-main">
-                      <div className="auto-update-source-name-line">
-                        <strong className="auto-update-source-name">{skill.name}</strong>
-                        <span className="auto-update-trusted-chip">已信任</span>
-                      </div>
-                      <span className="auto-update-source-url">{skill.source?.url}</span>
-                    </div>
+                autoUpdateSourceGroups.map((group) => {
+                  const skill = group.representative;
+                  const removeBusy = actionBusy === `remove-auto-update:${group.sourceKey}`;
+                  const removalOpen = pendingAutoUpdateRemovalSourceKey === group.sourceKey;
+                  return (
                     <div
-                      className="auto-update-remove-actions"
-                      data-testid={`auto-update-remove-actions-${skill.id}`}
+                      className={`auto-update-source-row${removalOpen ? " is-open" : ""}`}
+                      data-testid={`auto-update-source-row-${skill.id}`}
+                      key={group.sourceKey}
                     >
-                      <button
-                        className="auto-update-remove"
-                        data-testid={`remove-auto-update-${skill.id}`}
-                        disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                        onClick={() => setPendingAutoUpdateRemovalSkillId(skill.id)}
-                        type="button"
-                      >
-                        {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "移除"}
-                      </button>
-                    </div>
-                    {pendingAutoUpdateRemovalSkillId === skill.id ? (
-                      <div
-                        className="auto-update-remove-confirm"
-                        data-testid={`auto-update-remove-confirm-${skill.id}`}
-                      >
-                        <div className="auto-update-remove-confirm-copy">
-                          <strong>移出自动更新列表？</strong>
-                          <span>不会删除本地 Skill，只会关闭这个来源的信任与自动更新。</span>
+                      <div className="auto-update-source-main">
+                        <div className="auto-update-source-name-line">
+                          <strong className="auto-update-source-name">{skill.name}</strong>
+                          <span className="auto-update-trusted-chip">已信任</span>
                         </div>
-                        <div className="auto-update-remove-confirm-actions">
-                          <button
-                            className="auto-update-cancel"
-                            data-testid={`cancel-remove-auto-update-${skill.id}`}
-                            disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                            onClick={() => setPendingAutoUpdateRemovalSkillId(null)}
-                            type="button"
-                          >
-                            取消
-                          </button>
-                          <button
-                            className="auto-update-confirm"
-                            data-testid={`confirm-remove-auto-update-${skill.id}`}
-                            disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                            onClick={() => handleRemoveAutoUpdateSkill(skill)}
-                            type="button"
-                          >
-                            {actionBusy === `remove-auto-update:${skill.id}` ? "移出中" : "确认移出"}
-                          </button>
-                        </div>
+                        <span className="auto-update-source-url">{skill.source?.url}</span>
                       </div>
-                    ) : null}
-                  </div>
-                ))
+                      <div
+                        className="auto-update-remove-actions"
+                        data-testid={`auto-update-remove-actions-${skill.id}`}
+                      >
+                        <button
+                          className="auto-update-remove"
+                          data-testid={`remove-auto-update-${skill.id}`}
+                          disabled={removeBusy}
+                          onClick={() => setPendingAutoUpdateRemovalSourceKey(group.sourceKey)}
+                          type="button"
+                        >
+                          {removeBusy ? "移除中" : "移除"}
+                        </button>
+                      </div>
+                      {removalOpen ? (
+                        <div
+                          className="auto-update-remove-confirm"
+                          data-testid={`auto-update-remove-confirm-${skill.id}`}
+                        >
+                          <div className="auto-update-remove-confirm-copy">
+                            <strong>移出自动更新列表？</strong>
+                            <span>不会删除本地 Skill，只会关闭这个来源的信任与自动更新。</span>
+                          </div>
+                          <div className="auto-update-remove-confirm-actions">
+                            <button
+                              className="auto-update-cancel"
+                              data-testid={`cancel-remove-auto-update-${skill.id}`}
+                              disabled={removeBusy}
+                              onClick={() => setPendingAutoUpdateRemovalSourceKey(null)}
+                              type="button"
+                            >
+                              取消
+                            </button>
+                            <button
+                              className="auto-update-confirm"
+                              data-testid={`confirm-remove-auto-update-${skill.id}`}
+                              disabled={removeBusy}
+                              onClick={() => handleRemoveAutoUpdateSkill(group)}
+                              type="button"
+                            >
+                              {removeBusy ? "移出中" : "确认移出"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
               )}
             </div>
             <button
@@ -2412,6 +2422,31 @@ function isUiRedesignPreviewRoute() {
   const hash = window.location.hash.replace(/^#/, "");
   const search = window.location.search;
   return hash === "/ui-redesign-preview" || search.includes("preview=ui-redesign");
+}
+
+function groupAutoUpdateSkillsBySource(skills: DesktopSkill[]): AutoUpdateSourceGroup[] {
+  const groups = new Map<string, AutoUpdateSourceGroup>();
+  for (const skill of skills) {
+    const source = skill.source;
+    if (!source) {
+      continue;
+    }
+    const sourceKey =
+      skill.source_id?.trim() ||
+      source.id.trim() ||
+      `source\u0000${source.url}\u0000${source.repo_path}\u0000${source.ref_}`;
+    const existing = groups.get(sourceKey);
+    if (existing) {
+      existing.members.push(skill);
+      continue;
+    }
+    groups.set(sourceKey, {
+      sourceKey,
+      representative: skill,
+      members: [skill],
+    });
+  }
+  return Array.from(groups.values());
 }
 
 function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
