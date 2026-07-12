@@ -5586,8 +5586,7 @@ textarea {
   font-weight: 720;
 }
 
-.dashboard-stat-card.redesign-stat-card span,
-.dashboard-stat-card.redesign-stat-card small {
+.dashboard-stat-card.redesign-stat-card span {
   font-size: 11px;
   font-weight: 620;
 }
@@ -7671,8 +7670,7 @@ textarea {
   border: 1px solid rgba(223, 232, 242, 0.7);
 }
 
-.redesign-stat-card span,
-.redesign-stat-card small {
+.redesign-stat-card span {
   color: #738297;
   font-size: 12px;
   font-weight: 850;

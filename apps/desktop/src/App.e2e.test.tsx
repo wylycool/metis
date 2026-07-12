@@ -1791,6 +1791,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByTestId("skill-status-filters")).toBeNull();
     expect(screen.queryByTestId("agent-category-bar")).toBeNull();
     expect(screen.getByTestId("skill-dashboard-stats")).toBeTruthy();
+    expect(screen.queryByText("from real scan")).toBeNull();
+    expect(screen.queryByText("needs review")).toBeNull();
+    expect(screen.queryByText("ready to use")).toBeNull();
     expect(screen.getByTestId("skill-card-grid")).toBeTruthy();
     expect(screen.getByTestId("skill-card-grid").className).toContain("redesign-skill-grid");
     expect(screen.getByTestId("skill-card-e2e-skill")).toBeTruthy();
@@ -1913,6 +1916,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("redesign-stat-total")).toBeTruthy();
     expect(screen.getByTestId("redesign-stat-updates")).toBeTruthy();
     expect(screen.getByTestId("redesign-stat-latest")).toBeTruthy();
+    expect(screen.queryByText("+6 from last scan")).toBeNull();
+    expect(screen.queryByText("trusted repos")).toBeNull();
     expect(screen.getByTestId("redesign-skill-grid")).toBeTruthy();
     expect(screen.getByTestId("redesign-skill-card-memory-weaver")).toBeTruthy();
     expect(screen.getByTestId("redesign-agent-stack-memory-weaver")).toBeTruthy();

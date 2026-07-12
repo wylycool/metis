@@ -1057,7 +1057,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
       "font-weight: 720;",
     );
-    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card span,\n.dashboard-stat-card.redesign-stat-card small")).toContain(
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card span")).toContain(
       "font-weight: 620;",
     );
     expect(stylesheet).toMatch(

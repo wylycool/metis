@@ -442,7 +442,6 @@ function DashboardStat({
     <article className={`dashboard-stat-card redesign-stat-card ${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>{label === "待更新" ? "needs review" : label === "已最新" ? "ready to use" : "from real scan"}</small>
     </article>
   );
 }
