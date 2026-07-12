@@ -1,4 +1,6 @@
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitRemoteRef {
@@ -75,22 +77,40 @@ impl GitCommandRunner for SystemGitRunner {
 
 #[derive(Debug, Clone, Default)]
 pub struct EnvironmentGitRunner {
+    executable: PathBuf,
     environment: Vec<(String, String)>,
 }
 
 impl EnvironmentGitRunner {
     pub fn new(environment: Vec<(String, String)>) -> Self {
-        Self { environment }
+        Self {
+            executable: PathBuf::from("git"),
+            environment,
+        }
+    }
+
+    pub fn with_executable(
+        executable: impl Into<PathBuf>,
+        environment: Vec<(String, String)>,
+    ) -> Self {
+        Self {
+            executable: executable.into(),
+            environment,
+        }
     }
 
     pub fn environment(&self) -> &[(String, String)] {
         &self.environment
     }
+
+    pub fn executable(&self) -> &Path {
+        &self.executable
+    }
 }
 
 impl GitCommandRunner for EnvironmentGitRunner {
     fn run_git(&self, args: &[&str]) -> Result<GitCommandOutput, GitProviderError> {
-        run_system_git(args, &self.environment)
+        run_git_command(&self.executable, args, &self.environment)
     }
 }
 
@@ -98,8 +118,22 @@ fn run_system_git(
     args: &[&str],
     environment: &[(String, String)],
 ) -> Result<GitCommandOutput, GitProviderError> {
+    run_git_command(Path::new("git"), args, environment)
+}
+
+fn run_git_command(
+    executable: &Path,
+    args: &[&str],
+    environment: &[(String, String)],
+) -> Result<GitCommandOutput, GitProviderError> {
     let merged_environment = merged_git_environment(environment);
-    let output = Command::new("git")
+    let started = Instant::now();
+    eprintln!(
+        "[metis][git] start executable={} command={}",
+        executable.display(),
+        sanitized_git_command(args)
+    );
+    let output = Command::new(executable)
         .args(args)
         .envs(merged_environment.iter().map(|(key, value)| (key, value)))
         .output()
@@ -111,13 +145,54 @@ fn run_system_git(
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     if !output.status.success() {
+        eprintln!(
+            "[metis][git] failed executable={} command={} elapsed_ms={} status={}",
+            executable.display(),
+            sanitized_git_command(args),
+            started.elapsed().as_millis(),
+            output.status
+        );
         return Err(GitProviderError::CommandFailed {
             command: format!("git {}", args.join(" ")),
             stderr,
         });
     }
 
+    eprintln!(
+        "[metis][git] success executable={} command={} elapsed_ms={}",
+        executable.display(),
+        sanitized_git_command(args),
+        started.elapsed().as_millis()
+    );
+
     Ok(GitCommandOutput { stdout, stderr })
+}
+
+fn sanitized_git_command(args: &[&str]) -> String {
+    let operation = args
+        .iter()
+        .enumerate()
+        .find_map(|(index, arg)| {
+            if *arg == "-C" {
+                return None;
+            }
+            if index > 0 && args[index - 1] == "-C" {
+                return None;
+            }
+            (!arg.starts_with('-')).then_some(*arg)
+        })
+        .unwrap_or("unknown");
+    let flags = args
+        .iter()
+        .filter(|arg| arg.starts_with('-') && **arg != "-C")
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if flags.is_empty() {
+        operation.to_string()
+    } else {
+        format!("{operation} {flags}")
+    }
 }
 
 fn merged_git_environment(environment: &[(String, String)]) -> Vec<(String, String)> {

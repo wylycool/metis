@@ -22,6 +22,7 @@ serde_json.workspace = true
 dirs.workspace = true
 sha2.workspace = true
 base64 = "0.22"
+wait-timeout.workspace = true
 
 metis-core = { path = "../../../crates/core" }
 metis-git-provider = { path = "../../../crates/git-provider" }
