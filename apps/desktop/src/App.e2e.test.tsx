@@ -1133,7 +1133,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("Updates")).toBeNull();
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
-    expect(await screen.findByText("Skill 自动更新")).toBeTruthy();
+    expect(await screen.findByText("一键更新受信任 Skill")).toBeTruthy();
     expect(screen.getByText("只会更新已加入自动更新列表、且本地没有修改的 Skill。")).toBeTruthy();
     expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
     expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
@@ -1143,7 +1143,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(autoUpdateList.getByText("已信任")).toBeTruthy();
     expect(autoUpdateList.getByText("file:///tmp/metis-trusted-repo")).toBeTruthy();
     expect(autoUpdateList.queryByText("Untrusted Skill")).toBeNull();
-    expect(screen.getByTestId("run-auto-update").textContent).toBe("开启自动更新");
+    expect(screen.getByTestId("run-auto-update").textContent).toBe("立刻检查并更新");
     expect(screen.queryByText("团队清单合规")).toBeNull();
     expect(screen.queryByText("企业网络")).toBeNull();
     expect(screen.queryByText("凭据引用")).toBeNull();
@@ -1203,7 +1203,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));
     await waitFor(() => expect(screen.queryByTestId("auto-update-source-row-trusted-skill")).toBeNull());
     expect(within(autoUpdateSection).queryByTestId("auto-update-empty-state")).toBeTruthy();
-    expect(within(autoUpdateSection).getAllByText("开启自动更新")).toHaveLength(1);
+    expect(within(autoUpdateSection).getAllByText("立刻检查并更新")).toHaveLength(1);
     expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
       request: expect.objectContaining({
         skill_id: "trusted-skill",
@@ -1327,7 +1327,7 @@ describe("Metis desktop GUI main flow", () => {
     render(<App />);
 
     await user.click(await screen.findByTestId("workspace-tab-settings"));
-    expect(await screen.findByText("Skill 自动更新")).toBeTruthy();
+    expect(await screen.findByText("一键更新受信任 Skill")).toBeTruthy();
     expect(screen.queryByText(/自动更新列表 \d+ 个/)).toBeNull();
     expect(screen.queryByText(/本次可更新候选 \d+ 个/)).toBeNull();
     const autoUpdateSection = within(screen.getByTestId("settings-section-auto-update"));
@@ -1336,7 +1336,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(
       emptyState.getByText("去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。"),
     ).toBeTruthy();
-    expect(autoUpdateSection.getAllByText("开启自动更新")).toHaveLength(1);
+    expect(autoUpdateSection.getAllByText("立刻检查并更新")).toHaveLength(1);
 
     await user.click(screen.getByTestId("run-auto-update"));
 
@@ -1770,7 +1770,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.getByTestId("settings-agent-path-codex")).toBeTruthy();
     expect(screen.getByText("内置 Agent 路径管理")).toBeTruthy();
     expect(screen.getByText("自定义路径管理")).toBeTruthy();
-    expect(screen.getByText("Skill 自动更新")).toBeTruthy();
+    expect(screen.getByText("一键更新受信任 Skill")).toBeTruthy();
     expect(screen.queryByText("企业网络")).toBeNull();
     expect(screen.queryByText("团队清单合规")).toBeNull();
 
@@ -3691,7 +3691,7 @@ describe("Metis software update flow", () => {
     await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
 
     expect(await screen.findByText("Metis 软件更新")).toBeTruthy();
-    expect(screen.getByText("Skill 自动更新")).toBeTruthy();
+    expect(screen.getByText("一键更新受信任 Skill")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: /^自动更新$/ })).toBeNull();
     const startupCheck = screen.getByTestId(
       "software-update-check-on-startup",

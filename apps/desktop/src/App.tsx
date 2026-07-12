@@ -2149,7 +2149,7 @@ function MetisApp() {
 
           <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
             <div className="auto-update-copy">
-              <h3>Skill 自动更新</h3>
+              <h3>一键更新受信任 Skill</h3>
               <p>只会更新已加入自动更新列表、且本地没有修改的 Skill。</p>
             </div>
             <div className="auto-update-source-list" data-testid="auto-update-source-list">
@@ -2227,12 +2227,19 @@ function MetisApp() {
               )}
             </div>
             <button
-              className="auto-update-run"
+              className={`auto-update-run${actionBusy === "auto-update" ? " is-busy" : ""}`}
               data-testid="run-auto-update"
               disabled={actionBusy === "auto-update" || skills.length === 0}
               onClick={handleRunAutoUpdate}
             >
-              {actionBusy === "auto-update" ? "更新中" : "开启自动更新"}
+              {actionBusy === "auto-update" ? (
+                <>
+                  <span className="auto-update-run-spinner" aria-hidden="true" />
+                  正在检查并更新
+                </>
+              ) : (
+                "立刻检查并更新"
+              )}
             </button>
           </section>
 
