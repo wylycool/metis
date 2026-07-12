@@ -5359,6 +5359,11 @@ textarea {
     #ffffff;
 }
 
+.app-shell.redesign-main.settings-workspace-main {
+  grid-template-rows: auto;
+  grid-auto-rows: max-content;
+}
+
 .topbar.redesign-page-topbar {
   min-height: 60px;
   display: grid;

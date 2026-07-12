@@ -1758,6 +1758,9 @@ describe("Metis desktop GUI main flow", () => {
 
     await user.click(screen.getByTestId("workspace-tab-settings"));
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
+    expect(screen.getByTestId("metis-reference-main").className).toContain(
+      "settings-workspace-main",
+    );
     expect(screen.getByTestId("workspace-topbar")).toBeTruthy();
     expect(screen.getByTestId("workspace-topbar-middle")).toBeTruthy();
     expect(screen.getByTestId("workspace-topbar-actions")).toBeTruthy();

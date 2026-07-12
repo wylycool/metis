@@ -1226,6 +1226,7 @@ describe("Phase 6 light workspace contrast", () => {
     const autoUpdateSection = exactBlockFor(".settings-section.auto-update-section");
     const realWindow = exactBlockFor(".metis-window.redesign-preview-shell");
     const realShell = exactBlockFor(".metis-shell.redesign-app-window");
+    const settingsMain = exactBlockFor(".app-shell.redesign-main.settings-workspace-main");
     const settingsHeadingSize = declaredPx(latestBlockFor(".settings-section h3"), "font-size");
     const compactViewport = mediaBlocksFor("(max-width: 760px)").join("\n");
     const narrowViewport = mediaBlocksFor("(max-width: 520px)").join("\n");
@@ -1266,6 +1267,8 @@ describe("Phase 6 light workspace contrast", () => {
     expect(realWindow).toContain("overflow: hidden;");
     expect(realShell).toContain("height: 100vh;");
     expect(realShell).toContain("min-height: 0;");
+    expect(settingsMain).toContain("grid-template-rows: auto;");
+    expect(settingsMain).toContain("grid-auto-rows: max-content;");
     expect(compactViewport).toMatch(
       /\.settings-section\.software-update-settings-section\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
     );

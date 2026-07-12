@@ -1875,7 +1875,12 @@ function MetisApp() {
             </button>
           </div>
         </aside>
-        <div className="app-shell redesign-main">
+        <div
+          className={`app-shell redesign-main${
+            activeWorkspace === "settings" ? " settings-workspace-main" : ""
+          }`}
+          data-testid="metis-reference-main"
+        >
           {!isSkillDetailView && (
             <WorkspaceTopbar
               actionBusy={actionBusy}
