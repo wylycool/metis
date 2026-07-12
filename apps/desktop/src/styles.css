@@ -5405,8 +5405,8 @@ textarea {
 }
 
 .metis-sidebar-github {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   align-self: center;
@@ -7428,8 +7428,8 @@ textarea {
 }
 
 .redesign-github-link {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   align-self: center;

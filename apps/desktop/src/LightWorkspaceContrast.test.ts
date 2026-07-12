@@ -739,8 +739,8 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".redesign-skill-card")).toContain("-webkit-line-clamp: 2;");
     expect(latestBlockFor(".redesign-agent-stack")).toContain("margin-left: -7px;");
-    expect(latestBlockFor(".redesign-github-link")).toContain("width: 42px;");
-    expect(latestBlockFor(".redesign-github-link")).toContain("height: 42px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("width: 48px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("height: 48px;");
     expect(latestBlockFor(".redesign-github-link")).toContain("border-radius: 14px;");
     expect(latestBlockFor(".redesign-github-link svg")).toContain("width: 20px;");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("position: fixed");
@@ -994,8 +994,8 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".metis-sidebar-footer")).toContain("align-self: end;");
     expect(latestBlockFor(".metis-sidebar-footer")).toContain("display: flex;");
-    expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 42px;");
-    expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 42px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 48px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 48px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border-radius: 14px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border: 0;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("box-shadow: none;");
