@@ -6228,7 +6228,7 @@ textarea {
   font-weight: 760;
 }
 
-/* Static mock route for docs/design/2026-06-21-metis-ui-redesign-design.md. */
+/* Static mock route used for UI regression comparison. */
 :root {
   --redesign-canvas: #f5f4f8;
   --redesign-raised: #ffffff;
