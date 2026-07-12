@@ -3575,6 +3575,18 @@ describe("Metis software update flow", () => {
     await user.click(within(error).getByText("重试"));
     await waitFor(() => expect(manualScenario.commandCalls("check_software_update")).toBe(2));
     expect(softwareSection.getByTestId("software-update-settings-feedback")).toBe(feedbackSlot);
+
+    await user.click(screen.getByTestId("workspace-tab-skills"));
+    expect(screen.queryByTestId("workspace-settings")).toBeNull();
+    await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
+
+    const reopenedSoftwareSection = within(
+      await screen.findByTestId("settings-section-software-update"),
+    );
+    expect(
+      reopenedSoftwareSection.getByTestId("software-update-settings-feedback").childElementCount,
+    ).toBe(0);
+    expect(reopenedSoftwareSection.queryByRole("alert")).toBeNull();
   });
 
   test("places compact software update settings after the other settings sections", async () => {

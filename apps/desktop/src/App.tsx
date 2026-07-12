@@ -1787,6 +1787,11 @@ function MetisApp() {
       setRemotePreviewError(null);
     }
   }, []);
+  const openSettingsWorkspace = useCallback(() => {
+    setSoftwareUpdateCheckMessage(null);
+    setSoftwareUpdateCheckError(null);
+    setActiveWorkspace("settings");
+  }, []);
   const openSkillsHome = useCallback(() => {
     if (activeWorkspace === "settings") {
       if (hasUnsavedAgentPathChanges) {
@@ -1856,7 +1861,7 @@ function MetisApp() {
               aria-pressed={activeWorkspace === "settings"}
               className={activeWorkspace === "settings" ? "active" : ""}
               data-testid="workspace-tab-settings-sidebar"
-              onClick={() => setActiveWorkspace("settings")}
+              onClick={openSettingsWorkspace}
             >
               <GearIcon />
               Settings
@@ -1889,7 +1894,7 @@ function MetisApp() {
               skillCount={skills.length}
               skillSearchQuery={skillSearchQuery}
               onCheckAllUpdates={() => handleCheckUpdates(skills.map((skill) => skill.id))}
-              onOpenSettings={() => setActiveWorkspace("settings")}
+              onOpenSettings={openSettingsWorkspace}
               onScan={handleScan}
               onSearchChange={setSkillSearchQuery}
             />
@@ -2400,7 +2405,7 @@ function MetisApp() {
           onLoadSkillAuditEvents={loadSkillAuditEvents}
           onLoadSkillSize={loadSkillSize}
           onOpenBind={openBindForm}
-          onOpenSettings={() => setActiveWorkspace("settings")}
+          onOpenSettings={openSettingsWorkspace}
           onPreviewRemoteSync={handlePreviewRemoteSync}
           onResetRemoteSync={resetRemoteSyncState}
           onRestoreBackup={handleRestoreBackup}
