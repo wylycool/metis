@@ -869,6 +869,7 @@ function MetisApp() {
         return next;
       });
       setDiffError({});
+      setActionMessage("检查完成");
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {

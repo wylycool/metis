@@ -2162,7 +2162,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(scenario.checkedSkillIds()).toEqual([["codex-planner", "claude-writer"]]);
   });
 
-  test("home bulk check uses deduplicated dashboard stats without a duplicate toast", async () => {
+  test("home bulk check confirms completion without duplicating dashboard counts", async () => {
     const user = userEvent.setup();
     const scenario = createBetaReadinessScenario({ duplicateTrustedAgentInstall: true });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
@@ -2176,7 +2176,7 @@ describe("Metis desktop GUI main flow", () => {
 
     await waitFor(() => expect(statValue("待更新")).toBe("2"));
     expect(statValue("已最新")).toBe("0");
-    expect(screen.queryByTestId("redesign-toast")).toBeNull();
+    expect((await screen.findByTestId("redesign-toast")).textContent).toBe("检查完成");
     expect(screen.queryByText(/检查完成：.*个 (skill|Agent).*更新/)).toBeNull();
   });
 
