@@ -1794,10 +1794,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByText("from real scan")).toBeNull();
     expect(screen.queryByText("needs review")).toBeNull();
     expect(screen.queryByText("ready to use")).toBeNull();
-    expect(screen.getByTestId("dashboard-stat-icon-grid")).toBeTruthy();
-    expect(screen.getByTestId("dashboard-stat-icon-refresh")).toBeTruthy();
-    expect(screen.getByTestId("dashboard-stat-icon-check")).toBeTruthy();
-    expect(screen.getByTestId("dashboard-stat-icon-edit")).toBeTruthy();
+    expect(document.querySelector(".dashboard-stat-icon")).toBeNull();
     expect(screen.getByTestId("skill-card-grid")).toBeTruthy();
     expect(screen.getByTestId("skill-card-grid").className).toContain("redesign-skill-grid");
     expect(screen.getByTestId("skill-card-e2e-skill")).toBeTruthy();

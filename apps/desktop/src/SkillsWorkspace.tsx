@@ -330,10 +330,10 @@ export function SkillsWorkspace({
                 检查完成
               </div>
             )}
-            <DashboardStat icon="grid" label="全部 Skill" value={baseVisibleSkills.length} tone="mint" />
-            <DashboardStat icon="refresh" label="待更新" value={visibleUpdateAvailableCount} tone="warm" />
-            <DashboardStat icon="check" label="已最新" value={visibleUpToDateCount} tone="blue" />
-            <DashboardStat icon="edit" label="本地修改" value={visibleModifiedCount} tone="rose" />
+            <DashboardStat label="全部 Skill" value={baseVisibleSkills.length} tone="mint" />
+            <DashboardStat label="待更新" value={visibleUpdateAvailableCount} tone="warm" />
+            <DashboardStat label="已最新" value={visibleUpToDateCount} tone="blue" />
+            <DashboardStat label="本地修改" value={visibleModifiedCount} tone="rose" />
           </div>
 
           {state === "loading" && <LoadingState />}
@@ -430,12 +430,10 @@ export function SkillsWorkspace({
 }
 
 function DashboardStat({
-  icon,
   label,
   tone,
   value,
 }: {
-  icon: "check" | "edit" | "grid" | "refresh";
   label: string;
   tone: "mint" | "rose" | "blue" | "warm";
   value: number;
@@ -444,49 +442,7 @@ function DashboardStat({
     <article className={`dashboard-stat-card redesign-stat-card ${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <DashboardStatIcon icon={icon} />
     </article>
-  );
-}
-
-function DashboardStatIcon({ icon }: { icon: "check" | "edit" | "grid" | "refresh" }) {
-  return (
-    <div
-      aria-hidden="true"
-      className="dashboard-stat-icon"
-      data-testid={`dashboard-stat-icon-${icon}`}
-    >
-      <svg viewBox="0 0 24 24">
-        {icon === "grid" && (
-          <>
-            <rect height="6" rx="1.4" width="6" x="4" y="4" />
-            <rect height="6" rx="1.4" width="6" x="14" y="4" />
-            <rect height="6" rx="1.4" width="6" x="4" y="14" />
-            <rect height="6" rx="1.4" width="6" x="14" y="14" />
-          </>
-        )}
-        {icon === "refresh" && (
-          <>
-            <path d="M20 7v5h-5" />
-            <path d="M4 17v-5h5" />
-            <path d="M6.1 9a7 7 0 0 1 11.5-2.3L20 9" />
-            <path d="M17.9 15a7 7 0 0 1-11.5 2.3L4 15" />
-          </>
-        )}
-        {icon === "check" && (
-          <>
-            <circle cx="12" cy="12" r="8" />
-            <path d="m8.5 12 2.3 2.3 4.8-5" />
-          </>
-        )}
-        {icon === "edit" && (
-          <>
-            <path d="M5 19h4l9.4-9.4a2.1 2.1 0 0 0-4-4L5 15v4Z" />
-            <path d="m13 7 4 4" />
-          </>
-        )}
-      </svg>
-    </div>
   );
 }
 

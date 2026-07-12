@@ -1057,11 +1057,10 @@ describe("Phase 6 light workspace contrast", () => {
     expect(stylesheet).toMatch(
       /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*80px;/,
     );
-    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card")).toContain(
-      "grid-template-columns: minmax(0, 1fr) 34px;",
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card")).not.toContain(
+      "grid-template-columns:",
     );
-    expect(exactBlockFor(".dashboard-stat-icon")).toContain("opacity: 0.72;");
-    expect(exactBlockFor(".dashboard-stat-icon svg")).toContain("stroke-width: 1.8;");
+    expect(stylesheet).not.toContain(".dashboard-stat-icon");
     expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
       "font-weight: 720;",
     );
