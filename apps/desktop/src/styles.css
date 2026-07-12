@@ -5467,6 +5467,10 @@ textarea {
   grid-auto-rows: max-content;
 }
 
+.app-shell.redesign-main:has(.skill-dashboard-stats) {
+  gap: 30px;
+}
+
 .topbar.redesign-page-topbar {
   min-height: 60px;
   display: grid;
@@ -5613,7 +5617,7 @@ textarea {
 
 .skill-dashboard-check-complete {
   position: absolute;
-  top: -13px;
+  bottom: calc(100% + 4px);
   right: 12px;
   z-index: 2;
   display: inline-flex;
