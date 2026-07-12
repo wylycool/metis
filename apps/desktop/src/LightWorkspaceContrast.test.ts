@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
 const stylesheet = readFileSync("src/styles.css", "utf8");
@@ -131,6 +131,29 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe("Phase 6 light workspace contrast", () => {
+  test("does not ship the obsolete dark-gold global theme baseline", () => {
+    const firstComponentRule = stylesheet.indexOf(".app-shell");
+    const globalPrelude = stylesheet.slice(0, firstComponentRule);
+
+    expect(firstComponentRule).toBeGreaterThan(0);
+    expect(globalPrelude).not.toMatch(/:root\s*\{/);
+    expect(globalPrelude).not.toContain("#111317");
+    expect(globalPrelude).not.toContain("#191d23");
+    expect(globalPrelude).not.toContain("#20262e");
+    expect(globalPrelude).not.toContain("#d0a84f");
+    expect(globalPrelude).not.toContain("#101216");
+    expect(globalPrelude).not.toMatch(
+      /^\s*(color|background|border-color|box-shadow|accent-color):/m,
+    );
+    expect(globalPrelude).toContain("box-sizing: border-box;");
+    expect(globalPrelude).toContain("min-width: 320px;");
+  });
+
+  test("does not copy one-off static UI previews into production assets", () => {
+    expect(existsSync("public/auto-update-remove-preview.html")).toBe(false);
+    expect(existsSync("public/git-check-failures.html")).toBe(false);
+  });
+
   test("defines semantic light theme tokens for brand, surfaces, borders, text, and status", () => {
     const requiredTokens = [
       "--brand",
@@ -239,7 +262,7 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".metis-brand-mark")).toContain("linear-gradient(135deg");
     expect(latestBlockFor(".workspace-rail")).toContain("display: none");
-    expect(latestBlockFor(".workspace-tabs")).toContain("display: none");
+    expect(stylesheet).not.toContain(".workspace-tabs");
   });
 
   test("keeps the refreshed desktop chrome compact while allowing dashboard cards", () => {
@@ -338,7 +361,9 @@ describe("Phase 6 light workspace contrast", () => {
 
   test("uses the reference preview typography scale on the formal desktop", () => {
     expect(declaredPx(latestBlockFor("h1"), "font-size")).toBeLessThanOrEqual(30);
-    expect(declaredPx(latestBlockFor(".workspace-tab"), "font-size")).toBeLessThanOrEqual(15);
+    expect(
+      declaredPx(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button"), "font-size"),
+    ).toBeLessThanOrEqual(15);
     expect(declaredPx(latestBlockFor(".metric strong"), "font-size")).toBeLessThanOrEqual(22);
     expect(declaredPx(latestBlockFor(".agent-filter-pill"), "font-size")).toBeLessThanOrEqual(13);
   });

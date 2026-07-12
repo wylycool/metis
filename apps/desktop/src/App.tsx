@@ -1878,22 +1878,6 @@ function MetisApp() {
             />
           )}
 
-          <nav className="workspace-tabs" aria-hidden="true" hidden>
-            <WorkspaceTab
-              active={activeWorkspace === "skills"}
-              count={skills.length}
-              label="Skills"
-              testId="workspace-tab-skills-legacy"
-              onClick={openSkillsHome}
-            />
-            <WorkspaceTab
-              active={activeWorkspace === "settings"}
-              label="Settings"
-              testId="workspace-tab-settings-legacy"
-              onClick={() => setActiveWorkspace("settings")}
-            />
-          </nav>
-
       {activeWorkspace !== "skills" && (
         <section className="summary-strip" aria-label="路径摘要">
           <SummaryMetric label="内置有效路径" value={builtinPathHealth.valid.toString()} />
@@ -2520,32 +2504,6 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-function WorkspaceTab({
-  active,
-  count,
-  label,
-  testId,
-  onClick,
-}: {
-  active: boolean;
-  count?: number;
-  label: string;
-  testId: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-pressed={active}
-      className={`workspace-tab ${active ? "active" : ""}`}
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <span>{label}</span>
-      {count !== undefined && <strong>{count}</strong>}
-    </button>
   );
 }
 

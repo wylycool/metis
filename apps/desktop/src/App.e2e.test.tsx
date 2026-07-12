@@ -2032,7 +2032,7 @@ describe("Metis desktop GUI main flow", () => {
       scenario.invoke(command, args),
     );
 
-    render(<App />);
+    const { container } = render(<App />);
 
     const emptyState = await screen.findByTestId("skills-empty-state");
     expect(emptyState).toBeTruthy();
@@ -2042,7 +2042,10 @@ describe("Metis desktop GUI main flow", () => {
 
     expect(await screen.findByTestId("workspace-settings")).toBeTruthy();
     expect(screen.getByText("内置 Agent 路径管理")).toBeTruthy();
+    expect(screen.queryByTestId("workspace-tab-skills-legacy")).toBeNull();
+    expect(screen.queryByTestId("workspace-tab-settings-legacy")).toBeNull();
     expect(screen.queryByTestId("workspace-tab-governance-legacy")).toBeNull();
+    expect(container.querySelector(".workspace-tabs")).toBeNull();
   });
 
   test("agent detail filters skills and checks only the selected agent", async () => {

@@ -1,44 +1,18 @@
-:root {
-  --bg: #111317;
-  --panel: #191d23;
-  --panel-strong: #20262e;
-  --border: #303843;
-  --text: #f0eee7;
-  --muted: #a7b0b8;
-  --subtle: #79838d;
-  --gold: #d0a84f;
-  --green: #61c38b;
-  --red: #e05f5f;
-  --blue: #6aa6cf;
-  --shadow: rgba(0, 0, 0, 0.28);
-}
-
 * {
   box-sizing: border-box;
-}
-
-html {
-  background: var(--bg);
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: var(--text);
-  background:
-    linear-gradient(180deg, rgba(208, 168, 79, 0.08), transparent 260px),
-    var(--bg);
-  font-family: "Avenir Next", "SF Pro Text", "Segoe UI", sans-serif;
 }
 
 button {
   min-height: 38px;
-  border: 1px solid rgba(208, 168, 79, 0.7);
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 0 16px;
-  color: #151515;
-  background: var(--gold);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -50,7 +24,6 @@ button {
 
 button:hover:not(:disabled) {
   transform: translateY(-1px);
-  background: #e2bd66;
 }
 
 button:disabled {
@@ -61,27 +34,19 @@ button:disabled {
 input {
   width: 100%;
   min-height: 36px;
-  border: 1px solid #39424d;
+  border: 1px solid transparent;
   border-radius: 7px;
   padding: 0 10px;
-  color: var(--text);
-  background: #101216;
   font: inherit;
   outline: none;
-}
-
-input:focus {
-  border-color: rgba(208, 168, 79, 0.8);
 }
 
 textarea {
   width: 100%;
   min-height: 96px;
-  border: 1px solid #39424d;
+  border: 1px solid transparent;
   border-radius: 7px;
   padding: 10px;
-  color: var(--text);
-  background: #101216;
   font: inherit;
   font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
   font-size: 12px;
@@ -90,22 +55,15 @@ textarea {
   resize: vertical;
 }
 
-textarea:focus {
-  border-color: rgba(208, 168, 79, 0.8);
-}
-
 input[type="checkbox"] {
   width: 16px;
   min-height: 16px;
-  accent-color: var(--gold);
 }
 
 code {
   display: block;
   width: 100%;
-  color: #d7dfdc;
-  background: #101216;
-  border: 1px solid #2c333b;
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 8px 10px;
   font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
@@ -194,48 +152,6 @@ h1 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 14px;
-}
-
-.workspace-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0 0 12px;
-  padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(16, 18, 22, 0.78);
-}
-
-.workspace-tab {
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-color: transparent;
-  color: var(--muted);
-  background: transparent;
-}
-
-.workspace-tab strong {
-  min-width: 22px;
-  border-radius: 999px;
-  padding: 2px 7px;
-  color: #d8e3de;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 11px;
-}
-
-.workspace-tab.active {
-  color: var(--text);
-  border-color: rgba(208, 168, 79, 0.52);
-  background: rgba(208, 168, 79, 0.12);
-}
-
-.workspace-tab.active strong {
-  color: #151515;
-  background: var(--gold);
 }
 
 .workspace-pane {
@@ -1686,38 +1602,6 @@ h1 {
   font-size: 24px;
 }
 
-.workspace-tabs {
-  margin-bottom: 10px;
-  padding: 5px;
-  border-color: var(--border);
-  background: var(--surface-panel);
-}
-
-.workspace-tab {
-  min-height: 34px;
-  font-size: 15px;
-  color: var(--muted);
-}
-
-.workspace-tab strong {
-  min-width: 20px;
-  padding: 1px 6px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  font-size: 10px;
-}
-
-.workspace-tab.active {
-  color: var(--primary);
-  border-color: var(--brand-border);
-  background: var(--surface-selected);
-}
-
-.workspace-tab.active strong {
-  color: var(--text-inverse);
-  background: var(--primary);
-}
-
 .ghost-button {
   color: var(--primary);
   border-color: var(--brand-border);
@@ -2138,10 +2022,6 @@ h1 {
 .rail-scan-summary em {
   color: var(--text-tertiary);
   font-style: normal;
-}
-
-.workspace-tabs {
-  display: none;
 }
 
 .app-shell {
@@ -3120,10 +3000,6 @@ body {
 .scan-button:hover:not(:disabled) {
   color: var(--text-inverse);
   background: var(--ink-hover);
-}
-
-.workspace-tabs {
-  display: none;
 }
 
 .skill-panel {
