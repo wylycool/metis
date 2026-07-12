@@ -108,6 +108,7 @@ fn resolve_windows_path_runtime() -> Result<GitRuntime, String> {
 pub struct GitRuntimeManager {
     resolver: Arc<dyn GitRuntimeResolver>,
     current: Mutex<Option<GitRuntime>>,
+    resolution: Mutex<()>,
     state_file: Option<PathBuf>,
 }
 
@@ -130,6 +131,7 @@ impl GitRuntimeManager {
         Self {
             resolver,
             current: Mutex::new(None),
+            resolution: Mutex::new(()),
             state_file: None,
         }
     }
@@ -138,23 +140,36 @@ impl GitRuntimeManager {
         Self {
             resolver: Arc::new(SystemGitRuntimeResolver),
             current: Mutex::new(None),
+            resolution: Mutex::new(()),
             state_file: Some(state_file),
         }
     }
 
     pub fn current_or_resolve(&self, force_refresh: bool) -> Result<GitRuntime, String> {
-        let mut current = self
-            .current
-            .lock()
-            .map_err(|_| "Git Runtime 状态暂时不可用，请重启 Metis 后重试。".to_string())?;
         if !force_refresh {
-            if let Some(runtime) = current.as_ref() {
+            if let Some(runtime) = self.current_runtime()? {
                 eprintln!(
                     "[metis][git-runtime] cache hit executable={} version={}",
                     runtime.executable.display(),
                     runtime.version
                 );
-                return Ok(runtime.clone());
+                return Ok(runtime);
+            }
+        }
+
+        let _resolution = self
+            .resolution
+            .lock()
+            .map_err(|_| "Git Runtime 检测状态暂时不可用，请重启 Metis 后重试。".to_string())?;
+
+        if !force_refresh {
+            if let Some(runtime) = self.current_runtime()? {
+                eprintln!(
+                    "[metis][git-runtime] cache hit executable={} version={}",
+                    runtime.executable.display(),
+                    runtime.version
+                );
+                return Ok(runtime);
             }
             if let Some(runtime) = self.load_persisted_runtime()? {
                 eprintln!(
@@ -162,7 +177,7 @@ impl GitRuntimeManager {
                     runtime.executable.display(),
                     runtime.version
                 );
-                *current = Some(runtime.clone());
+                self.replace_current(runtime.clone())?;
                 return Ok(runtime);
             }
         }
@@ -174,20 +189,36 @@ impl GitRuntimeManager {
         match self.resolver.resolve() {
             Ok(runtime) => {
                 self.persist_runtime(&runtime);
-                *current = Some(runtime.clone());
+                self.replace_current(runtime.clone())?;
                 Ok(runtime)
             }
             Err(error) => {
-                if let Some(runtime) = current.as_ref() {
+                if let Some(runtime) = self.current_runtime()? {
                     eprintln!(
                         "[metis][git-runtime] refresh failed reason={} keep_current=true",
                         sanitized_reason(&error)
                     );
-                    return Ok(runtime.clone());
+                    return Ok(runtime);
                 }
                 Err(error)
             }
         }
+    }
+
+    fn current_runtime(&self) -> Result<Option<GitRuntime>, String> {
+        self.current
+            .lock()
+            .map(|current| current.clone())
+            .map_err(|_| "Git Runtime 状态暂时不可用，请重启 Metis 后重试。".to_string())
+    }
+
+    fn replace_current(&self, runtime: GitRuntime) -> Result<(), String> {
+        let mut current = self
+            .current
+            .lock()
+            .map_err(|_| "Git Runtime 状态暂时不可用，请重启 Metis 后重试。".to_string())?;
+        *current = Some(runtime);
+        Ok(())
     }
 
     fn load_persisted_runtime(&self) -> Result<Option<GitRuntime>, String> {
@@ -509,6 +540,8 @@ fn sanitized_reason(reason: &str) -> String {
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::mpsc;
 
     struct SequenceResolver {
         results: Mutex<VecDeque<Result<GitRuntime, String>>>,
@@ -583,6 +616,99 @@ mod tests {
         let current = manager.current_or_resolve(true).unwrap();
         assert_eq!(current.version, "git version 2.30.1");
         assert_eq!(current.executable(), Path::new("git"));
+    }
+
+    struct BlockingResolver {
+        calls: AtomicUsize,
+        entered: Mutex<Option<mpsc::Sender<()>>>,
+        release: Mutex<mpsc::Receiver<()>>,
+        result: GitRuntime,
+    }
+
+    impl GitRuntimeResolver for BlockingResolver {
+        fn resolve(&self) -> Result<GitRuntime, String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(entered) = self.entered.lock().unwrap().take() {
+                entered.send(()).unwrap();
+            }
+            self.release.lock().unwrap().recv().unwrap();
+            Ok(self.result.clone())
+        }
+    }
+
+    #[test]
+    fn normal_call_reuses_current_runtime_while_forced_refresh_is_resolving() {
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let resolver = Arc::new(BlockingResolver {
+            calls: AtomicUsize::new(0),
+            entered: Mutex::new(Some(entered_tx)),
+            release: Mutex::new(release_rx),
+            result: runtime(
+                "/opt/example/bin/git",
+                "git version 2.45.1",
+                GitRuntimeSource::LoginShell,
+            ),
+        });
+        let manager = Arc::new(GitRuntimeManager {
+            resolver,
+            current: Mutex::new(Some(runtime(
+                "git",
+                "git version 2.30.1",
+                GitRuntimeSource::ProcessPathFallback,
+            ))),
+            resolution: Mutex::new(()),
+            state_file: None,
+        });
+        let refreshing = Arc::clone(&manager);
+        let refresh_thread = std::thread::spawn(move || refreshing.current_or_resolve(true));
+        entered_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+
+        let reading = Arc::clone(&manager);
+        let (current_tx, current_rx) = mpsc::channel();
+        let current_thread = std::thread::spawn(move || {
+            current_tx.send(reading.current_or_resolve(false)).unwrap();
+        });
+        let current = current_rx
+            .recv_timeout(Duration::from_millis(100))
+            .expect("normal Git operations should not wait for a forced refresh")
+            .unwrap();
+        assert_eq!(current.version, "git version 2.30.1");
+
+        release_tx.send(()).unwrap();
+        refresh_thread.join().unwrap().unwrap();
+        current_thread.join().unwrap();
+    }
+
+    #[test]
+    fn concurrent_initial_calls_share_one_runtime_resolution() {
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let resolver = Arc::new(BlockingResolver {
+            calls: AtomicUsize::new(0),
+            entered: Mutex::new(Some(entered_tx)),
+            release: Mutex::new(release_rx),
+            result: runtime(
+                "/opt/example/bin/git",
+                "git version 2.45.1",
+                GitRuntimeSource::LoginShell,
+            ),
+        });
+        let manager = Arc::new(GitRuntimeManager::new(resolver.clone()));
+
+        let first_manager = Arc::clone(&manager);
+        let first = std::thread::spawn(move || first_manager.current_or_resolve(false));
+        entered_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        let second_manager = Arc::clone(&manager);
+        let second = std::thread::spawn(move || second_manager.current_or_resolve(false));
+
+        release_tx.send(()).unwrap();
+        assert_eq!(first.join().unwrap().unwrap().version, "git version 2.45.1");
+        assert_eq!(
+            second.join().unwrap().unwrap().version,
+            "git version 2.45.1"
+        );
+        assert_eq!(resolver.calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -683,6 +809,7 @@ mod tests {
                 })])),
             }),
             current: Mutex::new(None),
+            resolution: Mutex::new(()),
             state_file: Some(state_file.clone()),
         };
         first.current_or_resolve(false).unwrap();
@@ -692,6 +819,7 @@ mod tests {
                 results: Mutex::new(VecDeque::from([Err("resolver should not run".to_string())])),
             }),
             current: Mutex::new(None),
+            resolution: Mutex::new(()),
             state_file: Some(state_file),
         };
         let restored = restarted.current_or_resolve(false).unwrap();

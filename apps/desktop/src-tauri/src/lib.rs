@@ -1501,8 +1501,15 @@ fn check_path_status(path: String) -> DesktopAgentPath {
 }
 
 #[tauri::command]
-fn scan_skills(state: tauri::State<'_, DesktopAppState>) -> Result<DesktopScanResponse, String> {
-    scan_skills_for_state(&state, DesktopScanRequest::default())
+async fn scan_skills(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopScanResponse, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        scan_skills_for_state(&state, DesktopScanRequest::default())
+    })
+    .await
+    .map_err(|error| format!("扫描 Skill 后台任务失败: {error}"))?
 }
 
 #[tauri::command]
@@ -5787,5 +5794,17 @@ description: {description}
         );
 
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn scan_skills_command_runs_filesystem_work_in_blocking_worker() {
+        let source = include_str!("lib.rs");
+        let start = source
+            .find("#[tauri::command]\nasync fn scan_skills(")
+            .expect("scan_skills command should be async");
+        let command = &source[start..source.len().min(start + 520)];
+
+        assert!(command.contains("tauri::async_runtime::spawn_blocking"));
+        assert!(command.contains("scan_skills_for_state"));
     }
 }
