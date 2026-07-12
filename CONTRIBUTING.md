@@ -10,7 +10,6 @@ metis/
   LICENSE                   # MIT 许可证
   SECURITY.md              # 安全策略
   CONTRIBUTING.md          # 本文件
-  PROJECT_BLUEPRINT.md     # 项目蓝图
   ARCHITECTURE.md          # 架构文档
   ROADMAP.md              # 路线图
   docs/
@@ -49,8 +48,7 @@ metis/
 ### 提出新功能
 
 1. 先检查 [ROADMAP.md](ROADMAP.md) 确认是否已在规划中。
-2. 阅读 [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md) 中的非目标部分。
-3. 在 Issue 中描述：
+2. 在 Issue 中描述：
    - 这个功能解决什么问题
    - 建议的实现方式
    - 是否愿意自己实现
