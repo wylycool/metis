@@ -1144,9 +1144,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(autoUpdateList.getByText("file:///tmp/metis-trusted-repo")).toBeTruthy();
     expect(autoUpdateList.queryByText("Untrusted Skill")).toBeNull();
     const runAutoUpdate = screen.getByTestId("run-auto-update");
-    expect(runAutoUpdate.textContent).toBe("立即更新受信任 Skill");
+    expect(runAutoUpdate.textContent).toBe("立即更新");
     expect(runAutoUpdate.className).toContain("metis-action-button");
-    expect(runAutoUpdate.className).toContain("metis-action-button--primary");
+    expect(runAutoUpdate.className).not.toContain("metis-action-button--primary");
     expect(runAutoUpdate.getAttribute("aria-busy")).toBe("false");
     expect(screen.getByTestId("test-git-environment").className).toContain(
       "metis-action-button",
@@ -1219,7 +1219,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(screen.getByTestId("confirm-remove-auto-update-trusted-skill"));
     await waitFor(() => expect(screen.queryByTestId("auto-update-source-row-trusted-skill")).toBeNull());
     expect(within(autoUpdateSection).queryByTestId("auto-update-empty-state")).toBeTruthy();
-    expect(within(autoUpdateSection).getAllByText("立即更新受信任 Skill")).toHaveLength(1);
+    expect(within(autoUpdateSection).getAllByText("立即更新")).toHaveLength(1);
     expect(invokeMock).toHaveBeenCalledWith("bind_skill_source", {
       request: expect.objectContaining({
         skill_id: "trusted-skill",
@@ -1352,7 +1352,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(
       emptyState.getByText("去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。"),
     ).toBeTruthy();
-    expect(autoUpdateSection.getAllByText("立即更新受信任 Skill")).toHaveLength(1);
+    expect(autoUpdateSection.getAllByText("立即更新")).toHaveLength(1);
 
     await user.click(screen.getByTestId("run-auto-update"));
 

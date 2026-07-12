@@ -428,9 +428,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-test-button:disabled")).toContain("background: #dbeafe;");
     expect(latestBlockFor(".source-test-button:disabled")).toContain("cursor: default;");
     expect(latestBlockFor(".source-test-button:disabled")).not.toContain("cursor: wait;");
-    expect(latestBlockFor(".source-test-button[data-busy=\"true\"]")).toContain("cursor: wait;");
+    expect(latestBlockFor(".source-test-button[data-busy=\"true\"]")).toContain("cursor: default;");
     expect(latestBlockFor(".source-save-button:disabled")).toContain("cursor: default;");
-    expect(latestBlockFor(".source-save-button[data-busy=\"true\"]")).toContain("cursor: wait;");
+    expect(latestBlockFor(".source-save-button[data-busy=\"true\"]")).toContain("cursor: default;");
     expect(exactBlockFor("button:disabled")).toContain("cursor: default;");
     expect(exactBlockFor("button:disabled")).not.toContain("cursor: wait;");
     const previewDisabledBlock = latestBlockFor(".add-skill-preview-button:disabled");
@@ -441,7 +441,8 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".settings-git-health-card")).toContain("display: flex;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("border: 0;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("padding: 0;");
-    expect(latestBlockFor(".settings-git-health-action")).toContain("gap: 16px;");
+    expect(latestBlockFor(".settings-git-health-action")).toContain("justify-content: space-between;");
+    expect(latestBlockFor(".settings-git-health-action")).toContain("width: 100%;");
     expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 108px;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("background: #fff7ed;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("border: 1px solid #fed7aa;");
@@ -1263,7 +1264,8 @@ describe("Phase 6 light workspace contrast", () => {
     expect(compact).toContain("min-height: 32px;");
     expect(neutral).toContain("background: #ffffff;");
     expect(danger).toContain("color: #b42318;");
-    expect(busy).toContain("cursor: wait;");
+    expect(busy).toContain("cursor: default;");
+    expect(busy).not.toContain("cursor: wait;");
     expect(busy).toContain("opacity: 1;");
     expect(spinner).toContain("animation: metisActionSpin 820ms linear infinite;");
     expect(reducedMotion).toMatch(

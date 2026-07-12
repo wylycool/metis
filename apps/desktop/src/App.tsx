@@ -2047,7 +2047,6 @@ function MetisApp() {
           <section className="settings-section custom-monitor-section" data-testid="settings-section-custom-monitors">
             <div>
               <h3>自定义路径管理</h3>
-              <p>把个人或团队的 skill 目录作为独立来源展示，名称会和 Codex、OpenClaw 一样出现在列表里。</p>
             </div>
             <div className="custom-monitor-list">
               {customMonitorDrafts.length === 0 ? (
@@ -2254,7 +2253,7 @@ function MetisApp() {
             </div>
             <button
               aria-busy={actionBusy === "auto-update"}
-              className={`auto-update-run metis-action-button metis-action-button--primary${
+              className={`auto-update-run metis-action-button${
                 actionBusy === "auto-update" ? " is-busy" : ""
               }`}
               data-testid="run-auto-update"
@@ -2267,7 +2266,7 @@ function MetisApp() {
                   正在检查并更新
                 </>
               ) : (
-                "立即更新受信任 Skill"
+                "立即更新"
               )}
             </button>
           </section>
@@ -2276,6 +2275,12 @@ function MetisApp() {
             <h3>本机Git 检测</h3>
             <div className="settings-git-health-card">
               <div className="settings-git-health-action">
+                {gitEnvironmentResult && (
+                  <div className="settings-git-health-result success" data-testid="git-environment-result">
+                    <strong>{gitEnvironmentResult.message}</strong>
+                    <span>{gitEnvironmentResult.version}</span>
+                  </div>
+                )}
                 <button
                   aria-busy={actionBusy === "git-environment"}
                   className={`settings-git-test-button metis-action-button${
@@ -2295,12 +2300,6 @@ function MetisApp() {
                     "检测"
                   )}
                 </button>
-                {gitEnvironmentResult && (
-                  <div className="settings-git-health-result success" data-testid="git-environment-result">
-                    <strong>{gitEnvironmentResult.message}</strong>
-                    <span>{gitEnvironmentResult.version}</span>
-                  </div>
-                )}
               </div>
               {gitEnvironmentError && (
                 <div
@@ -2961,7 +2960,10 @@ function WorkspaceTopbar({
   const showSearch = activeWorkspace === "skills";
 
   return (
-    <header className="topbar redesign-page-topbar" data-testid="workspace-topbar">
+    <header
+      className={`topbar redesign-page-topbar${activeWorkspace === "settings" ? " settings-topbar" : ""}`}
+      data-testid="workspace-topbar"
+    >
       <div className="topbar-title">
         <p>{copy.eyebrow}</p>
         <h1>{copy.title}</h1>

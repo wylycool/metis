@@ -3933,7 +3933,7 @@ textarea {
 }
 
 .metis-shell.redesign-app-window button.metis-action-button.is-busy {
-  cursor: wait;
+  cursor: default;
   opacity: 1;
 }
 
@@ -7979,7 +7979,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .redesign-detail-agent-row-action:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.68;
 }
 
@@ -8223,7 +8223,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .redesign-operation-tabs .operation-button[aria-busy="true"] {
-  cursor: progress;
+  cursor: default;
   color: var(--operation-selected-text);
   border-color: var(--operation-hover-border);
   background: var(--operation-hover-surface);
@@ -9038,11 +9038,11 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .source-test-button[data-busy="true"] {
-  cursor: wait;
+  cursor: default;
 }
 
 .source-save-button[data-busy="true"] {
-  cursor: wait;
+  cursor: default;
 }
 
 .source-save-button:disabled {
@@ -9077,9 +9077,22 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 .settings-git-health-action {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
+  width: 100%;
   flex-wrap: wrap;
   gap: 16px;
+}
+
+.topbar.redesign-page-topbar.settings-topbar .topbar-middle-slot {
+  display: none;
+}
+
+.topbar.redesign-page-topbar.settings-topbar .topbar-actions {
+  grid-template-columns: 1fr auto;
+}
+
+.topbar.redesign-page-topbar.settings-topbar .redesign-top-actions {
+  grid-template-columns: auto;
 }
 
 .settings-git-test-button {
@@ -9228,7 +9241,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 .auto-update-remove:disabled {
   color: #65728a;
   background: #f8fafc;
-  cursor: wait;
+  cursor: default;
 }
 
 .auto-update-remove-actions {
@@ -9356,7 +9369,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 .auto-update-confirm:disabled {
   color: #9f6b62;
   background: #fff7f4;
-  cursor: wait;
+  cursor: default;
 }
 
 @media (max-width: 520px) {
