@@ -1224,6 +1224,8 @@ describe("Phase 6 light workspace contrast", () => {
   test("keeps software and Skill update settings compact and shadowless", () => {
     const softwareSection = exactBlockFor(".settings-section.software-update-settings-section");
     const autoUpdateSection = exactBlockFor(".settings-section.auto-update-section");
+    const realWindow = exactBlockFor(".metis-window.redesign-preview-shell");
+    const realShell = exactBlockFor(".metis-shell.redesign-app-window");
     const settingsHeadingSize = declaredPx(latestBlockFor(".settings-section h3"), "font-size");
     const compactViewport = mediaBlocksFor("(max-width: 760px)").join("\n");
     const narrowViewport = mediaBlocksFor("(max-width: 520px)").join("\n");
@@ -1231,6 +1233,8 @@ describe("Phase 6 light workspace contrast", () => {
     expect(softwareSection).toContain("padding: 14px;");
     expect(softwareSection).toContain("border-radius: 14px;");
     expect(softwareSection).toContain("box-shadow: none;");
+    expect(softwareSection).toContain('grid-template-areas: "copy controls" "feedback feedback";');
+    expect(softwareSection).toContain("grid-template-rows: auto 32px;");
     expect(autoUpdateSection).toContain("padding: 14px;");
     expect(autoUpdateSection).toContain("border-radius: 14px;");
     expect(autoUpdateSection).toContain("box-shadow: none;");
@@ -1241,7 +1245,27 @@ describe("Phase 6 light workspace contrast", () => {
       settingsHeadingSize,
     );
     expect(exactBlockFor(".software-update-settings-controls")).toContain("display: flex;");
-    expect(exactBlockFor(".software-update-settings-controls")).toContain("flex-wrap: wrap;");
+    expect(exactBlockFor(".software-update-settings-controls")).toContain(
+      "border: 1px solid #e2e8f0;",
+    );
+    expect(exactBlockFor(".software-update-settings-controls")).toContain(
+      "background: #f8fafc;",
+    );
+    expect(exactBlockFor(".software-update-settings-feedback")).toContain("min-height: 32px;");
+    expect(latestBlockFor(".software-update-check-button")).toContain("color: #3154df;");
+    expect(latestBlockFor(".software-update-check-button")).toContain("background: #eef4ff;");
+    expect(latestBlockFor(".software-update-check-button")).toContain("box-shadow: none;");
+    expect(exactBlockFor(".software-update-check-error > button")).toContain(
+      "min-height: 28px;",
+    );
+    expect(exactBlockFor(".software-update-check-error > button")).toContain(
+      "background: #fde8e4;",
+    );
+    expect(realWindow).toContain("height: 100vh;");
+    expect(realWindow).toContain("min-height: 0;");
+    expect(realWindow).toContain("overflow: hidden;");
+    expect(realShell).toContain("height: 100vh;");
+    expect(realShell).toContain("min-height: 0;");
     expect(compactViewport).toMatch(
       /\.settings-section\.software-update-settings-section\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
     );

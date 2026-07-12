@@ -2313,23 +2313,31 @@ function MetisApp() {
                 {softwareUpdateCheckBusy ? "检查中" : "检查更新"}
               </button>
             </div>
-            {softwareUpdateCheckMessage && (
-              <div className="software-update-check-result" role="status">
-                {softwareUpdateCheckMessage}
-              </div>
-            )}
-            {softwareUpdateCheckError && (
-              <div className="software-update-check-error" role="alert">
-                <span>{softwareUpdateCheckError}</span>
-                <button
-                  disabled={softwareUpdateCheckBusy}
-                  onClick={() => void handleCheckSoftwareUpdate("manual")}
-                  type="button"
-                >
-                  重试
-                </button>
-              </div>
-            )}
+            <div
+              className="software-update-settings-feedback"
+              data-testid="software-update-settings-feedback"
+            >
+              {softwareUpdateCheckBusy ? (
+                <div className="software-update-check-progress" role="status">
+                  <span aria-hidden="true" />
+                  正在检查更新
+                </div>
+              ) : softwareUpdateCheckError ? (
+                <div className="software-update-check-error" role="alert">
+                  <span>{softwareUpdateCheckError}</span>
+                  <button
+                    onClick={() => void handleCheckSoftwareUpdate("manual")}
+                    type="button"
+                  >
+                    重试
+                  </button>
+                </div>
+              ) : softwareUpdateCheckMessage ? (
+                <div className="software-update-check-result" role="status">
+                  {softwareUpdateCheckMessage}
+                </div>
+              ) : null}
+            </div>
           </section>
 
           <div className="form-actions settings-save-actions">

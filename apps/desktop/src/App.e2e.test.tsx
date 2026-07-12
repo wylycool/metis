@@ -3560,12 +3560,18 @@ describe("Metis software update flow", () => {
 
     await screen.findByTestId("skill-row-software-update-skill");
     await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
-    await user.click(screen.getByTestId("check-software-update"));
-    const error = await screen.findByRole("alert");
+    const softwareSection = within(screen.getByTestId("settings-section-software-update"));
+    const feedbackSlot = softwareSection.getByTestId("software-update-settings-feedback");
+    expect(feedbackSlot.childElementCount).toBe(0);
+
+    await user.click(softwareSection.getByTestId("check-software-update"));
+    const error = await softwareSection.findByRole("alert");
+    expect(softwareSection.getByTestId("software-update-settings-feedback")).toBe(feedbackSlot);
     expect(within(error).getByText("暂时无法获取更新信息，请稍后重试。")).toBeTruthy();
     expect(within(error).queryByText(/Could not fetch|release JSON|remote/)).toBeNull();
     await user.click(within(error).getByText("重试"));
     await waitFor(() => expect(manualScenario.commandCalls("check_software_update")).toBe(2));
+    expect(softwareSection.getByTestId("software-update-settings-feedback")).toBe(feedbackSlot);
   });
 
   test("places compact software update settings after the other settings sections", async () => {
