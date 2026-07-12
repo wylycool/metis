@@ -3,6 +3,7 @@ import { AgentBadge, AgentBadgeStack, normalizeAgentId, type AgentIdentity } fro
 import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { GitHubIcon } from "./GitHubIcon";
 import { textInputAssistanceProps } from "./inputAssistance";
+import { MetisBrandWordmark } from "./MetisBrandWordmark";
 import { METIS_GITHUB_URL } from "./projectLinks";
 
 type PreviewRoute = { kind: "home" } | { kind: "detail"; skillId: string } | { kind: "settings" };
@@ -291,7 +292,7 @@ function RedesignSidebar({
             <CrystalSkillLogo testId="redesign-brand-crystal-logo" />
           </span>
           <span>
-            <strong>Metis</strong>
+            <MetisBrandWordmark testId="redesign-brand-wordmark" />
             <small>Skill Manager</small>
           </span>
         </a>
@@ -403,10 +404,10 @@ function RedesignHome({
       </header>
 
       <div className="redesign-home-stats">
-        <StatCard testId="redesign-stat-total" tone="mint" label="全部 Skill" value="48" meta="+6 from last scan" />
-        <StatCard testId="redesign-stat-updates" tone="warm" label="待更新" value={String(updateCount)} meta="needs review" />
-        <StatCard testId="redesign-stat-latest" tone="blue" label="已最新" value={String(latestCount)} meta="ready to use" />
-        <StatCard testId="redesign-stat-trusted" tone="rose" label="可信来源" value="31" meta="trusted repos" />
+        <StatCard testId="redesign-stat-total" tone="mint" label="全部 Skill" value="48" />
+        <StatCard testId="redesign-stat-updates" tone="warm" label="待更新" value={String(updateCount)} />
+        <StatCard testId="redesign-stat-latest" tone="blue" label="已最新" value={String(latestCount)} />
+        <StatCard testId="redesign-stat-trusted" tone="rose" label="可信来源" value="31" />
       </div>
 
       <div className="redesign-section-heading">
@@ -449,19 +450,16 @@ function StatCard({
   tone,
   label,
   value,
-  meta,
 }: {
   testId: string;
   tone: "mint" | "warm" | "blue" | "rose";
   label: string;
   value: string;
-  meta: string;
 }) {
   return (
     <div className={`redesign-stat-card ${tone}`} data-testid={testId}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>{meta}</small>
     </div>
   );
 }

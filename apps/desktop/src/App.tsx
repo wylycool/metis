@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import desktopPackage from "../package.json";
 import {
   applySkillUpdate,
   bindSkillSource,
@@ -30,6 +31,7 @@ import { CrystalSkillLogo } from "./CrystalSkillLogo";
 import { normalizeRemoteSyncDraft } from "./gitWebUrl";
 import { GitHubIcon } from "./GitHubIcon";
 import { textInputAssistanceProps } from "./inputAssistance";
+import { MetisBrandWordmark } from "./MetisBrandWordmark";
 import { METIS_GITHUB_URL } from "./projectLinks";
 import { isRemoteTargetSelectable, remoteTargetId, SkillsWorkspace } from "./SkillsWorkspace";
 import {
@@ -37,6 +39,18 @@ import {
   type DetailLocalInstallState,
 } from "./SkillDetailPage";
 import { InlineError, type BindDraft } from "./SkillRow";
+import {
+  checkSoftwareUpdate,
+  downloadSoftwareUpdate,
+  openDownloadsDirectory,
+  openSoftwareUpdateInstaller,
+} from "./software-update/api";
+import { SoftwareUpdateSurface } from "./software-update/SoftwareUpdateSurface";
+import {
+  emptySoftwareUpdateDownloadState,
+  type SoftwareUpdateDownloadEvent,
+  type SoftwareUpdateInfo,
+} from "./software-update/types";
 import { UiRedesignPreview } from "./UiRedesignPreview";
 import type {
   DesktopAgentStatus,
@@ -73,6 +87,11 @@ interface DetailLocalInstallPending {
   operation: DetailLocalInstallOperation;
   token: number;
 }
+interface AutoUpdateSourceGroup {
+  sourceKey: string;
+  representative: DesktopSkill;
+  members: DesktopSkill[];
+}
 
 function App() {
   if (isUiRedesignPreviewRoute()) {
@@ -95,6 +114,7 @@ function MetisApp() {
   const [backups, setBackups] = useState<Record<string, DesktopBackupSummary[]>>({});
   const [backupError, setBackupError] = useState<Record<string, DesktopError>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [homeCheckCompletionKey, setHomeCheckCompletionKey] = useState<number | null>(null);
   const [sourceRequiredSkillId, setSourceRequiredSkillId] = useState<string | null>(null);
   const [settings, setSettings] = useState<DesktopSettings>({
     custom_scan_paths: [],
@@ -102,7 +122,20 @@ function MetisApp() {
     custom_monitored_paths: [],
     team_policy_path: null,
     enterprise_network: emptyEnterpriseNetworkSettings(),
+    software_update: { check_on_startup: true },
   });
+  const [softwareUpdateCheckOnStartupDraft, setSoftwareUpdateCheckOnStartupDraft] =
+    useState(true);
+  const [softwareUpdateInfo, setSoftwareUpdateInfo] = useState<SoftwareUpdateInfo | null>(null);
+  const [softwareUpdateDismissed, setSoftwareUpdateDismissed] = useState(false);
+  const [softwareUpdateDialogOpen, setSoftwareUpdateDialogOpen] = useState(false);
+  const [softwareUpdateDownloadState, setSoftwareUpdateDownloadState] = useState(
+    emptySoftwareUpdateDownloadState,
+  );
+  const [softwareUpdateCheckBusy, setSoftwareUpdateCheckBusy] = useState(false);
+  const [softwareUpdateCheckMessage, setSoftwareUpdateCheckMessage] = useState<string | null>(null);
+  const [softwareUpdateCheckError, setSoftwareUpdateCheckError] = useState<string | null>(null);
+  const [softwareUpdateOpenError, setSoftwareUpdateOpenError] = useState<string | null>(null);
   const [agentPathOverrideDrafts, setAgentPathOverrideDrafts] = useState<Record<string, string>>({});
   const [editingAgentPathId, setEditingAgentPathId] = useState<string | null>(null);
   const [customMonitorDrafts, setCustomMonitorDrafts] = useState<DesktopCustomMonitoredPath[]>([]);
@@ -142,16 +175,17 @@ function MetisApp() {
   const [detailLocalInstallStates, setDetailLocalInstallStates] = useState<
     Record<string, DetailLocalInstallState>
   >({});
-  const [pendingAutoUpdateRemovalSkillId, setPendingAutoUpdateRemovalSkillId] =
+  const [pendingAutoUpdateRemovalSourceKey, setPendingAutoUpdateRemovalSourceKey] =
     useState<string | null>(null);
   const [remoteInstallResult, setRemoteInstallResult] =
     useState<DesktopInstallRemoteSkillResult | null>(null);
   const builtinPathHealth = builtinPathHealthForAgents(agents);
   const customPathHealth = pathHealthForAgents(agents, "custom");
-  const autoUpdateSourceSkills = skills.filter(
+  const autoUpdateInstallationSkills = skills.filter(
     (skill) => skill.source?.trusted && skill.source.auto_update,
   );
-  const trustedAutoUpdateSkills = autoUpdateSourceSkills.filter(
+  const autoUpdateSourceGroups = groupAutoUpdateSkillsBySource(autoUpdateInstallationSkills);
+  const trustedAutoUpdateSkills = autoUpdateInstallationSkills.filter(
     (skill) => skill.local_modified !== true,
   );
   const sourceRequiredSkill = sourceRequiredSkillId
@@ -161,6 +195,7 @@ function MetisApp() {
   const guidanceToastVisible = Boolean(sourceRequiredSkill || autoUpdateUnavailable);
   const didBootstrap = useRef(false);
   const detailLocalInstallRequestSequenceRef = useRef(0);
+  const softwareUpdateCheckSequenceRef = useRef(0);
   const detailLocalInstallRequestTokensRef = useRef<Record<string, number>>({});
   const detailLocalInstallPendingRef = useRef<Record<string, DetailLocalInstallPending>>({});
   const agentPathInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -184,6 +219,16 @@ function MetisApp() {
     }, guidanceToastVisible ? 6000 : 3000);
     return () => window.clearTimeout(toastTimer);
   }, [actionMessage, guidanceToastVisible]);
+
+  useEffect(() => {
+    if (homeCheckCompletionKey === null) {
+      return;
+    }
+    const completionTimer = window.setTimeout(() => {
+      setHomeCheckCompletionKey(null);
+    }, 3000);
+    return () => window.clearTimeout(completionTimer);
+  }, [homeCheckCompletionKey]);
 
   useEffect(() => {
     if (!editingAgentPathId) {
@@ -212,6 +257,7 @@ function MetisApp() {
         setSkills(indexedResult);
         setWarnings([]);
         setState("loaded");
+        startStartupSoftwareUpdateCheck(settingsResult);
         return;
       }
 
@@ -220,6 +266,7 @@ function MetisApp() {
       setWarnings(scanResult.warnings);
       setState("loaded");
       setActionMessage("已重新扫描本机 skill 路径");
+      startStartupSoftwareUpdateCheck(settingsResult);
     } catch (caught) {
       setError(desktopError(caught));
       setState("error");
@@ -228,6 +275,12 @@ function MetisApp() {
 
   function hasMissingLocalUpdatedAt(indexedSkills: DesktopSkill[]) {
     return indexedSkills.some((skill) => skill.local_updated_at === null);
+  }
+
+  function startStartupSoftwareUpdateCheck(nextSettings: DesktopSettings) {
+    if (nextSettings.software_update?.check_on_startup ?? true) {
+      void handleCheckSoftwareUpdate("startup");
+    }
   }
 
   function settingsRequestFromDrafts(): DesktopSettings {
@@ -242,14 +295,18 @@ function MetisApp() {
       });
     }
     return {
-      custom_scan_paths: [],
+      ...settings,
+      custom_scan_paths: settings.custom_scan_paths ?? [],
       agent_path_overrides: Object.entries(agentPathOverrideDrafts).map(([agent_id, path]) => ({
         agent_id,
         path,
       })),
       custom_monitored_paths: nextCustomMonitors,
-      team_policy_path: null,
-      enterprise_network: emptyEnterpriseNetworkSettings(),
+      team_policy_path: settings.team_policy_path ?? null,
+      enterprise_network: settings.enterprise_network ?? emptyEnterpriseNetworkSettings(),
+      software_update: {
+        check_on_startup: softwareUpdateCheckOnStartupDraft,
+      },
     };
   }
 
@@ -265,6 +322,130 @@ function MetisApp() {
     setCustomMonitorPathStatuses({});
     setNewCustomMonitorName("");
     setNewCustomMonitorPath("");
+    setSoftwareUpdateCheckOnStartupDraft(
+      nextSettings.software_update?.check_on_startup ?? true,
+    );
+  }
+
+  async function handleCheckSoftwareUpdate(mode: "startup" | "manual") {
+    const requestToken = softwareUpdateCheckSequenceRef.current + 1;
+    softwareUpdateCheckSequenceRef.current = requestToken;
+    setSoftwareUpdateCheckBusy(true);
+    if (mode === "manual") {
+      setSoftwareUpdateCheckMessage(null);
+      setSoftwareUpdateCheckError(null);
+    }
+
+    try {
+      const update = await checkSoftwareUpdate();
+      if (requestToken !== softwareUpdateCheckSequenceRef.current) {
+        return;
+      }
+      setSoftwareUpdateInfo(update);
+      if (update) {
+        setSoftwareUpdateDismissed(false);
+        if (mode === "manual") {
+          setSoftwareUpdateCheckMessage(`发现 Metis ${update.version}`);
+        }
+      } else if (mode === "manual") {
+        setSoftwareUpdateCheckMessage("当前已是最新版");
+      }
+    } catch {
+      if (mode === "manual" && requestToken === softwareUpdateCheckSequenceRef.current) {
+        setSoftwareUpdateCheckError("暂时无法获取更新信息，请稍后重试。");
+      }
+    } finally {
+      if (requestToken === softwareUpdateCheckSequenceRef.current) {
+        setSoftwareUpdateCheckBusy(false);
+      }
+    }
+  }
+
+  function handleSoftwareUpdateDownloadEvent(event: SoftwareUpdateDownloadEvent) {
+    setSoftwareUpdateDownloadState((current) => {
+      switch (event.event) {
+        case "started":
+          return {
+            phase: "downloading",
+            downloaded: 0,
+            contentLength: event.content_length ?? null,
+            result: null,
+            error: null,
+          };
+        case "progress":
+          return {
+            ...current,
+            phase: "downloading",
+            downloaded: event.downloaded,
+            contentLength: event.content_length ?? current.contentLength,
+          };
+        case "verifying":
+          return { ...current, phase: "verifying" };
+        case "saving":
+        case "finished":
+          return { ...current, phase: "saving" };
+      }
+    });
+  }
+
+  async function handleDownloadSoftwareUpdate() {
+    if (!softwareUpdateInfo || softwareUpdateCheckBusy) {
+      return;
+    }
+    softwareUpdateCheckSequenceRef.current += 1;
+    setSoftwareUpdateDialogOpen(true);
+    setSoftwareUpdateOpenError(null);
+    setSoftwareUpdateDownloadState({
+      ...emptySoftwareUpdateDownloadState(),
+      phase: "downloading",
+    });
+    try {
+      const result = await downloadSoftwareUpdate(handleSoftwareUpdateDownloadEvent);
+      setSoftwareUpdateDownloadState((current) => ({
+        ...current,
+        phase: "saved",
+        downloaded: current.contentLength ?? current.downloaded,
+        result,
+        error: null,
+      }));
+    } catch (caught) {
+      setSoftwareUpdateDownloadState((current) => ({
+        ...current,
+        phase: "error",
+        error: softwareUpdateErrorMessage(
+          caught,
+          "更新没有下载完成，请检查网络后重试。",
+        ),
+      }));
+    }
+  }
+
+  async function handleOpenSoftwareUpdateInstaller() {
+    setSoftwareUpdateOpenError(null);
+    try {
+      await openSoftwareUpdateInstaller();
+    } catch (caught) {
+      setSoftwareUpdateOpenError(
+        softwareUpdateErrorMessage(caught, "暂时无法打开安装包，请稍后重试。"),
+      );
+    }
+  }
+
+  async function handleOpenDownloadsDirectory() {
+    setSoftwareUpdateOpenError(null);
+    try {
+      await openDownloadsDirectory();
+    } catch {
+      setSoftwareUpdateOpenError("暂时无法打开下载目录，请稍后重试。");
+    }
+  }
+
+  function closeSoftwareUpdateDialog() {
+    if (softwareUpdateDownloadState.phase === "saved") {
+      setSoftwareUpdateDismissed(true);
+    }
+    setSoftwareUpdateDialogOpen(false);
+    setSoftwareUpdateOpenError(null);
   }
 
   async function handleScan() {
@@ -307,6 +488,11 @@ function MetisApp() {
     setActionBusy("settings");
 
     try {
+      const pathValidationError = await validateCustomMonitorPathAvailability(nextSettings);
+      if (pathValidationError) {
+        setActionError(pathValidationError);
+        return;
+      }
       const saved = await saveDesktopSettings(nextSettings);
       setSettings(saved);
       syncPathSettingsDrafts(saved);
@@ -368,6 +554,39 @@ function MetisApp() {
     }
 
     return null;
+  }
+
+  async function validateCustomMonitorPathAvailability(
+    nextSettings: DesktopSettings,
+  ): Promise<DesktopError | null> {
+    const customPaths = nextSettings.custom_monitored_paths ?? [];
+    const statuses = await Promise.all(
+      customPaths.map(async (customPath) => {
+        const status = await checkPathStatus(customPath.path).catch(
+          () =>
+            ({
+              path: customPath.path,
+              scope: "custom",
+              exists: false,
+              readable: false,
+              writable: false,
+            }) satisfies DesktopAgentPath,
+        );
+        return [customPath.id, status] as const;
+      }),
+    );
+    setCustomMonitorPathStatuses(Object.fromEntries(statuses));
+
+    const invalidPath = statuses.find(
+      ([, status]) => !status.exists || !status.readable || !status.writable,
+    );
+    if (!invalidPath) {
+      return null;
+    }
+    return settingsValidationError(
+      "自定义路径不可用",
+      "请确认该目录存在，并且当前用户拥有读取和写入权限。",
+    );
   }
 
   function handleAgentPathDraftChange(agentId: string, nextPath: string) {
@@ -650,6 +869,7 @@ function MetisApp() {
     setActionBusy(busyKey);
     setActionError(null);
     setActionMessage(null);
+    setHomeCheckCompletionKey(null);
 
     try {
       const results = await checkSkillUpdates({ skill_ids: skillIds });
@@ -661,8 +881,7 @@ function MetisApp() {
         return next;
       });
       setDiffError({});
-      const updateCount = results.filter((result) => result.status === "UpdateAvailable").length;
-      setActionMessage(`检查完成：${updateCount} 个 skill 待更新`);
+      setHomeCheckCompletionKey((current) => (current ?? 0) + 1);
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1221,12 +1440,13 @@ function MetisApp() {
     }
   }
 
-  async function handleRemoveAutoUpdateSkill(skill: DesktopSkill) {
+  async function handleRemoveAutoUpdateSkill(group: AutoUpdateSourceGroup) {
+    const skill = group.representative;
     if (!skill.source) {
       return;
     }
 
-    setActionBusy(`remove-auto-update:${skill.id}`);
+    setActionBusy(`remove-auto-update:${group.sourceKey}`);
     setActionError(null);
     setActionMessage(null);
 
@@ -1241,8 +1461,8 @@ function MetisApp() {
         auto_update: false,
       });
       await refreshIndexedSkills();
-      setPendingAutoUpdateRemovalSkillId(null);
-      setActionMessage("已移出自动更新列表");
+      setPendingAutoUpdateRemovalSourceKey(null);
+      setActionMessage("已移出一键更新列表");
     } catch (caught) {
       setActionError(desktopError(caught));
     } finally {
@@ -1602,14 +1822,26 @@ function MetisApp() {
     Boolean(newCustomMonitorName.trim() && newCustomMonitorPath.trim()) ||
     JSON.stringify(customMonitorDrafts) !==
       JSON.stringify(settings.custom_monitored_paths ?? []);
+  const hasSoftwareUpdateDraftChanges =
+    softwareUpdateCheckOnStartupDraft !==
+    (settings.software_update?.check_on_startup ?? true);
   const hasSettingsDraftChanges =
-    hasUnsavedAgentPathChanges || hasCustomMonitorDraftChanges;
+    hasUnsavedAgentPathChanges ||
+    hasCustomMonitorDraftChanges ||
+    hasSoftwareUpdateDraftChanges;
   const isSkillDetailView = activeWorkspace === "skills" && skillsViewKind === "detail";
   const handleSkillsRouteKindChange = useCallback((kind: SkillsViewKind) => {
     setSkillsViewKind(kind);
     if (kind !== "add") {
       setRemotePreviewError(null);
     }
+  }, []);
+  const openSettingsWorkspace = useCallback(() => {
+    setSoftwareUpdateCheckMessage(null);
+    setSoftwareUpdateCheckError(null);
+    setGitEnvironmentResult(null);
+    setGitEnvironmentError(null);
+    setActiveWorkspace("settings");
   }, []);
   const openSkillsHome = useCallback(() => {
     if (activeWorkspace === "settings") {
@@ -1661,7 +1893,7 @@ function MetisApp() {
                 <CrystalSkillLogo testId="metis-brand-crystal-logo" />
               </span>
               <span>
-                <strong>Metis</strong>
+                <MetisBrandWordmark testId="metis-brand-wordmark" />
                 <small>Skill Manager</small>
               </span>
             </button>
@@ -1680,7 +1912,7 @@ function MetisApp() {
               aria-pressed={activeWorkspace === "settings"}
               className={activeWorkspace === "settings" ? "active" : ""}
               data-testid="workspace-tab-settings-sidebar"
-              onClick={() => setActiveWorkspace("settings")}
+              onClick={openSettingsWorkspace}
             >
               <GearIcon />
               Settings
@@ -1699,7 +1931,12 @@ function MetisApp() {
             </button>
           </div>
         </aside>
-        <div className="app-shell redesign-main">
+        <div
+          className={`app-shell redesign-main${
+            activeWorkspace === "settings" ? " settings-workspace-main" : ""
+          }`}
+          data-testid="metis-reference-main"
+        >
           {!isSkillDetailView && (
             <WorkspaceTopbar
               actionBusy={actionBusy}
@@ -1708,27 +1945,11 @@ function MetisApp() {
               skillCount={skills.length}
               skillSearchQuery={skillSearchQuery}
               onCheckAllUpdates={() => handleCheckUpdates(skills.map((skill) => skill.id))}
-              onOpenSettings={() => setActiveWorkspace("settings")}
+              onOpenSettings={openSettingsWorkspace}
               onScan={handleScan}
               onSearchChange={setSkillSearchQuery}
             />
           )}
-
-          <nav className="workspace-tabs" aria-hidden="true" hidden>
-            <WorkspaceTab
-              active={activeWorkspace === "skills"}
-              count={skills.length}
-              label="Skills"
-              testId="workspace-tab-skills-legacy"
-              onClick={openSkillsHome}
-            />
-            <WorkspaceTab
-              active={activeWorkspace === "settings"}
-              label="Settings"
-              testId="workspace-tab-settings-legacy"
-              onClick={() => setActiveWorkspace("settings")}
-            />
-          </nav>
 
       {activeWorkspace !== "skills" && (
         <section className="summary-strip" aria-label="路径摘要">
@@ -1779,6 +2000,20 @@ function MetisApp() {
             {actionMessage}
           </div>
         ))}
+
+      <SoftwareUpdateSurface
+        dismissed={softwareUpdateDismissed}
+        dialogOpen={softwareUpdateDialogOpen}
+        downloadDisabled={softwareUpdateCheckBusy}
+        downloadState={softwareUpdateDownloadState}
+        info={softwareUpdateInfo}
+        openError={softwareUpdateOpenError}
+        onCloseDialog={closeSoftwareUpdateDialog}
+        onDismiss={() => setSoftwareUpdateDismissed(true)}
+        onDownload={() => void handleDownloadSoftwareUpdate()}
+        onOpenDownloads={() => void handleOpenDownloadsDirectory()}
+        onOpenInstaller={() => void handleOpenSoftwareUpdateInstaller()}
+      />
 
       {activeWorkspace === "settings" && (
         <section className="settings-panel workspace-pane redesign-settings-page" aria-label="配置" data-testid="workspace-settings">
@@ -1840,7 +2075,9 @@ function MetisApp() {
                     <div className="agent-path-row-actions">
                       {isDirty && <small className="agent-path-pending-badge">待保存</small>}
                       <button
-                        className="ghost-button compact agent-path-edit-button"
+                        className={`ghost-button compact agent-path-edit-button metis-action-button metis-action-button--compact${
+                          isEditing ? " metis-action-button--neutral" : ""
+                        }`}
                         data-testid={`agent-path-${isEditing ? "cancel" : "edit"}-${row.agent_id}`}
                         onClick={() =>
                           isEditing
@@ -1861,7 +2098,6 @@ function MetisApp() {
           <section className="settings-section custom-monitor-section" data-testid="settings-section-custom-monitors">
             <div>
               <h3>自定义路径管理</h3>
-              <p>把个人或团队的 skill 目录作为独立来源展示，名称会和 Codex、OpenClaw 一样出现在列表里。</p>
             </div>
             <div className="custom-monitor-list">
               {customMonitorDrafts.length === 0 ? (
@@ -1921,7 +2157,11 @@ function MetisApp() {
                         }
                       />
                       <button
-                        className="ghost-button compact custom-monitor-remove"
+                        className={`ghost-button compact custom-monitor-remove metis-action-button metis-action-button--compact ${
+                          isPendingRemoval
+                            ? "metis-action-button--neutral"
+                            : "metis-action-button--danger"
+                        }`}
                         onClick={() =>
                           isPendingRemoval
                             ? restoreCustomMonitor(path.id)
@@ -1962,7 +2202,7 @@ function MetisApp() {
                 onChange={(event) => setNewCustomMonitorPath(event.target.value)}
               />
               <button
-                className="ghost-button compact custom-monitor-add"
+                className="ghost-button compact custom-monitor-add metis-action-button metis-action-button--compact"
                 data-testid="custom-monitor-add"
                 disabled={!newCustomMonitorName.trim() || !newCustomMonitorPath.trim()}
                 onClick={addCustomMonitorDraft}
@@ -1975,110 +2215,143 @@ function MetisApp() {
 
           <section className="settings-section auto-update-section" data-testid="settings-section-auto-update">
             <div className="auto-update-copy">
-              <h3>自动更新</h3>
-              <p>只会更新已加入自动更新列表、且本地没有修改的 Skill。</p>
+              <h3>一键更新受信任 Skill</h3>
+              <p>仅更新已加入一键更新列表且本地无修改的 Skill。</p>
             </div>
             <div className="auto-update-source-list" data-testid="auto-update-source-list">
-              {autoUpdateSourceSkills.length === 0 ? (
+              {autoUpdateSourceGroups.length === 0 ? (
                 <div className="auto-update-empty-state" data-testid="auto-update-empty-state">
-                  <strong>暂无加入自动更新列表的 Skill</strong>
-                  <span>去来源设置里开启信任与自动更新后，这里会显示可被受控更新的 Skill。</span>
+                  <strong>暂无加入一键更新列表的 Skill</strong>
+                  <span>在来源设置中加入一键更新列表后，这里会显示可安全更新的 Skill。</span>
                 </div>
               ) : (
-                autoUpdateSourceSkills.map((skill) => (
-                  <div
-                    className={`auto-update-source-row${
-                      pendingAutoUpdateRemovalSkillId === skill.id ? " is-open" : ""
-                    }`}
-                    data-testid={`auto-update-source-row-${skill.id}`}
-                    key={skill.id}
-                  >
-                    <div className="auto-update-source-main">
-                      <div className="auto-update-source-name-line">
-                        <strong className="auto-update-source-name">{skill.name}</strong>
-                        <span className="auto-update-trusted-chip">已信任</span>
-                      </div>
-                      <span className="auto-update-source-url">{skill.source?.url}</span>
-                    </div>
+                autoUpdateSourceGroups.map((group) => {
+                  const skill = group.representative;
+                  const removeBusy = actionBusy === `remove-auto-update:${group.sourceKey}`;
+                  const removalOpen = pendingAutoUpdateRemovalSourceKey === group.sourceKey;
+                  return (
                     <div
-                      className="auto-update-remove-actions"
-                      data-testid={`auto-update-remove-actions-${skill.id}`}
+                      className={`auto-update-source-row${removalOpen ? " is-open" : ""}`}
+                      data-testid={`auto-update-source-row-${skill.id}`}
+                      key={group.sourceKey}
                     >
-                      <button
-                        className="auto-update-remove"
-                        data-testid={`remove-auto-update-${skill.id}`}
-                        disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                        onClick={() => setPendingAutoUpdateRemovalSkillId(skill.id)}
-                        type="button"
-                      >
-                        {actionBusy === `remove-auto-update:${skill.id}` ? "移除中" : "移除"}
-                      </button>
-                    </div>
-                    {pendingAutoUpdateRemovalSkillId === skill.id ? (
-                      <div
-                        className="auto-update-remove-confirm"
-                        data-testid={`auto-update-remove-confirm-${skill.id}`}
-                      >
-                        <div className="auto-update-remove-confirm-copy">
-                          <strong>移出自动更新列表？</strong>
-                          <span>不会删除本地 Skill，只会关闭这个来源的信任与自动更新。</span>
+                      <div className="auto-update-source-main">
+                        <div className="auto-update-source-name-line">
+                          <strong className="auto-update-source-name">{skill.name}</strong>
+                          <span className="auto-update-trusted-chip">已信任</span>
                         </div>
-                        <div className="auto-update-remove-confirm-actions">
-                          <button
-                            className="auto-update-cancel"
-                            data-testid={`cancel-remove-auto-update-${skill.id}`}
-                            disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                            onClick={() => setPendingAutoUpdateRemovalSkillId(null)}
-                            type="button"
-                          >
-                            取消
-                          </button>
-                          <button
-                            className="auto-update-confirm"
-                            data-testid={`confirm-remove-auto-update-${skill.id}`}
-                            disabled={actionBusy === `remove-auto-update:${skill.id}`}
-                            onClick={() => handleRemoveAutoUpdateSkill(skill)}
-                            type="button"
-                          >
-                            {actionBusy === `remove-auto-update:${skill.id}` ? "移出中" : "确认移出"}
-                          </button>
-                        </div>
+                        <span className="auto-update-source-url">{skill.source?.url}</span>
                       </div>
-                    ) : null}
-                  </div>
-                ))
+                      <div
+                        className="auto-update-remove-actions"
+                        data-testid={`auto-update-remove-actions-${skill.id}`}
+                      >
+                        <button
+                          className="ghost-button compact auto-update-remove metis-action-button metis-action-button--compact metis-action-button--danger"
+                          data-testid={`remove-auto-update-${skill.id}`}
+                          disabled={removeBusy}
+                          onClick={() => setPendingAutoUpdateRemovalSourceKey(group.sourceKey)}
+                          type="button"
+                        >
+                          移除
+                        </button>
+                      </div>
+                      {removalOpen ? (
+                        <div
+                          className="auto-update-remove-confirm"
+                          data-testid={`auto-update-remove-confirm-${skill.id}`}
+                        >
+                          <div className="auto-update-remove-confirm-copy">
+                            <strong>移出一键更新列表？</strong>
+                            <span>不会删除本地 Skill，只会停止通过一键更新处理这个来源。</span>
+                          </div>
+                          <div className="auto-update-remove-confirm-actions">
+                            <button
+                              className="auto-update-cancel metis-action-button metis-action-button--compact metis-action-button--neutral"
+                              data-testid={`cancel-remove-auto-update-${skill.id}`}
+                              disabled={removeBusy}
+                              onClick={() => setPendingAutoUpdateRemovalSourceKey(null)}
+                              type="button"
+                            >
+                              取消
+                            </button>
+                            <button
+                              aria-busy={removeBusy}
+                              className={`auto-update-confirm metis-action-button metis-action-button--compact metis-action-button--danger${
+                                removeBusy ? " is-busy" : ""
+                              }`}
+                              data-testid={`confirm-remove-auto-update-${skill.id}`}
+                              disabled={removeBusy}
+                              onClick={() => handleRemoveAutoUpdateSkill(group)}
+                              type="button"
+                            >
+                              {removeBusy ? (
+                                <>
+                                  <span className="metis-action-spinner" aria-hidden="true" />
+                                  正在移出
+                                </>
+                              ) : (
+                                "确认移出"
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
               )}
             </div>
             <button
-              className="auto-update-run"
+              aria-busy={actionBusy === "auto-update"}
+              className={`auto-update-run metis-action-button${
+                actionBusy === "auto-update" ? " is-busy" : ""
+              }`}
               data-testid="run-auto-update"
               disabled={actionBusy === "auto-update" || skills.length === 0}
               onClick={handleRunAutoUpdate}
             >
-              {actionBusy === "auto-update" ? "更新中" : "开启自动更新"}
+              {actionBusy === "auto-update" ? (
+                <>
+                  <span className="metis-action-spinner" aria-hidden="true" />
+                  正在检查并更新
+                </>
+              ) : (
+                "立即更新"
+              )}
             </button>
           </section>
 
           <section className="settings-section git-health-section" data-testid="settings-section-git-health">
-            <h3>本机Git 检测</h3>
-            <div className="settings-git-health-card">
-              <div className="settings-git-health-action">
-                <button
-                  className="settings-git-test-button"
-                  data-testid="test-git-environment"
-                  disabled={actionBusy === "git-environment"}
-                  onClick={handleTestGitEnvironment}
-                  type="button"
-                >
-                  {actionBusy === "git-environment" ? "检测中" : "检测"}
-                </button>
-                {gitEnvironmentResult && (
-                  <div className="settings-git-health-result success" data-testid="git-environment-result">
-                    <strong>{gitEnvironmentResult.message}</strong>
-                    <span>{gitEnvironmentResult.version}</span>
-                  </div>
+            <div className="settings-git-health-heading">
+              <h3>本机Git 检测</h3>
+              <button
+                aria-busy={actionBusy === "git-environment"}
+                className={`settings-git-test-button metis-action-button${
+                  actionBusy === "git-environment" ? " is-busy" : ""
+                }`}
+                data-testid="test-git-environment"
+                disabled={actionBusy === "git-environment"}
+                onClick={handleTestGitEnvironment}
+                type="button"
+              >
+                {actionBusy === "git-environment" ? (
+                  <>
+                    <span className="metis-action-spinner" aria-hidden="true" />
+                    正在检测
+                  </>
+                ) : (
+                  "检测"
                 )}
-              </div>
+              </button>
+            </div>
+            <div className="settings-git-health-card">
+              {gitEnvironmentResult && (
+                <div className="settings-git-health-result success" data-testid="git-environment-result">
+                  <strong>{gitEnvironmentResult.message}</strong>
+                  <span>{gitEnvironmentResult.version}</span>
+                </div>
+              )}
               {gitEnvironmentError && (
                 <div
                   className="settings-git-health-notice"
@@ -2091,14 +2364,95 @@ function MetisApp() {
             </div>
           </section>
 
+          <section
+            className="settings-section software-update-settings-section"
+            data-testid="settings-section-software-update"
+          >
+            <div className="software-update-settings-copy">
+              <h3>Metis 软件更新</h3>
+              <p>启动时自动检查新版本；发现新版后由你确认下载和安装。</p>
+            </div>
+            <div className="software-update-settings-controls">
+              <span className="software-update-current-version">
+                当前版本 <strong>{desktopPackage.version}</strong>
+              </span>
+              <label className="software-update-startup-toggle">
+                <input
+                  checked={softwareUpdateCheckOnStartupDraft}
+                  data-testid="software-update-check-on-startup"
+                  onChange={(event) =>
+                    setSoftwareUpdateCheckOnStartupDraft(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>启动时检查</span>
+              </label>
+              <button
+                aria-busy={softwareUpdateCheckBusy}
+                className={`software-update-check-button metis-action-button${
+                  softwareUpdateCheckBusy ? " is-busy" : ""
+                }`}
+                data-testid="check-software-update"
+                disabled={
+                  softwareUpdateCheckBusy ||
+                  ["downloading", "verifying", "saving"].includes(
+                    softwareUpdateDownloadState.phase,
+                  )
+                }
+                onClick={() => void handleCheckSoftwareUpdate("manual")}
+                type="button"
+              >
+                {softwareUpdateCheckBusy ? (
+                  <>
+                    <span className="metis-action-spinner" aria-hidden="true" />
+                    正在检查
+                  </>
+                ) : (
+                  "检查更新"
+                )}
+              </button>
+            </div>
+            <div
+              className="software-update-settings-feedback"
+              data-testid="software-update-settings-feedback"
+            >
+              {softwareUpdateCheckBusy ? null : softwareUpdateCheckError ? (
+                <div className="software-update-check-error" role="alert">
+                  <span>{softwareUpdateCheckError}</span>
+                  <button
+                    className="metis-action-button metis-action-button--compact metis-action-button--danger metis-action-button--context"
+                    onClick={() => void handleCheckSoftwareUpdate("manual")}
+                    type="button"
+                  >
+                    重试
+                  </button>
+                </div>
+              ) : softwareUpdateCheckMessage ? (
+                <div className="software-update-check-result" role="status">
+                  {softwareUpdateCheckMessage}
+                </div>
+              ) : null}
+            </div>
+          </section>
+
           <div className="form-actions settings-save-actions">
             <button
-              className="settings-save-button"
+              aria-busy={actionBusy === "settings"}
+              className={`settings-save-button metis-action-button metis-action-button--primary${
+                actionBusy === "settings" ? " is-busy" : ""
+              }`}
               data-testid="settings-save"
               disabled={actionBusy === "settings" || !hasSettingsDraftChanges}
               onClick={() => handleSaveSettings(true)}
             >
-              {actionBusy === "settings" ? "保存中" : "保存"}
+              {actionBusy === "settings" ? (
+                <>
+                  <span className="metis-action-spinner" aria-hidden="true" />
+                  正在保存
+                </>
+              ) : (
+                "保存"
+              )}
             </button>
           </div>
         </section>
@@ -2123,6 +2477,7 @@ function MetisApp() {
           remoteTargets={remoteTargets}
           selectedRemoteTargetIds={selectedRemoteTargetIds}
           homeNavigationKey={skillsHomeNavigationKey}
+          homeCheckCompletionKey={homeCheckCompletionKey}
           skillAuditEvents={skillAuditEvents}
           skillSearchQuery={skillSearchQuery}
           skillSizes={skillSizes}
@@ -2146,7 +2501,7 @@ function MetisApp() {
           onLoadSkillAuditEvents={loadSkillAuditEvents}
           onLoadSkillSize={loadSkillSize}
           onOpenBind={openBindForm}
-          onOpenSettings={() => setActiveWorkspace("settings")}
+          onOpenSettings={openSettingsWorkspace}
           onPreviewRemoteSync={handlePreviewRemoteSync}
           onResetRemoteSync={resetRemoteSyncState}
           onRestoreBackup={handleRestoreBackup}
@@ -2190,6 +2545,31 @@ function isUiRedesignPreviewRoute() {
   return hash === "/ui-redesign-preview" || search.includes("preview=ui-redesign");
 }
 
+function groupAutoUpdateSkillsBySource(skills: DesktopSkill[]): AutoUpdateSourceGroup[] {
+  const groups = new Map<string, AutoUpdateSourceGroup>();
+  for (const skill of skills) {
+    const source = skill.source;
+    if (!source) {
+      continue;
+    }
+    const sourceKey =
+      skill.source_id?.trim() ||
+      source.id.trim() ||
+      `source\u0000${source.url}\u0000${source.repo_path}\u0000${source.ref_}`;
+    const existing = groups.get(sourceKey);
+    if (existing) {
+      existing.members.push(skill);
+      continue;
+    }
+    groups.set(sourceKey, {
+      sourceKey,
+      representative: skill,
+      members: [skill],
+    });
+  }
+  return Array.from(groups.values());
+}
+
 function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
   const boundSourceCount = skills.filter((skill) => skill.source).length;
   const autoUpdateSourceCount = skills.filter(
@@ -2200,26 +2580,26 @@ function autoUpdateUnavailableMessage(skills: DesktopSkill[]) {
   );
 
   if (boundSourceCount === 0) {
-    return "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入自动更新列表」。";
+    return "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入一键更新列表」。";
   }
 
   if (autoUpdateSourceCount === 0) {
-    return "请先在来源里开启「信任此来源并加入自动更新列表」。";
+    return "请先在来源里开启「信任此来源并加入一键更新列表」。";
   }
 
   if (blockedByLocalChanges) {
     return "候选 Skill 都有本地修改，请先检查或手动处理本地修改。";
   }
 
-  return "请确认 Skill 已加入自动更新列表，且本地没有修改。";
+  return "请确认 Skill 已加入一键更新列表，且本地没有修改。";
 }
 
 function isAutoUpdateUnavailableMessage(message: string | null) {
   return (
-    message === "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入自动更新列表」。" ||
-    message === "请先在来源里开启「信任此来源并加入自动更新列表」。" ||
+    message === "请先为 Skill 绑定 Git 来源，再开启「信任此来源并加入一键更新列表」。" ||
+    message === "请先在来源里开启「信任此来源并加入一键更新列表」。" ||
     message === "候选 Skill 都有本地修改，请先检查或手动处理本地修改。" ||
-    message === "请确认 Skill 已加入自动更新列表，且本地没有修改。"
+    message === "请确认 Skill 已加入一键更新列表，且本地没有修改。"
   );
 }
 
@@ -2280,32 +2660,6 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-function WorkspaceTab({
-  active,
-  count,
-  label,
-  testId,
-  onClick,
-}: {
-  active: boolean;
-  count?: number;
-  label: string;
-  testId: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-pressed={active}
-      className={`workspace-tab ${active ? "active" : ""}`}
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <span>{label}</span>
-      {count !== undefined && <strong>{count}</strong>}
-    </button>
   );
 }
 
@@ -2475,6 +2829,39 @@ function desktopError(caught: unknown): DesktopError {
   return unknownDesktopError("桌面后端返回了无法识别的错误");
 }
 
+const unsafeSavedInstallerMessage = "安装包安全检查未通过，请删除该文件并重新下载。";
+const softwareUpdateSecurityMessages = new Map<string, string>([
+  [
+    "安装包校验失败，已停止下载，请勿安装该文件。",
+    "安装包校验失败，已停止下载，请勿安装该文件。",
+  ],
+  ["安装包校验失败，请重新下载。", "安装包校验失败，请重新下载。"],
+  [
+    "安装包内容已发生变化，请删除该文件并重新下载。",
+    "安装包内容已发生变化，请删除该文件并重新下载。",
+  ],
+  ["安装包安全检查未完成，请重新下载。", "安装包安全检查未完成，请重新下载。"],
+  ["安装包已被移动或删除，请重新下载。", "安装包已被移动或删除，请重新下载。"],
+  ["已下载的安装包不是普通文件。", unsafeSavedInstallerMessage],
+  ["已下载的安装包文件名无效。", unsafeSavedInstallerMessage],
+  ["已下载的安装包没有父目录。", unsafeSavedInstallerMessage],
+  ["拒绝打开 Downloads 目录之外的文件。", unsafeSavedInstallerMessage],
+]);
+
+function softwareUpdateErrorMessage(caught: unknown, fallback: string): string {
+  const error = desktopError(caught);
+  for (const candidate of [error.message, error.debug_detail]) {
+    const message = candidate?.trim();
+    if (message) {
+      const securityMessage = softwareUpdateSecurityMessages.get(message);
+      if (securityMessage) {
+        return securityMessage;
+      }
+    }
+  }
+  return fallback;
+}
+
 function gitEnvironmentNoticeText(error: DesktopError): string {
   const detail = `${error.debug_detail ?? ""} ${error.message}`.toLowerCase();
   if (
@@ -2587,8 +2974,8 @@ function unknownDesktopError(detail: string): DesktopError {
   return {
     category: "unknown",
     title: "操作失败",
-    message: detail,
-    suggestion: "请确认目标目录、Git source 和本地数据库状态后重试。",
+    message: "操作没有完成，请稍后重试。",
+    suggestion: "如果仍然失败，请重新打开 Metis 后再试。",
     debug_detail: detail,
   };
 }
@@ -2607,7 +2994,7 @@ type WorkspaceTopbarProps = {
 
 const workspaceTopbarCopy: Record<WorkspaceKey, { eyebrow: string; title: string }> = {
   skills: { eyebrow: "Skill Dashboard", title: "Skills" },
-  settings: { eyebrow: "Settings", title: "Agent 路径设置" },
+  settings: { eyebrow: "Settings", title: "应用设置" },
 };
 
 function WorkspaceTopbar({
@@ -2625,7 +3012,10 @@ function WorkspaceTopbar({
   const showSearch = activeWorkspace === "skills";
 
   return (
-    <header className="topbar redesign-page-topbar" data-testid="workspace-topbar">
+    <header
+      className={`topbar redesign-page-topbar${activeWorkspace === "settings" ? " settings-topbar" : ""}`}
+      data-testid="workspace-topbar"
+    >
       <div className="topbar-title">
         <p>{copy.eyebrow}</p>
         <h1>{copy.title}</h1>
@@ -2649,21 +3039,41 @@ function WorkspaceTopbar({
           )}
         </div>
         <div className="redesign-top-actions" data-testid="workspace-topbar-actions">
+          {activeWorkspace === "skills" && (
+            <button
+              aria-busy={actionBusy === "check-updates"}
+              className={`ghost-button topbar-secondary-action metis-action-button${
+                actionBusy === "check-updates" ? " is-busy" : ""
+              }`}
+              data-testid="check-all-updates"
+              disabled={isLoading || actionBusy === "check-updates" || skillCount === 0}
+              onClick={onCheckAllUpdates}
+            >
+              {actionBusy === "check-updates" ? (
+                <>
+                  <span className="metis-action-spinner" aria-hidden="true" />
+                  正在检查
+                </>
+              ) : (
+                "检查全部 Skill"
+              )}
+            </button>
+          )}
           <button
-            className="ghost-button topbar-secondary-action"
-            data-testid="check-all-updates"
-            disabled={isLoading || actionBusy === "check-updates" || skillCount === 0}
-            onClick={onCheckAllUpdates}
-          >
-            {actionBusy === "check-updates" ? "检查中" : "检查更新"}
-          </button>
-          <button
-            className="scan-button"
+            aria-busy={isLoading}
+            className={`scan-button metis-action-button${isLoading ? " is-busy" : ""}`}
             data-testid="scan-skills"
             disabled={isLoading}
             onClick={onScan}
           >
-            {isLoading ? "扫描中" : "重新扫描"}
+            {isLoading ? (
+              <>
+                <span className="metis-action-spinner" aria-hidden="true" />
+                正在扫描
+              </>
+            ) : (
+              "重新扫描"
+            )}
           </button>
         </div>
         <button

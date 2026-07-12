@@ -1,44 +1,18 @@
-:root {
-  --bg: #111317;
-  --panel: #191d23;
-  --panel-strong: #20262e;
-  --border: #303843;
-  --text: #f0eee7;
-  --muted: #a7b0b8;
-  --subtle: #79838d;
-  --gold: #d0a84f;
-  --green: #61c38b;
-  --red: #e05f5f;
-  --blue: #6aa6cf;
-  --shadow: rgba(0, 0, 0, 0.28);
-}
-
 * {
   box-sizing: border-box;
-}
-
-html {
-  background: var(--bg);
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: var(--text);
-  background:
-    linear-gradient(180deg, rgba(208, 168, 79, 0.08), transparent 260px),
-    var(--bg);
-  font-family: "Avenir Next", "SF Pro Text", "Segoe UI", sans-serif;
 }
 
 button {
   min-height: 38px;
-  border: 1px solid rgba(208, 168, 79, 0.7);
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 0 16px;
-  color: #151515;
-  background: var(--gold);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -50,7 +24,6 @@ button {
 
 button:hover:not(:disabled) {
   transform: translateY(-1px);
-  background: #e2bd66;
 }
 
 button:disabled {
@@ -61,27 +34,19 @@ button:disabled {
 input {
   width: 100%;
   min-height: 36px;
-  border: 1px solid #39424d;
+  border: 1px solid transparent;
   border-radius: 7px;
   padding: 0 10px;
-  color: var(--text);
-  background: #101216;
   font: inherit;
   outline: none;
-}
-
-input:focus {
-  border-color: rgba(208, 168, 79, 0.8);
 }
 
 textarea {
   width: 100%;
   min-height: 96px;
-  border: 1px solid #39424d;
+  border: 1px solid transparent;
   border-radius: 7px;
   padding: 10px;
-  color: var(--text);
-  background: #101216;
   font: inherit;
   font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
   font-size: 12px;
@@ -90,22 +55,15 @@ textarea {
   resize: vertical;
 }
 
-textarea:focus {
-  border-color: rgba(208, 168, 79, 0.8);
-}
-
 input[type="checkbox"] {
   width: 16px;
   min-height: 16px;
-  accent-color: var(--gold);
 }
 
 code {
   display: block;
   width: 100%;
-  color: #d7dfdc;
-  background: #101216;
-  border: 1px solid #2c333b;
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 8px 10px;
   font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
@@ -194,48 +152,6 @@ h1 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 14px;
-}
-
-.workspace-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0 0 12px;
-  padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(16, 18, 22, 0.78);
-}
-
-.workspace-tab {
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-color: transparent;
-  color: var(--muted);
-  background: transparent;
-}
-
-.workspace-tab strong {
-  min-width: 22px;
-  border-radius: 999px;
-  padding: 2px 7px;
-  color: #d8e3de;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 11px;
-}
-
-.workspace-tab.active {
-  color: var(--text);
-  border-color: rgba(208, 168, 79, 0.52);
-  background: rgba(208, 168, 79, 0.12);
-}
-
-.workspace-tab.active strong {
-  color: #151515;
-  background: var(--gold);
 }
 
 .workspace-pane {
@@ -1686,38 +1602,6 @@ h1 {
   font-size: 24px;
 }
 
-.workspace-tabs {
-  margin-bottom: 10px;
-  padding: 5px;
-  border-color: var(--border);
-  background: var(--surface-panel);
-}
-
-.workspace-tab {
-  min-height: 34px;
-  font-size: 15px;
-  color: var(--muted);
-}
-
-.workspace-tab strong {
-  min-width: 20px;
-  padding: 1px 6px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  font-size: 10px;
-}
-
-.workspace-tab.active {
-  color: var(--primary);
-  border-color: var(--brand-border);
-  background: var(--surface-selected);
-}
-
-.workspace-tab.active strong {
-  color: var(--text-inverse);
-  background: var(--primary);
-}
-
 .ghost-button {
   color: var(--primary);
   border-color: var(--brand-border);
@@ -2138,10 +2022,6 @@ h1 {
 .rail-scan-summary em {
   color: var(--text-tertiary);
   font-style: normal;
-}
-
-.workspace-tabs {
-  display: none;
 }
 
 .app-shell {
@@ -3122,10 +3002,6 @@ body {
   background: var(--ink-hover);
 }
 
-.workspace-tabs {
-  display: none;
-}
-
 .skill-panel {
   min-height: auto;
   border: 0;
@@ -3716,20 +3592,6 @@ button,
   background: var(--command-selected);
 }
 
-.scan-button {
-  min-height: 32px;
-  border-color: var(--command-accent-border);
-  color: var(--command-accent);
-  background: var(--command-accent-soft);
-  font-size: 12px;
-}
-
-.scan-button:hover:not(:disabled) {
-  color: var(--command-accent);
-  border-color: #8bd8bf;
-  background: #ddf7ee;
-}
-
 .settings-icon-button {
   border-color: var(--command-border);
   background: var(--command-surface);
@@ -3951,6 +3813,824 @@ textarea {
 @media (max-width: 860px) {
   .settings-panel.settings-panel :where(.settings-editor) {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Task 374: one semantic action-button system for workspace and Settings operations. */
+.metis-shell.redesign-app-window button.metis-action-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d8e7ff;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #3154df;
+  background: #eef4ff;
+  font-size: 13px;
+  font-weight: 760;
+  white-space: nowrap;
+  box-shadow: none;
+  transform: none;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    background 180ms ease;
+}
+
+.metis-shell.redesign-app-window button.topbar-secondary-action {
+  min-width: 120px;
+}
+
+.metis-shell.redesign-app-window button.scan-button {
+  min-width: 108px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button:focus-visible {
+  border-color: #c8dafa;
+  color: #2749cf;
+  background: #e3edff;
+  box-shadow: none;
+  transform: none;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:focus-visible {
+  outline: 3px solid rgba(49, 84, 223, 0.16);
+  outline-offset: 2px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:active:not(:disabled) {
+  border-color: #b8cef6;
+  color: #213fae;
+  background: #dce9ff;
+  transform: none;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--primary {
+  border-color: #3154df;
+  color: #ffffff;
+  background: #3154df;
+  box-shadow: none;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--primary:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--primary:focus-visible {
+  border-color: #2749cf;
+  color: #ffffff;
+  background: #2749cf;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--compact {
+  min-height: 32px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--neutral {
+  border-color: #d8e1ec;
+  color: #475569;
+  background: #ffffff;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--neutral:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--neutral:focus-visible {
+  border-color: #c7d2e0;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--danger {
+  border-color: #ffc7bd;
+  color: #b42318;
+  background: #fff1ed;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--danger:hover:not(:disabled),
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--danger:focus-visible {
+  border-color: #fda29b;
+  color: #991b1b;
+  background: #ffe7df;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.metis-action-button--context {
+  min-height: 28px;
+  border-radius: 7px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button:disabled:not(.is-busy) {
+  border-color: #e1e8f1;
+  color: #8290a7;
+  background: #f3f6fa;
+  box-shadow: none;
+  cursor: default;
+  opacity: 1;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.is-busy {
+  cursor: default;
+  opacity: 1;
+}
+
+.metis-shell.redesign-app-window button.metis-action-button.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: -42% auto -42% -86%;
+  width: 72%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 32%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.18) 68%,
+    transparent 100%
+  );
+  transform: translateX(0) skewX(-16deg);
+  animation: metisActionSweep 1450ms ease-in-out infinite;
+}
+
+.metis-action-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  position: relative;
+  z-index: 1;
+  border: 2px solid rgba(49, 84, 223, 0.18);
+  border-top-color: #3154df;
+  border-right-color: #2db8a0;
+  border-radius: 999px;
+  animation: metisActionSpin 820ms linear infinite;
+}
+
+.metis-action-button--primary .metis-action-spinner {
+  border-color: rgba(255, 255, 255, 0.34);
+  border-top-color: #ffffff;
+  border-right-color: #7ef0dc;
+}
+
+.metis-action-button--danger .metis-action-spinner {
+  border-color: rgba(180, 35, 24, 0.18);
+  border-top-color: #b42318;
+  border-right-color: #f97362;
+}
+
+@keyframes metisActionSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes metisActionSweep {
+  0% {
+    transform: translateX(0) skewX(-16deg);
+  }
+  55%,
+  100% {
+    transform: translateX(330%) skewX(-16deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metis-shell.redesign-app-window button.metis-action-button.is-busy::after,
+  .metis-action-spinner {
+    animation: none;
+  }
+
+  .metis-shell.redesign-app-window button.metis-action-button {
+    transition: none;
+  }
+}
+
+/* Metis software update */
+.software-update-notice {
+  position: fixed;
+  top: 30px;
+  right: 34px;
+  z-index: 70;
+  width: min(500px, calc(100vw - 48px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid rgba(49, 95, 168, 0.22);
+  border-radius: 18px;
+  padding: 14px;
+  color: #1f365b;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);
+  box-shadow: 0 20px 46px rgba(49, 84, 146, 0.16);
+  animation: softwareUpdateNoticeIn 220ms ease-out;
+}
+
+.software-update-notice-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #4477bf, #315fa8);
+  box-shadow: 0 10px 22px rgba(49, 95, 168, 0.24);
+}
+
+.software-update-notice-icon svg,
+.software-update-hero svg,
+.software-update-saved-file svg,
+.software-update-dialog-close svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.software-update-notice-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.software-update-notice-copy strong {
+  color: #1d3558;
+  font-size: 14px;
+  font-weight: 820;
+}
+
+.software-update-notice-copy small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #58708f;
+  font-size: 12.5px;
+  font-weight: 560;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.software-update-notice-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.software-update-notice-actions button,
+.software-update-dialog-actions button {
+  min-height: 42px;
+  border-radius: 11px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 780;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.software-update-dismiss,
+.software-update-secondary-action {
+  border-color: #d4dfed;
+  color: #475d79;
+  background: #ffffff;
+}
+
+.software-update-download,
+.software-update-primary-action {
+  border-color: #315fa8;
+  color: #ffffff;
+  background: #315fa8;
+  box-shadow: 0 9px 20px rgba(49, 95, 168, 0.18);
+}
+
+.software-update-dismiss:hover:not(:disabled),
+.software-update-secondary-action:hover:not(:disabled) {
+  border-color: #b9cbe1;
+  color: #2d4768;
+  background: #f7faff;
+}
+
+.software-update-download:hover:not(:disabled),
+.software-update-primary-action:hover:not(:disabled) {
+  border-color: #284f8d;
+  color: #ffffff;
+  background: #284f8d;
+  box-shadow: 0 12px 24px rgba(49, 95, 168, 0.24);
+}
+
+.software-update-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(7px);
+  animation: softwareUpdateBackdropIn 180ms ease-out;
+}
+
+.software-update-dialog {
+  position: relative;
+  width: min(540px, 100%);
+  max-height: calc(100dvh - 32px);
+  display: grid;
+  gap: 20px;
+  border: 1px solid rgba(203, 216, 233, 0.92);
+  border-radius: 24px;
+  padding: 30px;
+  color: #17253a;
+  background: linear-gradient(155deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 34px 90px rgba(15, 23, 42, 0.26);
+  overflow-y: auto;
+  animation: softwareUpdateDialogIn 240ms ease-out;
+}
+
+.software-update-dialog-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  border-color: transparent;
+  border-radius: 12px;
+  padding: 0;
+  color: #64748b;
+  background: transparent;
+}
+
+.software-update-dialog-close:hover:not(:disabled) {
+  color: #334155;
+  background: #eef4fb;
+  transform: none;
+}
+
+.software-update-hero {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  color: #315fa8;
+  background: #eaf2ff;
+  box-shadow: inset 0 0 0 1px rgba(49, 95, 168, 0.12);
+}
+
+.software-update-hero.phase-saved {
+  color: #08775f;
+  background: #e4f8f1;
+  box-shadow: inset 0 0 0 1px rgba(8, 119, 95, 0.12);
+}
+
+.software-update-hero svg {
+  width: 30px;
+  height: 30px;
+}
+
+.software-update-dialog-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.software-update-dialog-eyebrow {
+  color: #315fa8;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.software-update-dialog-copy h2 {
+  color: #17253a;
+  font-size: 25px;
+  line-height: 1.2;
+}
+
+.software-update-dialog-copy > p:last-child {
+  max-width: 62ch;
+  color: #5d6d82;
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.65;
+}
+
+.software-update-progress-block {
+  display: grid;
+  gap: 9px;
+}
+
+.software-update-progress-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #334c6d;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+}
+
+.software-update-progress-copy small {
+  color: #586a82;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.software-update-progress {
+  position: relative;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e3ebf5;
+}
+
+.software-update-progress > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #315fa8, #61a6d9);
+  transform-origin: left center;
+  transition: transform 200ms ease-out;
+}
+
+.software-update-progress.indeterminate > span {
+  width: 42%;
+  animation: softwareUpdateIndeterminate 1.1s ease-in-out infinite;
+}
+
+.software-update-verifying,
+.software-update-saved-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #dce7f4;
+  border-radius: 15px;
+  padding: 13px 15px;
+  color: #38536f;
+  background: #f6f9fd;
+}
+
+.software-update-verifying > span {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 2px solid #bed0e5;
+  border-top-color: #315fa8;
+  border-radius: 999px;
+  animation: softwareUpdateSpin 800ms linear infinite;
+}
+
+.software-update-verifying strong {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.software-update-saved-file > span:first-child {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #08775f;
+  background: #e4f8f1;
+}
+
+.software-update-saved-file > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.software-update-saved-file strong,
+.software-update-saved-file small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.software-update-saved-file strong {
+  color: #1d3c35;
+  font-size: 13.5px;
+}
+
+.software-update-saved-file small {
+  color: #506c64;
+  font-size: 11.5px;
+}
+
+.software-update-error {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #f1c0b9;
+  border-radius: 13px;
+  padding: 12px 14px;
+  color: #9b2c20;
+  background: #fff5f3;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.software-update-error.compact {
+  padding: 9px 12px;
+}
+
+.software-update-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settings-section.software-update-settings-section {
+  min-height: 108px;
+  display: grid;
+  grid-template-areas: "copy controls" "feedback feedback";
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 32px;
+  gap: 6px 24px;
+  align-items: center;
+  border: 1px solid #d9e1ee;
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.software-update-settings-copy {
+  grid-area: copy;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.software-update-settings-copy h3 {
+  margin: 0;
+  color: #1c2a3d;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.software-update-settings-copy p {
+  max-width: 62ch;
+  color: #536178;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.software-update-settings-controls {
+  grid-area: controls;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 4px;
+  background: #f8fafc;
+}
+
+.software-update-current-version {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #67768a;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.software-update-current-version strong {
+  color: #2d4668;
+  font-variant-numeric: tabular-nums;
+}
+
+.software-update-startup-toggle {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #344a67;
+  background: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.software-update-startup-toggle input {
+  width: 32px;
+  height: 18px;
+  min-height: 18px;
+  position: relative;
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  margin: 0;
+  background: #dbe3ec;
+  box-shadow: none;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.software-update-startup-toggle input::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(30, 48, 78, 0.2);
+  transition: transform 160ms ease;
+}
+
+.software-update-startup-toggle input:checked {
+  border-color: #3154df;
+  background: #3154df;
+}
+
+.software-update-startup-toggle input:checked::after {
+  transform: translateX(14px);
+}
+
+.software-update-startup-toggle input:focus-visible {
+  outline: 3px solid rgba(49, 84, 223, 0.16);
+  outline-offset: 2px;
+}
+
+.software-update-check-button {
+  min-width: 108px;
+}
+
+.software-update-settings-feedback {
+  grid-area: feedback;
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.software-update-check-result {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d6e4fa;
+  border-radius: 9px;
+  padding: 5px 10px;
+  color: #25527e;
+  background: #f2f7ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.software-update-check-error {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 1px solid #f0c7c0;
+  border-radius: 9px;
+  padding: 3px 4px 3px 10px;
+  color: #9f3328;
+  background: #fff7f5;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+@keyframes softwareUpdateNoticeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes softwareUpdateBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes softwareUpdateDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes softwareUpdateIndeterminate {
+  from {
+    transform: translateX(-115%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
+@keyframes softwareUpdateSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .software-update-notice {
+    top: auto;
+    right: 18px;
+    bottom: 18px;
+    left: 18px;
+    width: auto;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .software-update-notice-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .redesign-preview-shell:has(.software-update-notice) .redesign-toast {
+    bottom: 154px;
+  }
+
+  .settings-section.software-update-settings-section {
+    min-height: auto;
+    grid-template-areas: "copy" "controls" "feedback";
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 32px;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .software-update-settings-controls {
+    justify-self: stretch;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .software-update-startup-toggle {
+    min-height: 34px;
+  }
+
+  .software-update-dialog {
+    padding: 26px 22px 22px;
+  }
+
+  .software-update-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .software-update-dialog-actions button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .software-update-notice,
+  .software-update-dialog-backdrop,
+  .software-update-dialog,
+  .software-update-progress > span,
+  .software-update-verifying > span,
+  .software-update-notice-actions button,
+  .software-update-dialog-actions button,
+  .software-update-check-error {
+    animation: none;
+    transition: none;
   }
 }
 
@@ -4602,18 +5282,20 @@ textarea {
 
 /* Task 180: make the real desktop UI use the same visual system as #/ui-redesign-preview. */
 .metis-window.redesign-preview-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
   place-items: stretch;
   padding: 0;
-  overflow-x: hidden;
+  overflow: hidden;
   background: #ffffff;
 }
 
 .metis-shell.redesign-app-window {
   width: 100vw;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
   grid-template-columns: 188px minmax(0, 1fr);
   border: 0;
@@ -4625,6 +5307,7 @@ textarea {
 
 .metis-sidebar.redesign-sidebar {
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 26px;
@@ -4768,6 +5451,7 @@ textarea {
 
 .app-shell.redesign-main {
   min-width: 0;
+  min-height: 0;
   display: grid;
   align-content: start;
   gap: 18px;
@@ -4776,6 +5460,15 @@ textarea {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.2)),
     #ffffff;
+}
+
+.app-shell.redesign-main.settings-workspace-main {
+  grid-template-rows: auto;
+  grid-auto-rows: max-content;
+}
+
+.app-shell.redesign-main:has(.skill-dashboard-stats) {
+  gap: 30px;
 }
 
 .topbar.redesign-page-topbar {
@@ -4874,6 +5567,7 @@ textarea {
 }
 
 .skill-dashboard-stats.redesign-home-stats {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -4881,10 +5575,11 @@ textarea {
 }
 
 .dashboard-stat-card.redesign-stat-card {
-  min-height: 88px;
+  min-height: 80px;
   display: grid;
+  grid-template-rows: auto auto;
   align-content: center;
-  gap: 6px;
+  gap: 4px;
   border: 1px solid rgba(223, 232, 242, 0.7);
   border-radius: 16px;
   padding: 12px 14px;
@@ -4892,14 +5587,118 @@ textarea {
 }
 
 .dashboard-stat-card.redesign-stat-card strong {
+  grid-column: 1;
+  grid-row: 2;
   font-size: 26px;
   font-weight: 720;
 }
 
-.dashboard-stat-card.redesign-stat-card span,
-.dashboard-stat-card.redesign-stat-card small {
+.dashboard-stat-card.redesign-stat-card span {
+  grid-column: 1;
+  grid-row: 1;
   font-size: 11px;
   font-weight: 620;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card {
+  animation: dashboardCheckPulse 720ms ease-out both;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card:nth-of-type(2) {
+  animation-delay: 55ms;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card:nth-of-type(3) {
+  animation-delay: 110ms;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card:nth-of-type(4) {
+  animation-delay: 165ms;
+}
+
+.skill-dashboard-stats.is-check-complete .dashboard-stat-card strong {
+  animation: dashboardCheckValue 520ms ease-out both;
+}
+
+.skill-dashboard-check-complete {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #ffffff;
+  background: #173b2d;
+  box-shadow: 0 8px 20px rgba(23, 59, 45, 0.22);
+  font-size: 11px;
+  font-weight: 820;
+  pointer-events: none;
+  animation: dashboardCheckBadgeIn 220ms ease-out both;
+}
+
+.skill-dashboard-check-complete span {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  color: #173b2d;
+  background: #b8f0d2;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+@keyframes dashboardCheckPulse {
+  0% {
+    border-color: rgba(223, 232, 242, 0.7);
+    box-shadow: none;
+    transform: translateY(0);
+  }
+  42% {
+    border-color: rgba(45, 184, 160, 0.72);
+    box-shadow: 0 0 0 3px rgba(45, 184, 160, 0.13), 0 12px 26px rgba(38, 112, 91, 0.1);
+    transform: translateY(-2px);
+  }
+  100% {
+    border-color: rgba(223, 232, 242, 0.7);
+    box-shadow: none;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboardCheckValue {
+  from {
+    opacity: 0.48;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboardCheckBadgeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-dashboard-stats.is-check-complete .dashboard-stat-card,
+  .skill-dashboard-stats.is-check-complete .dashboard-stat-card strong,
+  .skill-dashboard-check-complete {
+    animation: none;
+  }
 }
 
 .skill-list.redesign-skill-grid {
@@ -5330,66 +6129,43 @@ textarea {
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: auto;
   display: grid;
-  gap: 16px 28px;
+  gap: 10px 20px;
   align-items: start;
   border: 1px solid #d9e1ee;
-  border-radius: 22px;
-  padding: 28px 30px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 18px 46px rgba(23, 32, 51, 0.12);
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .auto-update-copy {
   grid-column: 1;
   display: grid;
-  gap: 7px;
+  gap: 4px;
 }
 
 .auto-update-copy h3 {
   margin: 0;
   color: #1c2a3d;
-  font-size: 20px;
-  line-height: 1.25;
+  font-size: 14px;
+  line-height: 1.4;
   letter-spacing: 0;
 }
 
 .auto-update-copy p {
   margin: 0;
   color: #536178;
-  font-size: 14px;
-  font-weight: 650;
-  line-height: 1.7;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
 }
 
-.settings-section.auto-update-section > button {
+.auto-update-run {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1;
   justify-self: end;
-  align-self: center;
-  min-height: 42px;
-  border: 1px solid #c9d6e7;
-  border-radius: 12px;
-  padding: 0 18px;
-  color: #142033;
-  background: #ffffff;
-  font-size: 14px;
-  font-weight: 850;
-  white-space: nowrap;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
-}
-
-.settings-section.auto-update-section > button:hover:not(:disabled) {
-  border-color: #b9c7dc;
-  color: #142033;
-  background: #f7faff;
-  transform: none;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
-}
-
-.settings-section.auto-update-section > button:disabled {
-  color: #64708a;
-  background: #f8fafc;
-  cursor: default;
+  align-self: start;
+  min-width: 108px;
 }
 
 .settings-agent-path-row.redesign-agent-path-row input,
@@ -5418,7 +6194,6 @@ textarea {
 .custom-monitor-add {
   justify-self: end;
   min-width: 78px;
-  background: #ffffff;
 }
 
 .settings-muted {
@@ -5433,43 +6208,7 @@ textarea {
 }
 
 .settings-save-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  min-width: 104px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 0 18px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #3154df, #4b7df0);
-  font-size: 12px;
-  font-weight: 900;
-  white-space: nowrap;
-  box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);
-}
-
-.settings-save-button:hover:not(:disabled) {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-save-button:focus-visible {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-save-button:disabled {
-  border-color: #d9e4ef;
-  color: #64708a;
-  background: #f8fafc;
-  box-shadow: none;
+  min-width: 108px;
 }
 
 .detail-status-strip {
@@ -5489,7 +6228,7 @@ textarea {
   font-weight: 760;
 }
 
-/* Static mock route for docs/design/2026-06-21-metis-ui-redesign-design.md. */
+/* Static mock route used for UI regression comparison. */
 :root {
   --redesign-canvas: #f5f4f8;
   --redesign-raised: #ffffff;
@@ -6474,25 +7213,8 @@ textarea {
 }
 
 :root {
-  --command-purple-soft: #f4efff;
-  --command-purple-border: #ddd1ff;
-  --command-purple-fg: #6d28d9;
   --skill-marker-start: #c4b5fd;
   --skill-marker-end: #f0abfc;
-}
-
-.scan-button {
-  min-height: 32px;
-  border-color: var(--command-purple-border);
-  color: var(--command-purple-fg);
-  background: var(--command-purple-soft);
-  font-size: 12px;
-}
-
-.scan-button:hover:not(:disabled) {
-  color: var(--command-purple-fg);
-  border-color: #c7b7ff;
-  background: #eee7ff;
 }
 
 /* Reference-dashboard mock route for the 2026-06-30 UI preview. */
@@ -6559,11 +7281,54 @@ textarea {
   line-height: 1;
 }
 
+.redesign-brand .metis-brand-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  width: fit-content;
+  color: #172033;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  isolation: isolate;
+}
+
+.metis-brand-wordmark-base {
+  color: #172033;
+}
+
+.metis-brand-wordmark-i {
+  position: relative;
+  color: #3154df;
+  font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", sans-serif;
+  font-weight: 800;
+}
+
+.metis-brand-wordmark-s {
+  display: inline-block;
+  padding-right: 0.1em;
+  margin-right: -0.1em;
+  color: #6a4bd8;
+  font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", sans-serif;
+  font-weight: 800;
+  background: linear-gradient(135deg, #3154df 0%, #6a4bd8 52%, #0b7788 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .redesign-brand small {
   margin-top: 4px;
   color: #718096;
   font-size: 11px;
   font-weight: 800;
+}
+
+@media (forced-colors: active) {
+  .metis-brand-wordmark-s {
+    color: CanvasText;
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+  }
+
 }
 
 .redesign-logo-mark {
@@ -6914,8 +7679,7 @@ textarea {
   border: 1px solid rgba(223, 232, 242, 0.7);
 }
 
-.redesign-stat-card span,
-.redesign-stat-card small {
+.redesign-stat-card span {
   color: #738297;
   font-size: 12px;
   font-weight: 850;
@@ -7324,7 +8088,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .redesign-detail-agent-row-action:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.68;
 }
 
@@ -7568,7 +8332,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .redesign-operation-tabs .operation-button[aria-busy="true"] {
-  cursor: progress;
+  cursor: default;
   color: var(--operation-selected-text);
   border-color: var(--operation-hover-border);
   background: var(--operation-hover-surface);
@@ -8383,11 +9147,11 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .source-test-button[data-busy="true"] {
-  cursor: wait;
+  cursor: default;
 }
 
 .source-save-button[data-busy="true"] {
-  cursor: wait;
+  cursor: default;
 }
 
 .source-save-button:disabled {
@@ -8403,13 +9167,16 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 }
 
 .settings-git-health-card {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  display: grid;
+  gap: 8px;
   border: 0;
   border-radius: 0;
   padding: 0;
   background: transparent;
+}
+
+.settings-git-health-card:empty {
+  display: none;
 }
 
 .settings-section.git-health-section {
@@ -8419,52 +9186,32 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   padding: 12px 14px;
 }
 
-.settings-git-health-action {
+.settings-git-health-heading {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 16px;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.settings-git-health-heading h3 {
+  margin: 0;
+}
+
+.topbar.redesign-page-topbar.settings-topbar .topbar-middle-slot {
+  display: none;
+}
+
+.topbar.redesign-page-topbar.settings-topbar .topbar-actions {
+  grid-template-columns: 1fr auto;
+}
+
+.topbar.redesign-page-topbar.settings-topbar .redesign-top-actions {
+  grid-template-columns: auto;
 }
 
 .settings-git-test-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  min-width: 76px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 0 14px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #3154df, #4b7df0);
-  font-size: 13px;
-  font-weight: 750;
-  white-space: nowrap;
-  box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);
-}
-
-.settings-git-test-button:hover:not(:disabled) {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-git-test-button:focus-visible {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #2749cf, #416fed);
-  box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);
-  transform: none;
-}
-
-.settings-git-test-button:disabled {
-  border-color: #d9e4ef;
-  color: #64708a;
-  background: #f8fafc;
-  box-shadow: none;
+  min-width: 108px;
 }
 
 .settings-git-health-result {
@@ -8586,30 +9333,6 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .auto-update-remove {
   justify-self: end;
-  min-width: 78px;
-  min-height: 38px;
-  border: 1px solid #cfd9e8;
-  border-radius: 12px;
-  padding: 0 14px;
-  color: #263247;
-  background: #ffffff;
-  font-size: 13px;
-  font-weight: 850;
-  cursor: pointer;
-}
-
-.auto-update-remove:hover:not(:disabled) {
-  border-color: #b9c7dc;
-  color: #263247;
-  background: #f7faff;
-  transform: none;
-  box-shadow: none;
-}
-
-.auto-update-remove:disabled {
-  color: #65728a;
-  background: #f8fafc;
-  cursor: wait;
 }
 
 .auto-update-remove-actions {
@@ -8718,6 +9441,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 
 .auto-update-confirm {
   min-height: 36px;
+  min-width: 104px;
   border-radius: 11px;
   padding: 0 13px;
   color: #b42318;
@@ -8736,7 +9460,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
 .auto-update-confirm:disabled {
   color: #9f6b62;
   background: #fff7f4;
-  cursor: wait;
+  cursor: default;
 }
 
 @media (max-width: 520px) {
@@ -8748,7 +9472,7 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
     grid-template-columns: 1fr;
   }
 
-  .settings-section.auto-update-section > button {
+  .auto-update-run {
     grid-column: 1;
     grid-row: auto;
     justify-self: stretch;
@@ -8760,16 +9484,16 @@ button.redesign-detail-agent-toggle:hover:not(:disabled) {
   }
 
   .auto-update-remove {
-    justify-self: stretch;
+    justify-self: end;
   }
 
   .auto-update-remove-actions {
     display: inline-flex;
-    justify-self: stretch;
+    justify-self: end;
   }
 
   .auto-update-remove-actions button {
-    width: 100%;
+    width: auto;
   }
 
   .auto-update-remove-confirm-actions {

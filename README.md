@@ -123,12 +123,10 @@ Metis 桌面版通过 [GitHub Releases](https://github.com/wylycool/metis/releas
 
 ## 文档索引
 
-- [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md)：项目愿景、边界、用户、MVP、非目标和成功标准。
-- [ARCHITECTURE.md](ARCHITECTURE.md)：当前高层架构、模块边界和关键数据流。
-- [ROADMAP.md](ROADMAP.md)：Phase 0 → Phase 6 演进记录、近期优先级和已知加固项。
+- [简体中文用户文档](docs/zh-CN/README.md)：安装、使用和故障排查入口。
+- [English documentation](docs/en/README.md): installation, usage, and troubleshooting.
 - [SECURITY.md](SECURITY.md)：安全策略、凭据模型、威胁模型和隐私承诺。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献指南，包含开发环境设置和 Adapter 贡献规范。
-- [docs/README.md](docs/README.md)：权威设计、进度历史、发布验收入口和文档维护规则。
 
 ## 项目原则
 

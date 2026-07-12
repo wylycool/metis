@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
 const stylesheet = readFileSync("src/styles.css", "utf8");
@@ -131,6 +131,29 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe("Phase 6 light workspace contrast", () => {
+  test("does not ship the obsolete dark-gold global theme baseline", () => {
+    const firstComponentRule = stylesheet.indexOf(".app-shell");
+    const globalPrelude = stylesheet.slice(0, firstComponentRule);
+
+    expect(firstComponentRule).toBeGreaterThan(0);
+    expect(globalPrelude).not.toMatch(/:root\s*\{/);
+    expect(globalPrelude).not.toContain("#111317");
+    expect(globalPrelude).not.toContain("#191d23");
+    expect(globalPrelude).not.toContain("#20262e");
+    expect(globalPrelude).not.toContain("#d0a84f");
+    expect(globalPrelude).not.toContain("#101216");
+    expect(globalPrelude).not.toMatch(
+      /^\s*(color|background|border-color|box-shadow|accent-color):/m,
+    );
+    expect(globalPrelude).toContain("box-sizing: border-box;");
+    expect(globalPrelude).toContain("min-width: 320px;");
+  });
+
+  test("does not copy one-off static UI previews into production assets", () => {
+    expect(existsSync("public/auto-update-remove-preview.html")).toBe(false);
+    expect(existsSync("public/git-check-failures.html")).toBe(false);
+  });
+
   test("defines semantic light theme tokens for brand, surfaces, borders, text, and status", () => {
     const requiredTokens = [
       "--brand",
@@ -239,7 +262,7 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".metis-brand-mark")).toContain("linear-gradient(135deg");
     expect(latestBlockFor(".workspace-rail")).toContain("display: none");
-    expect(latestBlockFor(".workspace-tabs")).toContain("display: none");
+    expect(stylesheet).not.toContain(".workspace-tabs");
   });
 
   test("keeps the refreshed desktop chrome compact while allowing dashboard cards", () => {
@@ -338,7 +361,9 @@ describe("Phase 6 light workspace contrast", () => {
 
   test("uses the reference preview typography scale on the formal desktop", () => {
     expect(declaredPx(latestBlockFor("h1"), "font-size")).toBeLessThanOrEqual(30);
-    expect(declaredPx(latestBlockFor(".workspace-tab"), "font-size")).toBeLessThanOrEqual(15);
+    expect(
+      declaredPx(latestBlockFor(".metis-sidebar-nav.redesign-side-nav button"), "font-size"),
+    ).toBeLessThanOrEqual(15);
     expect(declaredPx(latestBlockFor(".metric strong"), "font-size")).toBeLessThanOrEqual(22);
     expect(declaredPx(latestBlockFor(".agent-filter-pill"), "font-size")).toBeLessThanOrEqual(13);
   });
@@ -403,9 +428,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-test-button:disabled")).toContain("background: #dbeafe;");
     expect(latestBlockFor(".source-test-button:disabled")).toContain("cursor: default;");
     expect(latestBlockFor(".source-test-button:disabled")).not.toContain("cursor: wait;");
-    expect(latestBlockFor(".source-test-button[data-busy=\"true\"]")).toContain("cursor: wait;");
+    expect(latestBlockFor(".source-test-button[data-busy=\"true\"]")).toContain("cursor: default;");
     expect(latestBlockFor(".source-save-button:disabled")).toContain("cursor: default;");
-    expect(latestBlockFor(".source-save-button[data-busy=\"true\"]")).toContain("cursor: wait;");
+    expect(latestBlockFor(".source-save-button[data-busy=\"true\"]")).toContain("cursor: default;");
     expect(exactBlockFor("button:disabled")).toContain("cursor: default;");
     expect(exactBlockFor("button:disabled")).not.toContain("cursor: wait;");
     const previewDisabledBlock = latestBlockFor(".add-skill-preview-button:disabled");
@@ -413,40 +438,19 @@ describe("Phase 6 light workspace contrast", () => {
     expect(previewDisabledBlock).not.toContain("cursor: wait;");
     expect(latestBlockFor(".settings-section.git-health-section")).toContain("min-height: auto;");
     expect(latestBlockFor(".settings-section.git-health-section")).toContain("grid-template-rows: auto auto;");
-    expect(latestBlockFor(".settings-git-health-card")).toContain("display: flex;");
+    expect(latestBlockFor(".settings-git-health-heading")).toContain("justify-content: space-between;");
+    expect(latestBlockFor(".settings-git-health-card")).toContain("display: grid;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("border: 0;");
     expect(latestBlockFor(".settings-git-health-card")).toContain("padding: 0;");
-    expect(latestBlockFor(".settings-git-health-action")).toContain("gap: 16px;");
-    expect(latestBlockFor(".settings-git-test-button")).toContain("min-height: 36px;");
-    expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 76px;");
-    expect(latestBlockFor(".settings-git-test-button")).toContain("padding: 0 14px;");
-    expect(latestBlockFor(".settings-git-test-button")).toContain("font-size: 13px;");
-    expect(latestBlockFor(".settings-git-test-button")).toContain(
-      "background: linear-gradient(135deg, #3154df, #4b7df0);",
-    );
-    expect(latestBlockFor(".settings-git-test-button")).toContain(
-      "box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);",
-    );
-    const gitTestHoverBlock = latestBlockFor(".settings-git-test-button:hover:not(:disabled)");
-    expect(gitTestHoverBlock).toContain("color: #ffffff;");
-    expect(gitTestHoverBlock).toContain("border-color: transparent;");
-    expect(gitTestHoverBlock).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
-    expect(gitTestHoverBlock).toContain("box-shadow: 0 14px 24px rgba(49, 84, 223, 0.2);");
-    expect(gitTestHoverBlock).toContain("transform: none;");
-    expect(gitTestHoverBlock).not.toContain("background: #eff6ff;");
-    const gitTestFocusBlock = latestBlockFor(".settings-git-test-button:focus-visible");
-    expect(gitTestFocusBlock).toContain("background: linear-gradient(135deg, #2749cf, #416fed);");
-    expect(gitTestFocusBlock).toContain("color: #ffffff;");
-    expect(gitTestFocusBlock).toContain("transform: none;");
-    expect(latestBlockFor(".settings-git-test-button:disabled")).toContain("color: #64708a;");
-    expect(latestBlockFor(".settings-git-test-button:disabled")).toContain("background: #f8fafc;");
+    expect(latestBlockFor(".settings-git-health-card:empty")).toContain("display: none;");
+    expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 108px;");
+    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 108px;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("background: #fff7ed;");
     expect(latestBlockFor(".settings-git-health-notice")).toContain("border: 1px solid #fed7aa;");
     expect(latestBlockFor(".settings-git-health-notice")).not.toContain("danger");
     expect(latestBlockFor(".settings-git-health-notice")).not.toContain("#dc2626");
     expect(latestBlockFor(".custom-monitor-add")).toContain("justify-self: end;");
     expect(latestBlockFor(".custom-monitor-add")).toContain("min-width: 78px;");
-    expect(latestBlockFor(".custom-monitor-add")).toContain("background: #ffffff;");
     expect(exactBlockFor(".path-management-heading")).toContain("display: flex;");
     expect(exactBlockFor(".path-status-legend")).toContain("display: inline-flex;");
     expect(latestBlockFor(".path-status-legend-item")).toContain("white-space: nowrap;");
@@ -465,35 +469,23 @@ describe("Phase 6 light workspace contrast", () => {
         ),
       ),
     ).toBe(true);
-    expect(latestBlockFor(".settings-save-button")).toContain(
-      "background: linear-gradient(135deg, #3154df, #4b7df0);",
-    );
-    expect(latestBlockFor(".settings-save-button")).toContain(
-      "box-shadow: 0 12px 22px rgba(49, 84, 223, 0.18);",
-    );
-    expect(latestBlockFor(".settings-save-button:hover:not(:disabled)")).toContain(
-      "background: linear-gradient(135deg, #2749cf, #416fed);",
-    );
-    expect(latestBlockFor(".settings-save-button:hover:not(:disabled)")).toContain(
-      "transform: none;",
-    );
+    expect(latestBlockFor(".settings-save-button")).toContain("min-width: 108px;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("position: sticky;");
     expect(latestBlockFor(".source-form .form-actions")).toContain("bottom: 0;");
-    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("gap: 16px 28px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("gap: 10px 20px;");
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain("align-items: start;");
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border: 1px solid #d9e1ee;");
-    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border-radius: 22px;");
-    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("padding: 28px 30px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("border-radius: 14px;");
+    expect(exactBlockFor(".settings-section.auto-update-section")).toContain("padding: 14px;");
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
-      "background: rgba(255, 255, 255, 0.9);",
+      "background: #ffffff;",
     );
     expect(exactBlockFor(".settings-section.auto-update-section")).toContain(
-      "box-shadow: 0 18px 46px rgba(23, 32, 51, 0.12);",
+      "box-shadow: none;",
     );
-    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("min-height: 42px;");
-    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("border-radius: 12px;");
-    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("color: #142033;");
-    expect(exactBlockFor(".settings-section.auto-update-section > button")).toContain("background: #ffffff;");
+    expect(exactBlockFor(".auto-update-run")).toContain("grid-column: 2;");
+    expect(exactBlockFor(".auto-update-run")).toContain("justify-self: end;");
+    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 108px;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("display: grid;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("grid-column: 1 / -1;");
     expect(latestBlockFor(".auto-update-source-list")).toContain("gap: 10px;");
@@ -515,9 +507,9 @@ describe("Phase 6 light workspace contrast", () => {
     expect(exactBlockFor(".auto-update-remove-actions")).toContain("display: inline-flex;");
     expect(exactBlockFor(".auto-update-remove-actions")).toContain("justify-self: end;");
     expect(exactBlockFor(".auto-update-remove-actions")).not.toContain("grid-column: 1 / -1;");
-    expect(exactBlockFor(".auto-update-remove")).toContain("min-width: 78px;");
-    expect(exactBlockFor(".auto-update-remove")).toContain("min-height: 38px;");
-    expect(exactBlockFor(".auto-update-remove")).toContain("background: #ffffff;");
+    expect(exactBlockFor(".auto-update-remove")).toContain("justify-self: end;");
+    expect(exactBlockFor(".auto-update-remove")).not.toContain("background:");
+    expect(exactBlockFor(".auto-update-remove")).not.toContain("color:");
     expect(exactBlockFor(".auto-update-remove-confirm")).toContain("grid-column: 1 / -1;");
     expect(exactBlockFor(".auto-update-remove-confirm")).toContain(
       "linear-gradient(90deg, rgba(245, 158, 11, 0.1), transparent 42%),",
@@ -530,6 +522,7 @@ describe("Phase 6 light workspace contrast", () => {
     expect(exactBlockFor(".auto-update-confirm")).toContain("color: #b42318;");
     expect(exactBlockFor(".auto-update-confirm")).toContain("background: #fff1ed;");
     expect(exactBlockFor(".auto-update-confirm")).toContain("border: 1px solid #ffc7bd;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("min-width: 104px;");
     expect(latestBlockFor(".skill-intro-copy")).toContain("-webkit-line-clamp: 3");
   });
 
@@ -581,15 +574,13 @@ describe("Phase 6 light workspace contrast", () => {
   test("Command Sheet keeps top actions and selected states light", () => {
     expect(stylesheet).toContain("--command-surface:");
     expect(stylesheet).toContain("--command-accent:");
-    expect(stylesheet).toContain("--command-purple-soft:");
-    expect(latestBlockFor(".topbar-secondary-action")).toContain(
+    expect(exactBlockFor(".topbar-secondary-action")).toContain(
       "background: var(--command-surface);",
     );
-    expect(latestBlockFor(".topbar-secondary-action:hover:not(:disabled)")).not.toContain(
+    expect(exactBlockFor(".topbar-secondary-action:hover:not(:disabled)")).not.toContain(
       "background: var(--ink-hover);",
     );
-    expect(latestBlockFor(".scan-button")).toContain("background: var(--command-purple-soft);");
-    expect(latestBlockFor(".scan-button")).not.toContain("var(--command-accent-soft)");
+    expect(stylesheet).not.toContain("--command-purple-soft:");
     expect(latestBlockFor(".add-skill-button")).toContain("background: var(--command-surface);");
     expect(latestBlockFor(".skill-sort-control")).toContain("background: var(--command-surface);");
     expect(latestBlockFor(".skill-sort-control")).toContain("border-radius: 8px;");
@@ -789,6 +780,13 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".redesign-toast.info-toast")).toContain("background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);");
     expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("background: linear-gradient(135deg, #fffaf0 0%, #ffffff 68%);");
     expect(latestBlockFor(".redesign-toast.warning-toast")).toContain("border-color: rgba(214, 139, 38, 0.28);");
+    expect(latestBlockFor(".skill-dashboard-stats.is-check-complete .dashboard-stat-card")).toContain("animation: dashboardCheckPulse");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).toContain("position: absolute;");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).toContain("bottom: calc(100% + 4px);");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).not.toContain("top:");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).toContain("color: #ffffff;");
+    expect(exactBlockFor(".skill-dashboard-check-complete")).toContain("background: #173b2d;");
+    expect(latestBlockFor(".app-shell.redesign-main:has(.skill-dashboard-stats)")).toContain("gap: 30px;");
     expect(latestBlockFor(".source-required-toast")).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
     expect(latestBlockFor(".source-required-toast")).not.toContain("background:");
     expect(latestBlockFor(".source-required-toast")).not.toContain("box-shadow:");
@@ -797,6 +795,34 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-required-toast-action")).not.toContain("background: var(--ink)");
     expect(latestBlockFor(".source-required-toast-action:hover")).toContain("background: #ffedd5;");
     expect(latestBlockFor(".source-required-toast-action:hover")).toContain("color: #8a4b0f;");
+  });
+
+  test("uses the native Metis i dot without a decorative overlay", () => {
+    expect(latestBlockFor(".redesign-brand .metis-brand-wordmark")).toContain(
+      "letter-spacing: -0.02em;",
+    );
+    expect(latestBlockFor(".metis-brand-wordmark-base")).toContain("color: #172033;");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("position: relative;");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("color: #3154df;");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("font-family: ui-rounded");
+    expect(latestBlockFor(".metis-brand-wordmark-i")).toContain("font-weight: 800;");
+    expect(stylesheet).not.toContain(".metis-brand-wordmark-i::after");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("background: linear-gradient(");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("color: #6a4bd8;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("font-family: ui-rounded");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("font-weight: 800;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("display: inline-block;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("padding-right: 0.1em;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("margin-right: -0.1em;");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("#6a4bd8 52%");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain("#0b7788 100%");
+    expect(blockFor(".metis-brand-wordmark-s")).toContain(
+      "-webkit-background-clip: text;",
+    );
+    expect(blockFor(".metis-brand-wordmark-s")).toContain(
+      "-webkit-text-fill-color: transparent;",
+    );
+    expect(latestBlockFor(".redesign-logo-mark img")).toContain("width: 50px;");
   });
 
   test("brands overlapping agent letter badges by agent identity", () => {
@@ -1029,12 +1055,16 @@ describe("Phase 6 light workspace contrast", () => {
       /\.skill-list\.redesign-skill-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/,
     );
     expect(stylesheet).toMatch(
-      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*88px;/,
+      /\.dashboard-stat-card\.redesign-stat-card\s*\{[\s\S]*min-height:\s*80px;/,
     );
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card")).not.toContain(
+      "grid-template-columns:",
+    );
+    expect(stylesheet).not.toContain(".dashboard-stat-icon");
     expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card strong")).toContain(
       "font-weight: 720;",
     );
-    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card span,\n.dashboard-stat-card.redesign-stat-card small")).toContain(
+    expect(latestBlockFor(".dashboard-stat-card.redesign-stat-card span")).toContain(
       "font-weight: 620;",
     );
     expect(stylesheet).toMatch(
@@ -1144,5 +1174,132 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".source-help-card code")).toContain(
       "background: var(--source-help-code-bg);",
     );
+  });
+
+  test("keeps software update motion meaningful and removable", () => {
+    expect(latestBlockFor(".software-update-progress > span")).toContain(
+      "transform-origin: left center;",
+    );
+    expect(latestBlockFor(".software-update-progress > span")).toContain(
+      "transition: transform 200ms ease-out;",
+    );
+    const reducedMotion = mediaBlocksFor("(prefers-reduced-motion: reduce)").join("\n");
+    expect(reducedMotion).toContain(".software-update-notice");
+    expect(reducedMotion).toContain(".software-update-dialog");
+    expect(reducedMotion).toContain(".software-update-verifying > span");
+    expect(reducedMotion).toContain("animation: none;");
+    expect(reducedMotion).toContain("transition: none;");
+    expect(exactBlockFor(".software-update-dialog")).toContain(
+      "max-height: calc(100dvh - 32px);",
+    );
+    expect(exactBlockFor(".software-update-dialog")).toContain("overflow-y: auto;");
+    expect(stylesheet).toContain(
+      ".redesign-preview-shell:has(.software-update-notice) .redesign-toast",
+    );
+  });
+
+  test("keeps software and Skill update settings compact and shadowless", () => {
+    const softwareSection = exactBlockFor(".settings-section.software-update-settings-section");
+    const autoUpdateSection = exactBlockFor(".settings-section.auto-update-section");
+    const realWindow = exactBlockFor(".metis-window.redesign-preview-shell");
+    const realShell = exactBlockFor(".metis-shell.redesign-app-window");
+    const settingsMain = exactBlockFor(".app-shell.redesign-main.settings-workspace-main");
+    const settingsHeadingSize = declaredPx(latestBlockFor(".settings-section h3"), "font-size");
+    const compactViewport = mediaBlocksFor("(max-width: 760px)").join("\n");
+    const narrowViewport = mediaBlocksFor("(max-width: 520px)").join("\n");
+
+    expect(softwareSection).toContain("padding: 14px;");
+    expect(softwareSection).toContain("border-radius: 14px;");
+    expect(softwareSection).toContain("box-shadow: none;");
+    expect(softwareSection).toContain('grid-template-areas: "copy controls" "feedback feedback";');
+    expect(softwareSection).toContain("grid-template-rows: auto 32px;");
+    expect(autoUpdateSection).toContain("padding: 14px;");
+    expect(autoUpdateSection).toContain("border-radius: 14px;");
+    expect(autoUpdateSection).toContain("box-shadow: none;");
+    expect(declaredPx(latestBlockFor(".software-update-settings-copy h3"), "font-size")).toBe(
+      settingsHeadingSize,
+    );
+    expect(declaredPx(latestBlockFor(".auto-update-copy h3"), "font-size")).toBe(
+      settingsHeadingSize,
+    );
+    expect(exactBlockFor(".software-update-settings-controls")).toContain("display: flex;");
+    expect(exactBlockFor(".software-update-settings-controls")).toContain(
+      "border: 1px solid #e2e8f0;",
+    );
+    expect(exactBlockFor(".software-update-settings-controls")).toContain(
+      "background: #f8fafc;",
+    );
+    expect(exactBlockFor(".software-update-settings-feedback")).toContain("min-height: 32px;");
+    expect(latestBlockFor(".software-update-check-button")).toContain("min-width: 108px;");
+    expect(realWindow).toContain("height: 100vh;");
+    expect(realWindow).toContain("min-height: 0;");
+    expect(realWindow).toContain("overflow: hidden;");
+    expect(realShell).toContain("height: 100vh;");
+    expect(realShell).toContain("min-height: 0;");
+    expect(settingsMain).toContain("grid-template-rows: auto;");
+    expect(settingsMain).toContain("grid-auto-rows: max-content;");
+    expect(compactViewport).toMatch(
+      /\.settings-section\.software-update-settings-section\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
+    );
+    expect(narrowViewport).toMatch(
+      /\.settings-section\.auto-update-section\s*\{[\s\S]*grid-template-columns:\s*1fr;/,
+    );
+  });
+
+  test("uses one semantic action button system across Settings", () => {
+    const base = exactBlockFor(".metis-shell.redesign-app-window button.metis-action-button");
+    const primary = exactBlockFor(
+      ".metis-shell.redesign-app-window button.metis-action-button.metis-action-button--primary",
+    );
+    const compact = exactBlockFor(
+      ".metis-shell.redesign-app-window button.metis-action-button.metis-action-button--compact",
+    );
+    const neutral = exactBlockFor(
+      ".metis-shell.redesign-app-window button.metis-action-button.metis-action-button--neutral",
+    );
+    const danger = exactBlockFor(
+      ".metis-shell.redesign-app-window button.metis-action-button.metis-action-button--danger",
+    );
+    const busy = exactBlockFor(
+      ".metis-shell.redesign-app-window button.metis-action-button.is-busy",
+    );
+    const spinner = exactBlockFor(".metis-action-spinner");
+    const reducedMotion = mediaBlocksFor("(prefers-reduced-motion: reduce)").join("\n");
+
+    expect(base).toContain("min-height: 36px;");
+    expect(base).toContain("border: 1px solid #d8e7ff;");
+    expect(base).toContain("color: #3154df;");
+    expect(base).toContain("background: #eef4ff;");
+    expect(base).toContain("box-shadow: none;");
+    expect(primary).toContain("color: #ffffff;");
+    expect(primary).toContain("background: #3154df;");
+    expect(compact).toContain("min-height: 32px;");
+    expect(neutral).toContain("background: #ffffff;");
+    expect(danger).toContain("color: #b42318;");
+    expect(busy).toContain("cursor: default;");
+    expect(busy).not.toContain("cursor: wait;");
+    expect(busy).toContain("opacity: 1;");
+    expect(spinner).toContain("animation: metisActionSpin 820ms linear infinite;");
+    expect(reducedMotion).toMatch(
+      /\.metis-shell\.redesign-app-window button\.metis-action-button\.is-busy::after,[\s\S]*animation:\s*none;/,
+    );
+    expect(reducedMotion).toMatch(
+      /\.metis-shell\.redesign-app-window button\.metis-action-button\s*\{[^}]*transition:\s*none;/,
+    );
+    expect(reducedMotion).toContain(".metis-action-spinner");
+  });
+
+  test("keeps asynchronous action button footprints stable across label changes", () => {
+    expect(
+      exactBlockFor(".metis-shell.redesign-app-window button.topbar-secondary-action"),
+    ).toContain("min-width: 120px;");
+    expect(exactBlockFor(".metis-shell.redesign-app-window button.scan-button")).toContain(
+      "min-width: 108px;",
+    );
+    expect(latestBlockFor(".settings-git-test-button")).toContain("min-width: 108px;");
+    expect(latestBlockFor(".software-update-check-button")).toContain("min-width: 108px;");
+    expect(exactBlockFor(".auto-update-run")).toContain("min-width: 108px;");
+    expect(latestBlockFor(".settings-save-button")).toContain("min-width: 108px;");
+    expect(exactBlockFor(".auto-update-confirm")).toContain("min-width: 104px;");
   });
 });

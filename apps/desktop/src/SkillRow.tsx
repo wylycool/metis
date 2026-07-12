@@ -427,7 +427,7 @@ export function BindSourceForm({
               }
             />
             <span>
-              <strong>信任此来源并加入自动更新列表</strong>
+              <strong>信任此来源并加入一键更新列表</strong>
             </span>
           </label>
         </div>

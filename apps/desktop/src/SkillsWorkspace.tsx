@@ -46,6 +46,7 @@ export function SkillsWorkspace({
   remoteTargets,
   selectedRemoteTargetIds,
   homeNavigationKey,
+  homeCheckCompletionKey,
   skillAuditEvents,
   skillSearchQuery,
   skillSizes,
@@ -102,6 +103,7 @@ export function SkillsWorkspace({
   remoteTargets: DesktopSkillTarget[];
   selectedRemoteTargetIds: string[];
   homeNavigationKey: number;
+  homeCheckCompletionKey: number | null;
   skillAuditEvents: Record<string, DesktopAuditEvent[]>;
   skillSearchQuery: string;
   skillSizes: Record<string, DesktopSkillSize>;
@@ -310,7 +312,24 @@ export function SkillsWorkspace({
 
       {route.kind === "list" && (
         <section className="skill-panel redesign-home">
-          <div className="skill-dashboard-stats redesign-home-stats" data-testid="skill-dashboard-stats">
+          <div
+            className={`skill-dashboard-stats redesign-home-stats${
+              homeCheckCompletionKey === null ? "" : " is-check-complete"
+            }`}
+            data-testid="skill-dashboard-stats"
+          >
+            {homeCheckCompletionKey !== null && (
+              <div
+                aria-live="polite"
+                className="skill-dashboard-check-complete"
+                data-testid="skill-dashboard-check-complete"
+                key={homeCheckCompletionKey}
+                role="status"
+              >
+                <span aria-hidden="true">✓</span>
+                检查完成
+              </div>
+            )}
             <DashboardStat label="全部 Skill" value={baseVisibleSkills.length} tone="mint" />
             <DashboardStat label="待更新" value={visibleUpdateAvailableCount} tone="warm" />
             <DashboardStat label="已最新" value={visibleUpToDateCount} tone="blue" />
@@ -423,7 +442,6 @@ function DashboardStat({
     <article className={`dashboard-stat-card redesign-stat-card ${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>{label === "待更新" ? "needs review" : label === "已最新" ? "ready to use" : "from real scan"}</small>
     </article>
   );
 }

@@ -64,6 +64,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+mod software_update;
+use software_update::{
+    check_software_update, download_software_update, open_downloads_directory,
+    open_software_update_installer, SoftwareUpdateState,
+};
+
 #[derive(Debug, Clone)]
 pub struct DesktopAppState {
     sqlite_path: PathBuf,
@@ -207,6 +213,26 @@ pub struct DesktopSettings {
     pub team_policy_path: Option<String>,
     #[serde(default)]
     pub enterprise_network: DesktopEnterpriseNetworkSettings,
+    #[serde(default)]
+    pub software_update: DesktopSoftwareUpdateSettings,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopSoftwareUpdateSettings {
+    #[serde(default = "default_check_on_startup")]
+    pub check_on_startup: bool,
+}
+
+impl Default for DesktopSoftwareUpdateSettings {
+    fn default() -> Self {
+        Self {
+            check_on_startup: true,
+        }
+    }
+}
+
+fn default_check_on_startup() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -738,7 +764,9 @@ pub fn save_desktop_settings_for_state(
         custom_monitored_paths: normalize_custom_monitored_paths(settings.custom_monitored_paths),
         team_policy_path: normalize_optional_text(settings.team_policy_path),
         enterprise_network: normalize_enterprise_network_settings(settings.enterprise_network),
+        software_update: settings.software_update,
     };
+    validate_custom_monitored_path_availability(&normalized.custom_monitored_paths)?;
     let contents = serde_json::to_string_pretty(&normalized).map_err(|error| error.to_string())?;
     fs::write(state.settings_path(), contents).map_err(|error| error.to_string())?;
     Ok(normalized)
@@ -1875,6 +1903,25 @@ fn normalize_custom_monitored_paths(
     normalized
 }
 
+fn validate_custom_monitored_path_availability(
+    paths: &[DesktopCustomMonitoredPath],
+) -> Result<(), String> {
+    for path in paths {
+        let status = check_path_status_for_path(&path.path);
+        if !status.exists || !status.readable || !status.writable {
+            return Err(desktop_error(
+                "settings",
+                "设置未保存",
+                "自定义路径不可用",
+                "请确认该目录存在，并且当前用户拥有读取和写入权限。",
+                &path.path,
+            )
+            .wire_string());
+        }
+    }
+    Ok(())
+}
+
 fn core_agent_path_overrides(settings: &DesktopSettings) -> Vec<CoreAgentPathOverride> {
     settings
         .agent_path_overrides
@@ -2775,6 +2822,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(app_state)
+        .manage(SoftwareUpdateState::default())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             list_agents,
             check_path_status,
@@ -2806,7 +2855,11 @@ pub fn run() {
             export_team_compliance_report_to_file,
             export_environment_report_to_file,
             export_audit_log_report_to_file,
-            open_external_url
+            open_external_url,
+            check_software_update,
+            download_software_update,
+            open_software_update_installer,
+            open_downloads_directory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -4119,6 +4172,8 @@ description: {description}
     #[test]
     fn desktop_settings_default_when_file_is_missing_and_save_normalizes_paths() {
         let workspace = temp_dir("settings-state");
+        let custom_monitor = workspace.join("team-memory");
+        fs::create_dir_all(&custom_monitor).expect("custom monitor should be created");
         let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
 
         let default_settings =
@@ -4139,10 +4194,11 @@ description: {description}
                 custom_monitored_paths: vec![DesktopCustomMonitoredPath {
                     id: "".to_string(),
                     name: "  Team Memory  ".to_string(),
-                    path: "  /tmp/metis/team-memory  ".to_string(),
+                    path: format!("  {}  ", custom_monitor.to_string_lossy()),
                 }],
                 team_policy_path: Some("  /tmp/metis/team-policy.json  ".to_string()),
                 enterprise_network: DesktopEnterpriseNetworkSettings::default(),
+                software_update: DesktopSoftwareUpdateSettings::default(),
             },
         )
         .expect("settings should save");
@@ -4151,6 +4207,7 @@ description: {description}
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
 
         assert!(default_settings.custom_scan_paths.is_empty());
+        assert!(default_settings.software_update.check_on_startup);
         assert_eq!(
             saved.custom_scan_paths,
             vec!["/tmp/metis/custom", "/tmp/metis/other"]
@@ -4167,7 +4224,7 @@ description: {description}
             vec![DesktopCustomMonitoredPath {
                 id: "monitor-1".to_string(),
                 name: "Team Memory".to_string(),
-                path: "/tmp/metis/team-memory".to_string(),
+                path: custom_monitor.to_string_lossy().to_string(),
             }]
         );
         assert_eq!(loaded, saved);
@@ -4175,6 +4232,72 @@ description: {description}
             loaded.team_policy_path.as_deref(),
             Some("/tmp/metis/team-policy.json")
         );
+        assert!(loaded.software_update.check_on_startup);
+    }
+
+    #[test]
+    fn desktop_settings_rejects_missing_custom_monitored_paths_without_writing() {
+        let workspace = temp_dir("settings-missing-custom-monitor");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        let missing_path = workspace.join("missing-team-memory");
+
+        let error = save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                custom_monitored_paths: vec![DesktopCustomMonitoredPath {
+                    id: "team-memory".to_string(),
+                    name: "团队记忆".to_string(),
+                    path: missing_path.to_string_lossy().to_string(),
+                }],
+                ..Default::default()
+            },
+        )
+        .expect_err("missing custom monitor should be rejected");
+
+        assert!(error.contains("自定义路径不可用"));
+        assert!(!state.settings_path().exists());
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn desktop_settings_backfills_software_update_and_preserves_saved_toggle() {
+        let workspace = temp_dir("settings-software-update");
+        let state = DesktopAppState::new(workspace.join("data"), workspace.join("cache"));
+        state
+            .ensure_dirs()
+            .expect("settings directory should exist");
+        fs::write(
+            state.settings_path(),
+            r#"{
+  "custom_scan_paths": [],
+  "agent_path_overrides": [],
+  "custom_monitored_paths": [],
+  "team_policy_path": null,
+  "enterprise_network": {}
+}"#,
+        )
+        .expect("legacy settings should be written");
+
+        let legacy = get_desktop_settings_for_state(&state)
+            .expect("legacy settings should load with defaults");
+        assert!(legacy.software_update.check_on_startup);
+
+        let saved = save_desktop_settings_for_state(
+            &state,
+            DesktopSettings {
+                software_update: DesktopSoftwareUpdateSettings {
+                    check_on_startup: false,
+                },
+                ..legacy
+            },
+        )
+        .expect("software update setting should save");
+        let loaded = get_desktop_settings_for_state(&state).expect("settings should reload");
+
+        fs::remove_dir_all(&workspace).expect("workspace should be removed");
+
+        assert!(!saved.software_update.check_on_startup);
+        assert!(!loaded.software_update.check_on_startup);
     }
 
     #[test]

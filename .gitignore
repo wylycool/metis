@@ -45,3 +45,6 @@ release/
 *.AppImage
 *.msi
 *.exe
+
+# Internal project documents (kept locally, never published)
+internal-docs/
