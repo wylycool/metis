@@ -138,9 +138,13 @@ describe("Metis desktop GUI main flow", () => {
     expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("false");
     await user.click(sourceHelpButton);
     expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("true");
-    expect(sourceUrlHelp.getByText("复制 Skill 文件夹链接")).toBeTruthy();
-    expect(sourceUrlHelp.getByText("页面中能看到 SKILL.md 时，直接复制地址栏。")).toBeTruthy();
-    expect(sourceUrlHelp.getByText("不要填写仓库首页或 clone 地址。")).toBeTruthy();
+    expect(sourceUrlHelp.getByText("填写 Skill 来源链接")).toBeTruthy();
+    expect(
+      sourceUrlHelp.getByText("推荐粘贴能看到 SKILL.md 的目录页面链接，可自动识别 Skill 路径。"),
+    ).toBeTruthy();
+    expect(
+      sourceUrlHelp.getByText("也支持仓库首页或 clone 地址，但需要手动填写 Skill 路径。"),
+    ).toBeTruthy();
     expect(sourceUrlHelp.getByText("页面里有 SKILL.md")).toBeTruthy();
     expect(sourceUrlHelp.queryByText("不要停在仓库首页或上级目录。")).toBeNull();
     expect(sourceUrlHelp.queryByText("Metis 会自动识别")).toBeNull();
@@ -151,8 +155,9 @@ describe("Metis desktop GUI main flow", () => {
     await user.click(sourceDrawer.getByText("Skill 路径"));
     expect(sourceHelpButton.getAttribute("aria-expanded")).toBe("false");
     expect((screen.getByTestId("bind-url-e2e-skill") as HTMLInputElement).placeholder).toBe(
-      "粘贴能看到 SKILL.md 的文件夹页面链接",
+      "粘贴 Skill 目录页面链接或仓库地址",
     );
+    expect(screen.getByLabelText("Skill 来源链接")).toBeTruthy();
     expect(sourceDrawer.queryByText(/multica-ai|andrej-karpathy/)).toBeNull();
     const sourceSettings = within(sourceDrawer.getByTestId("source-settings-grid-e2e-skill"));
     expect(sourceDrawer.getByText("分支")).toBeTruthy();
