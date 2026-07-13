@@ -2795,7 +2795,10 @@ function agentPathRows(agents: DesktopAgentStatus[]) {
     { agent_id: "claude-code", agent_name: "Claude Code", path: "~/.claude/skills", exists: false },
     { agent_id: "openclaw", agent_name: "OpenClaw", path: "~/.openclaw/skills", exists: false },
     { agent_id: "hermes", agent_name: "Hermes", path: "~/.hermes/skills", exists: false },
-    { agent_id: "opencode", agent_name: "opencode", path: "~/.opencode/skills", exists: false },
+    { agent_id: "opencode", agent_name: "opencode", path: "~/.config/opencode/skill", exists: false },
+    { agent_id: "cursor", agent_name: "Cursor", path: "~/.cursor/skills", exists: false },
+    { agent_id: "qoder", agent_name: "Qoder", path: "~/.qoder/skills", exists: false },
+    { agent_id: "gemini-cli", agent_name: "Gemini CLI", path: "~/.gemini/skills", exists: false },
     { agent_id: "generic", agent_name: "Generic", path: "自定义路径", exists: false },
   ];
 

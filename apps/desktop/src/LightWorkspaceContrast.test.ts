@@ -851,6 +851,10 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-foreground: #343a46;");
     expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #e3e8ef;");
     expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-foreground: #334155;");
+    expect(latestBlockFor(".agent-badge-qoder")).toContain("--agent-badge-background: #ebe7ff;");
+    expect(latestBlockFor(".agent-badge-qoder")).toContain("--agent-badge-foreground: #5b4bc4;");
+    expect(latestBlockFor(".agent-badge-gemini-cli")).toContain("--agent-badge-background: #e4efff;");
+    expect(latestBlockFor(".agent-badge-gemini-cli")).toContain("--agent-badge-foreground: #3974d8;");
     expect(latestBlockFor(".agent-badge-openclaw")).toContain(
       "--agent-badge-background: #f7cccc;",
     );

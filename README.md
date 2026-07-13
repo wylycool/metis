@@ -4,7 +4,7 @@
 
 [简体中文](docs/zh-CN/README.md) | [English](docs/en/README.md) | [下载 Metis](https://github.com/wylycool/metis/releases)
 
-Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code、OpenClaw、Hermes、opencode 等 Agent 工具中的 Skills。
+Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code、OpenClaw、Hermes、opencode、Cursor、Qoder、Gemini CLI 等 Agent 工具中的 Skills。
 
 如果你同时使用多个 Agent，或者本机已经积累了很多来自不同 Git 仓库的 Skills，Metis 可以帮你回答这些问题：
 
@@ -88,6 +88,9 @@ Metis 当前内置以下 Agent 路径支持：
 - OpenClaw
 - Hermes
 - opencode
+- Cursor
+- Qoder
+- Gemini CLI
 - 通用 Agent Skills 目录
 - 用户自定义路径
 

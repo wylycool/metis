@@ -20,7 +20,7 @@ chmod +x Metis_*.AppImage
 
 ## 2. 扫描本机 Skills
 
-打开 Metis 后进入 `Skills`，点击重新扫描。Metis 会检查 Codex、Claude Code、OpenClaw、Hermes、opencode 和自定义路径。
+打开 Metis 后进入 `Skills`，点击重新扫描。Metis 会检查 Codex、Claude Code、OpenClaw、Hermes、opencode、Cursor、Qoder、Gemini CLI 和自定义路径。
 
 如果没有发现内容，请进入 `Settings` 检查 Agent 路径，并确认目标目录包含 `SKILL.md`。
 

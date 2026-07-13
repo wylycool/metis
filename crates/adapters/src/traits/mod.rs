@@ -266,9 +266,12 @@ mod tests {
     use super::*;
     use crate::claude_code::ClaudeCodeAdapter;
     use crate::codex::CodexAdapter;
+    use crate::cursor::CursorAdapter;
+    use crate::gemini_cli::GeminiCliAdapter;
     use crate::hermes::HermesAdapter;
     use crate::openclaw::OpenClawAdapter;
     use crate::opencode::OpencodeAdapter;
+    use crate::qoder::QoderAdapter;
 
     #[test]
     fn expands_install_path_template_variables_and_name() {
@@ -288,6 +291,9 @@ mod tests {
             Box::new(OpenClawAdapter::new()),
             Box::new(HermesAdapter::new()),
             Box::new(OpencodeAdapter::new()),
+            Box::new(CursorAdapter::new()),
+            Box::new(QoderAdapter::new()),
+            Box::new(GeminiCliAdapter::new()),
         ];
 
         let roots = adapters
@@ -299,12 +305,15 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        assert_eq!(roots.len(), 5);
+        assert_eq!(roots.len(), 8);
         assert_eq!(roots[0].agent_id, "codex");
         assert_eq!(roots[1].agent_id, "claude-code");
         assert_eq!(roots[2].agent_id, "openclaw");
         assert_eq!(roots[3].agent_id, "hermes");
         assert_eq!(roots[4].agent_id, "opencode");
+        assert_eq!(roots[5].agent_id, "cursor");
+        assert_eq!(roots[6].agent_id, "qoder");
+        assert_eq!(roots[7].agent_id, "gemini-cli");
         assert!(roots.iter().all(|root| root.scope == SkillScope::User));
         assert!(roots
             .iter()

@@ -173,7 +173,7 @@ const previewSkills: PreviewSkill[] = [
     sourceRef: "main",
     trusted: true,
     autoUpdate: false,
-    agents: ["codex", "claude-code", "cursor", "openclaw", "hermes", "opencode", "generic"],
+    agents: ["codex", "claude-code", "cursor", "qoder", "gemini-cli", "openclaw", "hermes", "opencode", "generic"],
     accentStart: "#8fa8ff",
     accentEnd: "#69cdbd",
   },
@@ -184,7 +184,10 @@ const agentPaths: AgentPath[] = [
   { id: "claude-code", name: "Claude Code", path: "~/.claude/skills", status: "ready" },
   { id: "openclaw", name: "OpenClaw", path: "~/Library/Application Support/OpenClaw/skills", status: "missing" },
   { id: "hermes", name: "Hermes", path: "~/.hermes/skills", status: "ready" },
-  { id: "opencode", name: "opencode", path: "~/.config/opencode/skills", status: "ready" },
+  { id: "opencode", name: "opencode", path: "~/.config/opencode/skill", status: "ready" },
+  { id: "cursor", name: "Cursor", path: "~/.cursor/skills", status: "ready" },
+  { id: "qoder", name: "Qoder", path: "~/.qoder/skills", status: "ready" },
+  { id: "gemini-cli", name: "Gemini CLI", path: "~/.gemini/skills", status: "ready" },
   { id: "generic", name: "Generic", path: "~/agent-skills", status: "ready" },
 ];
 
@@ -883,10 +886,12 @@ function previewAgentIdentity(agentId: string): AgentIdentity {
     "claude-code": "Claude Code",
     codex: "Codex",
     cursor: "Cursor",
+    "gemini-cli": "Gemini CLI",
     generic: "Generic Agent Skills",
     hermes: "Hermes",
     openclaw: "OpenClaw",
     opencode: "opencode",
+    qoder: "Qoder",
   };
   return { agent_id: agentId, agent_name: names[agentId] ?? agentId };
 }

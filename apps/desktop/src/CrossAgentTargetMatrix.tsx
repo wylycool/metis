@@ -330,6 +330,9 @@ function agentNameFromId(agentId: string) {
     openclaw: "OpenClaw",
     hermes: "Hermes",
     opencode: "opencode",
+    cursor: "Cursor",
+    qoder: "Qoder",
+    "gemini-cli": "Gemini CLI",
     generic: "Generic Agent Skills",
   };
   return names[agentId] ?? agentId;

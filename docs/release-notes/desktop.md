@@ -15,7 +15,7 @@ Metis is a cross-platform, local-first Agent Skill manager.
 
 ### Highlights
 
-- Discover Skills installed for Codex, Claude Code, OpenClaw, Hermes, opencode, and custom paths.
+- Discover Skills installed for Codex, Claude Code, OpenClaw, Hermes, opencode, Cursor, Qoder, Gemini CLI, and custom paths.
 - Bind local Skills to Git sources and check for updates on demand.
 - Review file changes and local modifications before updating.
 - Create backups before replacement and restore previous versions.
@@ -46,7 +46,7 @@ Metis 是一个跨平台、本地优先的 Agent Skill 管理器。
 
 ### 主要能力
 
-- 发现 Codex、Claude Code、OpenClaw、Hermes、opencode 和自定义路径中的 Skills。
+- 发现 Codex、Claude Code、OpenClaw、Hermes、opencode、Cursor、Qoder、Gemini CLI 和自定义路径中的 Skills。
 - 为本地 Skill 绑定 Git 来源，并按需检查更新。
 - 更新前查看文件变化和本地修改状态。
 - 覆盖前创建备份，并支持恢复旧版本。

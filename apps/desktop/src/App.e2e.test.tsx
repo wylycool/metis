@@ -1452,6 +1452,18 @@ describe("Metis desktop GUI main flow", () => {
     const hermesPathRow = screen.getByTestId("settings-agent-path-hermes");
     expect(hermesPathRow.className).toContain("missing");
     expect(within(hermesPathRow).queryByText("路径不存在")).toBeNull();
+    expect((screen.getByTestId("agent-path-opencode") as HTMLInputElement).value).toBe(
+      "~/.config/opencode/skill",
+    );
+    expect((screen.getByTestId("agent-path-cursor") as HTMLInputElement).value).toBe(
+      "~/.cursor/skills",
+    );
+    expect((screen.getByTestId("agent-path-qoder") as HTMLInputElement).value).toBe(
+      "~/.qoder/skills",
+    );
+    expect((screen.getByTestId("agent-path-gemini-cli") as HTMLInputElement).value).toBe(
+      "~/.gemini/skills",
+    );
 
     const codexPathRow = screen.getByTestId("settings-agent-path-codex");
     const codexPathInput = screen.getByTestId("agent-path-codex") as HTMLInputElement;
@@ -1946,6 +1958,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(previewAgentStack.getByTestId("agent-badge-openclaw")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-badge-hermes")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-badge-opencode")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-qoder")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-badge-gemini-cli")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-badge-generic")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-codex")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-claude-code")).toBeTruthy();
@@ -1953,6 +1967,8 @@ describe("Metis desktop GUI main flow", () => {
     expect(previewAgentStack.getByTestId("agent-logo-openclaw")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-hermes")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-opencode")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-qoder")).toBeTruthy();
+    expect(previewAgentStack.getByTestId("agent-logo-gemini-cli")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-generic")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-codex-terminal-cloud")).toBeTruthy();
     expect(previewAgentStack.getByTestId("agent-logo-cursor-hollow-square")).toBeTruthy();
@@ -2015,7 +2031,7 @@ describe("Metis desktop GUI main flow", () => {
     );
     expect(opencodeInstall.getByTestId("agent-logo-opencode")).toBeTruthy();
     expect(opencodeInstall.getByText("opencode")).toBeTruthy();
-    expect(opencodeInstall.getByText("~/.config/opencode/skills/memory-weaver")).toBeTruthy();
+    expect(opencodeInstall.getByText("~/.config/opencode/skill/memory-weaver")).toBeTruthy();
     expect(screen.getByTestId("redesign-update-workbench")).toBeTruthy();
 
     await user.click(screen.getByTestId("redesign-open-source-drawer"));

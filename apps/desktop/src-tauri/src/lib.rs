@@ -2861,6 +2861,9 @@ fn agent_name(agent_id: &str) -> &str {
         "openclaw" => "OpenClaw",
         "hermes" => "Hermes",
         "opencode" => "opencode",
+        "cursor" => "Cursor",
+        "qoder" => "Qoder",
+        "gemini-cli" => "Gemini CLI",
         "generic" => "Generic Agent Skills",
         _ => agent_id,
     }
@@ -3223,7 +3226,7 @@ mod tests {
         )
         .expect("targets should load");
 
-        assert_eq!(targets.len(), 6);
+        assert_eq!(targets.len(), 9);
         assert!(targets.iter().all(|target| target.agent_id != "generic"));
         let codex_target = targets
             .iter()
@@ -3238,6 +3241,20 @@ mod tests {
             codex_root.join("example").to_string_lossy().to_string()
         );
         assert_eq!(codex_target.status, "NotInstalled");
+        for (agent_id, expected_root_suffix) in [
+            ("cursor", ".cursor/skills"),
+            ("qoder", ".qoder/skills"),
+            ("gemini-cli", ".gemini/skills"),
+        ] {
+            let target = targets
+                .iter()
+                .find(|target| target.agent_id == agent_id)
+                .expect("new builtin target should exist");
+            assert!(target.root_path.ends_with(expected_root_suffix));
+            assert!(target
+                .install_path
+                .ends_with(&format!("{expected_root_suffix}/example")));
+        }
 
         let custom_target = targets
             .iter()
@@ -4159,7 +4176,16 @@ description: {description}
             .collect::<Vec<_>>();
         assert_eq!(
             agent_ids,
-            vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
+            vec![
+                "codex",
+                "claude-code",
+                "openclaw",
+                "hermes",
+                "opencode",
+                "cursor",
+                "qoder",
+                "gemini-cli"
+            ]
         );
         assert!(agents.iter().all(|agent| !agent.paths.is_empty()));
     }

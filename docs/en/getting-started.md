@@ -20,7 +20,7 @@ chmod +x Metis_*.AppImage
 
 ## 2. Scan local Skills
 
-Open Metis, go to `Skills`, and run a new scan. Metis checks Codex, Claude Code, OpenClaw, Hermes, opencode, and custom paths.
+Open Metis, go to `Skills`, and run a new scan. Metis checks Codex, Claude Code, OpenClaw, Hermes, opencode, Cursor, Qoder, Gemini CLI, and custom paths.
 
 If nothing is found, check the Agent paths in `Settings` and confirm that the target directory contains `SKILL.md`.
 

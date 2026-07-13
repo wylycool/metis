@@ -5096,6 +5096,16 @@ textarea {
   --agent-badge-foreground: #343a46;
 }
 
+.agent-badge-qoder {
+  --agent-badge-background: #ebe7ff;
+  --agent-badge-foreground: #5b4bc4;
+}
+
+.agent-badge-gemini-cli {
+  --agent-badge-background: #e4efff;
+  --agent-badge-foreground: #3974d8;
+}
+
 .agent-badge-opencode {
   --agent-badge-background: #e3e8ef;
   --agent-badge-foreground: #334155;
