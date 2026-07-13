@@ -184,7 +184,7 @@ const agentPaths: AgentPath[] = [
   { id: "claude-code", name: "Claude Code", path: "~/.claude/skills", status: "ready" },
   { id: "openclaw", name: "OpenClaw", path: "~/Library/Application Support/OpenClaw/skills", status: "missing" },
   { id: "hermes", name: "Hermes", path: "~/.hermes/skills", status: "ready" },
-  { id: "opencode", name: "opencode", path: "~/.config/opencode/skill", status: "ready" },
+  { id: "opencode", name: "opencode", path: "~/.config/opencode/skills", status: "ready" },
   { id: "cursor", name: "Cursor", path: "~/.cursor/skills", status: "ready" },
   { id: "qoder", name: "Qoder", path: "~/.qoder/skills", status: "ready" },
   { id: "gemini-cli", name: "Gemini CLI", path: "~/.gemini/skills", status: "ready" },

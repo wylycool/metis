@@ -1453,7 +1453,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(hermesPathRow.className).toContain("missing");
     expect(within(hermesPathRow).queryByText("路径不存在")).toBeNull();
     expect((screen.getByTestId("agent-path-opencode") as HTMLInputElement).value).toBe(
-      "~/.config/opencode/skill",
+      "~/.config/opencode/skills",
     );
     expect((screen.getByTestId("agent-path-cursor") as HTMLInputElement).value).toBe(
       "~/.cursor/skills",
@@ -2031,7 +2031,7 @@ describe("Metis desktop GUI main flow", () => {
     );
     expect(opencodeInstall.getByTestId("agent-logo-opencode")).toBeTruthy();
     expect(opencodeInstall.getByText("opencode")).toBeTruthy();
-    expect(opencodeInstall.getByText("~/.config/opencode/skill/memory-weaver")).toBeTruthy();
+    expect(opencodeInstall.getByText("~/.config/opencode/skills/memory-weaver")).toBeTruthy();
     expect(screen.getByTestId("redesign-update-workbench")).toBeTruthy();
 
     await user.click(screen.getByTestId("redesign-open-source-drawer"));
@@ -3067,7 +3067,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(introCard.queryByText("Codex")).toBeNull();
     expect(introCard.queryByText("/Users/me/.codex/skills/codex-planner")).toBeNull();
     expect(introCard.queryByText("opencode")).toBeNull();
-    expect(introCard.queryByText("/Users/me/.opencode/skills/codex-planner")).toBeNull();
+    expect(introCard.queryByText("/Users/me/.config/opencode/skills/codex-planner")).toBeNull();
     expect(introCard.queryByText("/Users/me/.claude/skills/codex-planner")).toBeNull();
     expect(
       screen
@@ -3093,7 +3093,9 @@ describe("Metis desktop GUI main flow", () => {
     expect(formalAgentPaths.getByText("Codex")).toBeTruthy();
     expect(formalAgentPaths.getByText("/Users/me/.codex/skills/codex-planner")).toBeTruthy();
     expect(formalAgentPaths.queryByText("opencode")).toBeNull();
-    expect(formalAgentPaths.queryByText("/Users/me/.opencode/skills/codex-planner")).toBeNull();
+    expect(
+      formalAgentPaths.queryByText("/Users/me/.config/opencode/skills/codex-planner"),
+    ).toBeNull();
     expect(await formalAgentPaths.findByTestId("target-row-claude-code")).toBeTruthy();
     expect(formalAgentPaths.getByText("Claude Code")).toBeTruthy();
     expect(formalAgentPaths.getByText("/Users/me/.claude/skills/codex-planner")).toBeTruthy();
@@ -5656,8 +5658,8 @@ function createAgentDetailScenario(
             {
               agent_id: "opencode",
               agent_name: "opencode",
-              root_path: "/Users/me/.opencode/skills",
-              install_path: "/Users/me/.opencode/skills/codex-planner",
+              root_path: "/Users/me/.config/opencode/skills",
+              install_path: "/Users/me/.config/opencode/skills/codex-planner",
               status: "Installed",
               root_available: true,
               root_status: "available",
