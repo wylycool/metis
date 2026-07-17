@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -204,8 +205,8 @@ function launchTauriDev() {
     HOME: home,
     XDG_CONFIG_HOME: join(home, ".config"),
     GIT_CONFIG_GLOBAL: gitconfig,
-    RUSTUP_HOME: process.env.RUSTUP_HOME || "/Users/example/.rustup",
-    CARGO_HOME: process.env.CARGO_HOME || "/Users/example/.cargo",
+    RUSTUP_HOME: process.env.RUSTUP_HOME || join(homedir(), ".rustup"),
+    CARGO_HOME: process.env.CARGO_HOME || join(homedir(), ".cargo"),
   };
   const child = spawn("pnpm", ["tauri", "dev"], {
     cwd: desktopDir,

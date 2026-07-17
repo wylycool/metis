@@ -739,10 +739,10 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".redesign-skill-card")).toContain("-webkit-line-clamp: 2;");
     expect(latestBlockFor(".redesign-agent-stack")).toContain("margin-left: -7px;");
-    expect(latestBlockFor(".redesign-github-link")).toContain("width: 42px;");
-    expect(latestBlockFor(".redesign-github-link")).toContain("height: 42px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("width: 48px;");
+    expect(latestBlockFor(".redesign-github-link")).toContain("height: 48px;");
     expect(latestBlockFor(".redesign-github-link")).toContain("border-radius: 14px;");
-    expect(latestBlockFor(".redesign-github-link svg")).toContain("width: 20px;");
+    expect(latestBlockFor(".redesign-github-link svg")).toContain("width: 19px;");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("position: fixed");
     expect(latestBlockFor(".redesign-source-drawer")).toContain("right: 0");
     expect(stylesheet).toMatch(/\.redesign-diff-viewer\s*\{[\s\S]*font-family:/);
@@ -851,6 +851,10 @@ describe("Phase 6 light workspace contrast", () => {
     expect(latestBlockFor(".agent-badge-cursor")).toContain("--agent-badge-foreground: #343a46;");
     expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-background: #e3e8ef;");
     expect(latestBlockFor(".agent-badge-opencode")).toContain("--agent-badge-foreground: #334155;");
+    expect(latestBlockFor(".agent-badge-qoder")).toContain("--agent-badge-background: #ebe7ff;");
+    expect(latestBlockFor(".agent-badge-qoder")).toContain("--agent-badge-foreground: #5b4bc4;");
+    expect(latestBlockFor(".agent-badge-gemini-cli")).toContain("--agent-badge-background: #e4efff;");
+    expect(latestBlockFor(".agent-badge-gemini-cli")).toContain("--agent-badge-foreground: #3974d8;");
     expect(latestBlockFor(".agent-badge-openclaw")).toContain(
       "--agent-badge-background: #f7cccc;",
     );
@@ -994,14 +998,20 @@ describe("Phase 6 light workspace contrast", () => {
     );
     expect(latestBlockFor(".metis-sidebar-footer")).toContain("align-self: end;");
     expect(latestBlockFor(".metis-sidebar-footer")).toContain("display: flex;");
-    expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 42px;");
-    expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 42px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("width: 48px;");
+    expect(latestBlockFor(".metis-sidebar-github")).toContain("height: 48px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border-radius: 14px;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("border: 0;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("box-shadow: none;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("align-self: center;");
     expect(latestBlockFor(".metis-sidebar-github")).toContain("justify-self: start;");
-    expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 20px;");
+    expect(latestBlockFor(".metis-sidebar-github svg")).toContain("width: 19px;");
+    const emptyAction = latestBlockFor(
+      ".metis-shell.redesign-app-window .empty-actions button.empty-state-action",
+    );
+    expect(emptyAction).toContain("min-height: 44px;");
+    expect(emptyAction).toContain("border-radius: 12px;");
+    expect(emptyAction).toContain("padding: 0 22px;");
     expect(stylesheet).toMatch(/\.app-shell\.redesign-main\s*\{[\s\S]*padding:\s*24px;/);
     expect(stylesheet).toMatch(
       /\.topbar\.redesign-page-topbar\s*\{[\s\S]*grid-template-columns:\s*minmax\(120px,\s*0\.42fr\) minmax\(0,\s*1fr\) auto;/,

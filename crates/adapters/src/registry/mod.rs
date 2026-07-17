@@ -1,9 +1,12 @@
 use crate::claude_code::ClaudeCodeAdapter;
 use crate::codex::CodexAdapter;
+use crate::cursor::CursorAdapter;
+use crate::gemini_cli::GeminiCliAdapter;
 use crate::generic::GenericAgentSkillsAdapter;
 use crate::hermes::HermesAdapter;
 use crate::openclaw::OpenClawAdapter;
 use crate::opencode::OpencodeAdapter;
+use crate::qoder::QoderAdapter;
 use crate::traits::AgentAdapter;
 
 /// 管理所有已注册的 Adapter
@@ -60,6 +63,9 @@ impl AdapterRegistry {
         registry.register(Box::new(OpenClawAdapter::new()));
         registry.register(Box::new(HermesAdapter::new()));
         registry.register(Box::new(OpencodeAdapter::new()));
+        registry.register(Box::new(CursorAdapter::new()));
+        registry.register(Box::new(QoderAdapter::new()));
+        registry.register(Box::new(GeminiCliAdapter::new()));
         registry.register(Box::new(GenericAgentSkillsAdapter::new(vec![])));
         registry
     }
@@ -92,6 +98,9 @@ mod tests {
                 "openclaw",
                 "hermes",
                 "opencode",
+                "cursor",
+                "qoder",
+                "gemini-cli",
                 "generic"
             ]
         );
@@ -108,7 +117,16 @@ mod tests {
 
         assert_eq!(
             agent_ids,
-            vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
+            vec![
+                "codex",
+                "claude-code",
+                "openclaw",
+                "hermes",
+                "opencode",
+                "cursor",
+                "qoder",
+                "gemini-cli"
+            ]
         );
     }
 }

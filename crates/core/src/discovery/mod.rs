@@ -1,10 +1,13 @@
 use chrono::{DateTime, Utc};
 use metis_adapters::claude_code::ClaudeCodeAdapter;
 use metis_adapters::codex::CodexAdapter;
+use metis_adapters::cursor::CursorAdapter;
+use metis_adapters::gemini_cli::GeminiCliAdapter;
 use metis_adapters::generic::GenericAgentSkillsAdapter;
 use metis_adapters::hermes::HermesAdapter;
 use metis_adapters::openclaw::OpenClawAdapter;
 use metis_adapters::opencode::OpencodeAdapter;
+use metis_adapters::qoder::QoderAdapter;
 use metis_adapters::standard::{discover_standard_skill_dirs, parse_standard_skill_metadata};
 use metis_adapters::traits::SkillCategory;
 use metis_adapters::{AdapterError, AdapterRegistry, AgentAdapter, SkillScope};
@@ -330,6 +333,9 @@ fn build_registry(custom_paths: Vec<String>) -> AdapterRegistry {
     registry.register(Box::new(OpenClawAdapter::new()));
     registry.register(Box::new(HermesAdapter::new()));
     registry.register(Box::new(OpencodeAdapter::new()));
+    registry.register(Box::new(CursorAdapter::new()));
+    registry.register(Box::new(QoderAdapter::new()));
+    registry.register(Box::new(GeminiCliAdapter::new()));
     if !custom_paths.is_empty() {
         registry.register(Box::new(GenericAgentSkillsAdapter::new(custom_paths)));
     }
@@ -681,7 +687,16 @@ mod tests {
 
         assert_eq!(
             agent_ids,
-            vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
+            vec![
+                "codex",
+                "claude-code",
+                "openclaw",
+                "hermes",
+                "opencode",
+                "cursor",
+                "qoder",
+                "gemini-cli"
+            ]
         );
     }
 

@@ -3923,6 +3923,14 @@ textarea {
   font-size: 11.5px;
 }
 
+.metis-shell.redesign-app-window .empty-actions button.empty-state-action {
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 0 22px;
+  font-size: 14px;
+  font-weight: 760;
+}
+
 .metis-shell.redesign-app-window button.metis-action-button:disabled:not(.is-busy) {
   border-color: #e1e8f1;
   color: #8290a7;
@@ -5088,6 +5096,16 @@ textarea {
   --agent-badge-foreground: #343a46;
 }
 
+.agent-badge-qoder {
+  --agent-badge-background: #ebe7ff;
+  --agent-badge-foreground: #5b4bc4;
+}
+
+.agent-badge-gemini-cli {
+  --agent-badge-background: #e4efff;
+  --agent-badge-foreground: #3974d8;
+}
+
 .agent-badge-opencode {
   --agent-badge-background: #e3e8ef;
   --agent-badge-foreground: #334155;
@@ -5405,8 +5423,8 @@ textarea {
 }
 
 .metis-sidebar-github {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   align-self: center;
@@ -5432,8 +5450,8 @@ textarea {
 }
 
 .metis-sidebar-github svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   fill: currentColor;
 }
 
@@ -7428,8 +7446,8 @@ textarea {
 }
 
 .redesign-github-link {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   align-self: center;
@@ -7455,8 +7473,8 @@ textarea {
 }
 
 .redesign-github-link svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   fill: currentColor;
 }
 

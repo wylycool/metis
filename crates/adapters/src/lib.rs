@@ -5,10 +5,13 @@
 
 pub mod claude_code;
 pub mod codex;
+pub mod cursor;
+pub mod gemini_cli;
 pub mod generic;
 pub mod hermes;
 pub mod openclaw;
 pub mod opencode;
+pub mod qoder;
 pub mod registry;
 pub mod standard;
 pub mod traits;

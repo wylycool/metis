@@ -1,4 +1,5 @@
 use crate::fetch::{GitCliProvider, GitCommandRunner, GitProviderError};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::time::Instant;
@@ -39,12 +40,15 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
         let checkout_dir = cache_checkout_dir(request);
         let checkout_dir_text = checkout_dir.to_string_lossy().to_string();
         let cache_exists = checkout_dir.exists();
+        let source_key = git_source_log_key(&request.url, &request.repo_path, &request.ref_);
+        let path_depth = repo_path_depth(&request.repo_path).to_string();
         perf_log(
             "checkout",
             &[
                 ("stage", "start".to_string()),
-                ("repo_path", request.repo_path.clone()),
-                ("ref", request.ref_.clone()),
+                ("source_key", source_key.clone()),
+                ("repo_path_depth", path_depth.clone()),
+                ("ref_present", (!request.ref_.trim().is_empty()).to_string()),
                 ("cache_hit", cache_exists.to_string()),
             ],
         );
@@ -121,7 +125,8 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
                 &[
                     ("stage", "sparse_checkout".to_string()),
                     ("elapsed_ms", elapsed_ms(sparse_start)),
-                    ("repo_path", request.repo_path.clone()),
+                    ("source_key", source_key.clone()),
+                    ("repo_path_depth", path_depth.clone()),
                 ],
             );
         }
@@ -164,7 +169,8 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
                     &[
                         ("stage", "fetch".to_string()),
                         ("elapsed_ms", elapsed_ms(fetch_start)),
-                        ("ref", request.ref_.clone()),
+                        ("source_key", source_key.clone()),
+                        ("ref_present", (!request.ref_.trim().is_empty()).to_string()),
                         ("fetch_fallback", "true".to_string()),
                     ],
                 );
@@ -199,7 +205,8 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
             &[
                 ("stage", "total".to_string()),
                 ("elapsed_ms", elapsed_ms(total_start)),
-                ("repo_path", request.repo_path.clone()),
+                ("source_key", source_key),
+                ("repo_path_depth", path_depth),
                 ("cache_hit", cache_exists.to_string()),
             ],
         );
@@ -209,6 +216,26 @@ impl<R: GitCommandRunner> GitCliProvider<R> {
             skill_dir: skill_dir.to_string_lossy().to_string(),
         })
     }
+}
+
+pub fn git_source_log_key(url: &str, repo_path: &str, ref_: &str) -> String {
+    let mut hasher = Sha256::new();
+    for value in [url, repo_path, ref_] {
+        hasher.update(value.len().to_le_bytes());
+        hasher.update(value.as_bytes());
+    }
+    let digest = hasher.finalize();
+    digest[..6]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+pub fn repo_path_depth(repo_path: &str) -> usize {
+    Path::new(repo_path)
+        .components()
+        .filter(|component| matches!(component, Component::Normal(_)))
+        .count()
 }
 
 fn find_reference_checkout_dir(
@@ -467,6 +494,23 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn diagnostic_source_key_is_stable_and_does_not_reveal_source_fields() {
+        let url = "https://git.example.com/example/repository.git";
+        let repo_path = "skills/private-example";
+        let ref_ = "feature/example";
+        let first = git_source_log_key(url, repo_path, ref_);
+        let second = git_source_log_key(url, repo_path, ref_);
+
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 12);
+        assert!(!first.contains("private-example"));
+        assert_eq!(repo_path_depth(repo_path), 2);
+        let source = include_str!("mod.rs");
+        assert!(!source.contains("(\"repo_path\","));
+        assert!(!source.contains("(\"ref\","));
+    }
 
     struct FakeRunner {
         calls: RefCell<Vec<Vec<String>>>,

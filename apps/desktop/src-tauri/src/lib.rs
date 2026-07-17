@@ -59,12 +59,16 @@ use metis_git_provider::fetch::{EnvironmentGitRunner, GitCliProvider};
 use metis_security::findings::{SecurityFinding, SecuritySeverity};
 use metis_storage::db::{SkillIndexStore, SkillRecord, SourceRecord};
 use serde::{Deserialize, Serialize};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+mod git_runtime;
 mod software_update;
+use git_runtime::{run_detection_git, GitRuntime, GitRuntimeManager};
 use software_update::{
     check_software_update, download_software_update, open_downloads_directory,
     open_software_update_installer, SoftwareUpdateState,
@@ -76,18 +80,23 @@ pub struct DesktopAppState {
     settings_path: PathBuf,
     backup_root: PathBuf,
     cache_root: PathBuf,
+    git_runtime: Arc<GitRuntimeManager>,
 }
 
 impl DesktopAppState {
     pub fn new(data_root: impl Into<PathBuf>, cache_root: impl Into<PathBuf>) -> Self {
         let data_root = data_root.into();
         let cache_root = cache_root.into().join("metis");
+        let git_runtime = Arc::new(GitRuntimeManager::system(
+            data_root.join("metis-git-runtime.json"),
+        ));
 
         Self {
             sqlite_path: data_root.join("metis.db"),
             settings_path: data_root.join("metis-settings.json"),
             backup_root: data_root.join("backups"),
             cache_root,
+            git_runtime,
         }
     }
 
@@ -116,6 +125,10 @@ impl DesktopAppState {
 
     pub fn cache_root(&self) -> &Path {
         &self.cache_root
+    }
+
+    fn git_runtime(&self, force_refresh: bool) -> Result<GitRuntime, String> {
+        self.git_runtime.current_or_resolve(force_refresh)
     }
 
     fn open_store(&self) -> Result<SkillIndexStore, String> {
@@ -941,13 +954,13 @@ pub trait GitVersionProbe {
     fn git_environment(&self) -> Result<GitEnvironmentProbeReport, String>;
 }
 
-struct SystemGitVersionProbe;
+struct SystemGitVersionProbe {
+    runtime: GitRuntime,
+}
 
 impl GitVersionProbe for SystemGitVersionProbe {
     fn git_environment(&self) -> Result<GitEnvironmentProbeReport, String> {
-        let output = Command::new("git")
-            .arg("--version")
-            .output()
+        let output = run_detection_git(&self.runtime, &[OsStr::new("--version")])
             .map_err(|error| format!("git unavailable: {error}"))?;
 
         if !output.status.success() {
@@ -968,7 +981,7 @@ impl GitVersionProbe for SystemGitVersionProbe {
             return Err("git unavailable: git --version returned empty output".to_string());
         }
 
-        run_local_git_clone_self_check()?;
+        run_local_git_clone_self_check(&self.runtime)?;
 
         Ok(GitEnvironmentProbeReport {
             version: stdout,
@@ -992,7 +1005,7 @@ pub fn test_git_environment_with_probe<P: GitVersionProbe>(
     })
 }
 
-fn run_local_git_clone_self_check() -> Result<(), String> {
+fn run_local_git_clone_self_check(runtime: &GitRuntime) -> Result<(), String> {
     let check_root = std::env::temp_dir().join(format!(
         "metis-git-check-{}-{}",
         std::process::id(),
@@ -1008,37 +1021,46 @@ fn run_local_git_clone_self_check() -> Result<(), String> {
         fs::create_dir_all(&check_root)
             .map_err(|error| format!("git unavailable: cannot create temp check dir: {error}"))?;
 
-        git_command_with_args(["init", "--bare"])
-            .arg(&origin_path)
-            .output()
-            .map_err(|error| format!("git unavailable: git init self-check failed: {error}"))
-            .and_then(|output| git_output_result(output, "git init self-check"))?;
+        run_detection_git(
+            runtime,
+            &[
+                OsStr::new("init"),
+                OsStr::new("--bare"),
+                origin_path.as_os_str(),
+            ],
+        )
+        .map_err(|error| format!("git unavailable: git init self-check failed: {error}"))
+        .and_then(|output| git_output_result(output, "git init self-check"))?;
 
-        git_command_with_args(["clone"])
-            .arg(&origin_path)
-            .arg(&clone_path)
-            .output()
-            .map_err(|error| format!("git unavailable: git clone self-check failed: {error}"))
-            .and_then(|output| git_output_result(output, "git clone self-check"))?;
+        run_detection_git(
+            runtime,
+            &[
+                OsStr::new("clone"),
+                origin_path.as_os_str(),
+                clone_path.as_os_str(),
+            ],
+        )
+        .map_err(|error| format!("git unavailable: git clone self-check failed: {error}"))
+        .and_then(|output| git_output_result(output, "git clone self-check"))?;
 
-        git_command_with_args(["-C"])
-            .arg(&clone_path)
-            .args(["fetch", "--dry-run", "origin"])
-            .output()
-            .map_err(|error| format!("git unavailable: git fetch self-check failed: {error}"))
-            .and_then(|output| git_output_result(output, "git fetch self-check"))?;
+        run_detection_git(
+            runtime,
+            &[
+                OsStr::new("-C"),
+                clone_path.as_os_str(),
+                OsStr::new("fetch"),
+                OsStr::new("--dry-run"),
+                OsStr::new("origin"),
+            ],
+        )
+        .map_err(|error| format!("git unavailable: git fetch self-check failed: {error}"))
+        .and_then(|output| git_output_result(output, "git fetch self-check"))?;
 
         Ok(())
     })();
 
     let _ = fs::remove_dir_all(&check_root);
     result
-}
-
-fn git_command_with_args<const N: usize>(args: [&str; N]) -> Command {
-    let mut command = Command::new("git");
-    command.args(args);
-    command
 }
 
 fn git_output_result(output: std::process::Output, label: &str) -> Result<(), String> {
@@ -1479,8 +1501,15 @@ fn check_path_status(path: String) -> DesktopAgentPath {
 }
 
 #[tauri::command]
-fn scan_skills(state: tauri::State<'_, DesktopAppState>) -> Result<DesktopScanResponse, String> {
-    scan_skills_for_state(&state, DesktopScanRequest::default())
+async fn scan_skills(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopScanResponse, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        scan_skills_for_state(&state, DesktopScanRequest::default())
+    })
+    .await
+    .map_err(|error| format!("扫描 Skill 后台任务失败: {error}"))?
 }
 
 #[tauri::command]
@@ -1572,9 +1601,14 @@ async fn test_source_connection(
 }
 
 #[tauri::command]
-async fn test_git_environment() -> Result<DesktopGitEnvironmentTestResult, String> {
+async fn test_git_environment(
+    state: tauri::State<'_, DesktopAppState>,
+) -> Result<DesktopGitEnvironmentTestResult, String> {
+    let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let probe = SystemGitVersionProbe;
+        let probe = SystemGitVersionProbe {
+            runtime: state.git_runtime(true).map_err(git_runtime_error)?,
+        };
         test_git_environment_with_probe(&probe)
     })
     .await
@@ -1790,8 +1824,11 @@ fn system_git_checker_for_state(
     state: &DesktopAppState,
 ) -> Result<GitCliProvider<EnvironmentGitRunner>, String> {
     let settings = get_desktop_settings_for_state(state)?;
+    let runtime = state.git_runtime(false).map_err(git_runtime_error)?;
+    let mut environment = runtime.environment();
+    environment.extend(git_environment_for_settings(&settings));
     Ok(GitCliProvider::with_cache_root(
-        EnvironmentGitRunner::new(git_environment_for_settings(&settings)),
+        EnvironmentGitRunner::with_executable(runtime.executable(), environment),
         state.cache_root().to_string_lossy().to_string(),
     ))
 }
@@ -2039,6 +2076,10 @@ fn git_environment_for_settings(settings: &DesktopSettings) -> Vec<(String, Stri
         environment.push(("GIT_SSL_CAINFO".to_string(), ca_bundle_path.clone()));
     }
     environment
+}
+
+fn git_runtime_error(error: String) -> String {
+    friendly_desktop_error(&format!("git unavailable: {error}")).wire_string()
 }
 
 fn list_indexed_skills_from_store(
@@ -2658,6 +2699,16 @@ fn friendly_desktop_error(message: &str) -> DesktopError {
         );
     }
 
+    if lower.contains("未找到可用 git") {
+        return desktop_error(
+            "git_unavailable",
+            "无法使用 Git",
+            "未找到可用 Git",
+            "",
+            message,
+        );
+    }
+
     if lower.contains("git unavailable") {
         return desktop_error(
             "git_unavailable",
@@ -2810,6 +2861,9 @@ fn agent_name(agent_id: &str) -> &str {
         "openclaw" => "OpenClaw",
         "hermes" => "Hermes",
         "opencode" => "opencode",
+        "cursor" => "Cursor",
+        "qoder" => "Qoder",
+        "gemini-cli" => "Gemini CLI",
         "generic" => "Generic Agent Skills",
         _ => agent_id,
     }
@@ -2819,6 +2873,16 @@ fn agent_name(agent_id: &str) -> &str {
 pub fn run() {
     let app_state =
         DesktopAppState::from_system_paths().expect("desktop state should initialize paths");
+    let startup_git_state = app_state.clone();
+    std::thread::spawn(move || {
+        eprintln!("[metis][git-runtime] startup background initialization");
+        if let Err(error) = startup_git_state.git_runtime(false) {
+            eprintln!(
+                "[metis][git-runtime] startup initialization failed reason={}",
+                error.split(':').next().unwrap_or("unknown")
+            );
+        }
+    });
 
     tauri::Builder::default()
         .manage(app_state)
@@ -3162,7 +3226,7 @@ mod tests {
         )
         .expect("targets should load");
 
-        assert_eq!(targets.len(), 6);
+        assert_eq!(targets.len(), 9);
         assert!(targets.iter().all(|target| target.agent_id != "generic"));
         let codex_target = targets
             .iter()
@@ -3177,6 +3241,20 @@ mod tests {
             codex_root.join("example").to_string_lossy().to_string()
         );
         assert_eq!(codex_target.status, "NotInstalled");
+        for (agent_id, expected_root_suffix) in [
+            ("cursor", ".cursor/skills"),
+            ("qoder", ".qoder/skills"),
+            ("gemini-cli", ".gemini/skills"),
+        ] {
+            let target = targets
+                .iter()
+                .find(|target| target.agent_id == agent_id)
+                .expect("new builtin target should exist");
+            assert!(target.root_path.ends_with(expected_root_suffix));
+            assert!(target
+                .install_path
+                .ends_with(&format!("{expected_root_suffix}/example")));
+        }
 
         let custom_target = targets
             .iter()
@@ -4098,7 +4176,16 @@ description: {description}
             .collect::<Vec<_>>();
         assert_eq!(
             agent_ids,
-            vec!["codex", "claude-code", "openclaw", "hermes", "opencode"]
+            vec![
+                "codex",
+                "claude-code",
+                "openclaw",
+                "hermes",
+                "opencode",
+                "cursor",
+                "qoder",
+                "gemini-cli"
+            ]
         );
         assert!(agents.iter().all(|agent| !agent.paths.is_empty()));
     }
@@ -4314,7 +4401,7 @@ description: {description}
                     proxy_url: Some("  http://proxy.corp.example:8080  ".to_string()),
                     no_proxy: Some("  localhost,127.0.0.1,.corp.example  ".to_string()),
                     certificate_authority_bundle_path: Some(
-                        "  /Users/me/certs/corp-ca.pem  ".to_string(),
+                        "  /Users/example/certs/corp-ca.pem  ".to_string(),
                     ),
                 },
                 ..Default::default()
@@ -4338,7 +4425,7 @@ description: {description}
                 .enterprise_network
                 .certificate_authority_bundle_path
                 .as_deref(),
-            Some("/Users/me/certs/corp-ca.pem")
+            Some("/Users/example/certs/corp-ca.pem")
         );
         assert_eq!(
             environment,
@@ -4357,7 +4444,7 @@ description: {description}
                 ),
                 (
                     "GIT_SSL_CAINFO".to_string(),
-                    "/Users/me/certs/corp-ca.pem".to_string()
+                    "/Users/example/certs/corp-ca.pem".to_string()
                 ),
             ]
         );
@@ -4982,6 +5069,18 @@ description: {description}
             error.suggestion,
             "请检查分支名，或者可以手动修改为正确的分支名"
         );
+        assert_eq!(error.debug_detail.as_deref(), Some(raw));
+    }
+
+    #[test]
+    fn desktop_error_reports_missing_windows_path_git_without_install_prompt() {
+        let raw = "git unavailable: 未找到可用 Git";
+        let error = friendly_desktop_error(raw);
+
+        assert_eq!(error.category, "git_unavailable");
+        assert_eq!(error.title, "无法使用 Git");
+        assert_eq!(error.message, "未找到可用 Git");
+        assert_eq!(error.suggestion, "");
         assert_eq!(error.debug_detail.as_deref(), Some(raw));
     }
 
@@ -5721,5 +5820,17 @@ description: {description}
         );
 
         fs::remove_dir_all(&workspace).expect("workspace should be removed");
+    }
+
+    #[test]
+    fn scan_skills_command_runs_filesystem_work_in_blocking_worker() {
+        let source = include_str!("lib.rs");
+        let start = source
+            .find("#[tauri::command]\nasync fn scan_skills(")
+            .expect("scan_skills command should be async");
+        let command = &source[start..source.len().min(start + 520)];
+
+        assert!(command.contains("tauri::async_runtime::spawn_blocking"));
+        assert!(command.contains("scan_skills_for_state"));
     }
 }

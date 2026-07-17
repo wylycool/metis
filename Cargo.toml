@@ -43,6 +43,7 @@ sha2 = "0.10"
 
 # 文件系统操作
 walkdir = "2"
+wait-timeout = "0.2"
 
 # 跨平台路径
 dirs = "5"

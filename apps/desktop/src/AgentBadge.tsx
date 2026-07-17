@@ -18,19 +18,23 @@ type AgentLogoKind =
   | "claude-code"
   | "codex"
   | "cursor"
+  | "gemini-cli"
   | "generic"
   | "hermes"
   | "openclaw"
-  | "opencode";
+  | "opencode"
+  | "qoder";
 
 const AGENT_BADGES: Record<string, BadgeDescriptor> = {
   "claude-code": { label: "C", className: "agent-badge-claude-code", logo: "claude-code" },
   codex: { label: "C", className: "agent-badge-codex", logo: "codex" },
   cursor: { label: "C", className: "agent-badge-cursor", logo: "cursor" },
+  "gemini-cli": { label: "G", className: "agent-badge-gemini-cli", logo: "gemini-cli" },
   generic: { label: "G", className: "agent-badge-generic", logo: "generic" },
   hermes: { label: "H", className: "agent-badge-hermes", logo: "hermes" },
   openclaw: { label: "O", className: "agent-badge-openclaw", logo: "openclaw" },
   opencode: { label: "O", className: "agent-badge-opencode", logo: "opencode" },
+  qoder: { label: "Q", className: "agent-badge-qoder", logo: "qoder" },
 };
 
 export function AgentBadgeStack({ agents, testId }: AgentBadgeStackProps) {
@@ -117,6 +121,11 @@ function AgentBadgeLogo({ kind }: { kind: AgentLogoKind }) {
           />
         </g>
       )}
+      {kind === "gemini-cli" && (
+        <g data-testid="agent-logo-gemini-cli-spark">
+          <path d="M12 4.4c.7 4.2 3.4 6.9 7.6 7.6-4.2.7-6.9 3.4-7.6 7.6-.7-4.2-3.4-6.9-7.6-7.6 4.2-.7 6.9-3.4 7.6-7.6Z" />
+        </g>
+      )}
       {kind === "openclaw" && (
         <g data-testid="agent-logo-openclaw-round-mark">
           <circle className="agent-logo-fill" cx="12" cy="12.1" r="5.8" opacity="0.92" />
@@ -143,6 +152,13 @@ function AgentBadgeLogo({ kind }: { kind: AgentLogoKind }) {
           <rect height="12.2" rx="2.2" width="15.2" x="4.4" y="5.9" strokeWidth="1.8" />
           <path d="m8 9.8 2.3 2.2L8 14.2" strokeWidth="2" />
           <path d="M12.8 14.2h3.4" strokeWidth="2" />
+        </g>
+      )}
+      {kind === "qoder" && (
+        <g data-testid="agent-logo-qoder-mark">
+          <circle cx="12" cy="12" r="6.5" strokeWidth="2" />
+          <path d="m14.7 14.7 3 3" strokeWidth="2" />
+          <path d="M9.6 9.4h4.8v5.2H9.6z" strokeWidth="1.6" />
         </g>
       )}
       {kind === "generic" && (

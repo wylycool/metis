@@ -1,41 +1,65 @@
-# Metis 桌面版发布说明
+# Metis Desktop / Metis 桌面版
 
-Metis 是一个跨平台、本地优先的 Agent Skill 管理器。桌面安装包通过 GitHub Releases 分发。
+[English](#english) | [简体中文](#简体中文)
 
-## 下载
+## English
 
-- macOS：下载 universal `.dmg`，同时支持 Apple Silicon 和 Intel Mac。
-- Windows：下载 Windows installer。
-- Linux：下载 `.deb` 或 `.AppImage`。
-- `SHA256SUMS`：用于校验下载文件完整性。
+Metis is a cross-platform, local-first Agent Skill manager.
 
-当前发布目标、推荐版本和直接下载地址以 [README](https://github.com/wylycool/metis#readme) 为准；全部历史版本见 [GitHub Releases](https://github.com/wylycool/metis/releases)。
+### Downloads
 
-从首个携带软件更新能力的版本开始，Metis 可以在启动后后台检查稳定版更新。发现新版后，由用户确认下载当前平台的标准 DMG、NSIS EXE 或 AppImage；安装包通过 Metis 内置的 Tauri 更新公钥校验后，保留 macOS / Windows 的系统下载来源标记并保存到系统 Downloads，安装仍由用户手动完成。用户可以在 Settings 关闭启动检查，也可以随时手动检查。
+- macOS: universal `.dmg` for Apple Silicon and Intel Mac
+- Windows: installer `.exe`
+- Linux: `.deb` or `.AppImage`
+- `SHA256SUMS`: checksums for release assets
 
-## 操作系统代码签名说明
+### Highlights
 
-应用内下载使用免费的 Tauri 更新签名确认安装包来自 Metis 更新通道且内容未被篡改，但这不等同于操作系统代码签名。当前安装包仍未做 macOS Developer ID 签名、公证或 Windows Authenticode 签名。macOS 可能需要右键打开或在系统设置中允许；Windows SmartScreen 可能提示未知发布者，需要选择继续运行。
+- Discover Skills installed for Codex, Claude Code, OpenClaw, Hermes, opencode, Cursor, Qoder, Gemini CLI, and custom paths.
+- Bind local Skills to Git sources and check for updates on demand.
+- Review file changes and local modifications before updating.
+- Create backups before replacement and restore previous versions.
+- Install a remote Skill to selected Agent paths.
+- Copy an existing local Skill to another Agent without accessing the remote or overwriting an existing directory.
+- Manage Agent paths, custom paths, trusted sources, and the one-click update list in Settings.
 
-## 当前能力
+### Network and installation behavior
 
-- 在 `Skills` 和 `Settings` 两个工作区管理本机 Agent skills 与安装路径。
-- 扫描 Codex、Claude Code、OpenClaw、Hermes、opencode 和自定义路径中的 `SKILL.md`。
-- 为已安装 Skill 绑定 Git 来源，按需检查 Skill 更新、查看文件差异、手动更新、备份和回滚。
-- 在“添加 Skill”页面预览远端 Git Skill，再安装或更新到用户选择的 Agent 或自定义路径。
-- 在 Skill 详情页展开安装位置后，将当前本地 Skill 复制到尚未安装的 Agent 或自定义路径；本地复制不检查远端更新，也不覆盖已有目录。
-- 在 Settings 中管理内置 Agent 路径、自定义路径、Skill 自动更新列表，并检测本机 Git 环境。
-- 在 Settings 中查看当前 Metis 版本、控制启动检查并手动检查软件更新；发现新版后可下载通过 Tauri 签名校验的标准安装包到系统 Downloads。
+Local scanning does not access a remote Git server. Git access occurs after an explicit source preview, connection test, update check, diff request, or update action. The optional startup application-update check can be disabled in Settings.
 
-## 远端交互边界
+Metis does not silently install, elevate privileges, or restart itself. A downloaded application update is saved to the system Downloads directory for the user to install manually.
 
-进入 Skill 详情页或展开安装位置不会访问远端 Git。只有用户主动预览远端来源、测试来源连接、检查 Skill 更新、查看差异或执行来源更新时，Metis 才会发起 Git 交互。
+### Signing notice
 
-启用“启动时检查软件更新”时，Metis 会在现有启动加载完成后访问固定 GitHub Releases 元数据地址；检查失败不会阻塞 Skills 首屏。安装包下载、打开安装包和打开 Downloads 均需要用户明确操作，Metis 不自动安装、提权或重启。
+Current macOS packages are not signed and notarized with Apple Developer ID, and Windows packages are not signed with Authenticode. Gatekeeper or SmartScreen may display an unknown-developer warning. Download only from this repository and verify `SHA256SUMS`.
 
-## 当前限制
+## 简体中文
 
-- 不包含 marketplace、社区 registry、云同步、账号系统或托管式企业后台。
-- 不包含 AI 自动生成或改写 Skill。
-- 安装包尚未进行 macOS Developer ID 签名、公证或 Windows Authenticode 签名。
-- 软件版本更新不包含静默下载、自动安装、自动重启、差分下载或更新回滚。
+Metis 是一个跨平台、本地优先的 Agent Skill 管理器。
+
+### 下载
+
+- macOS：适用于 Apple Silicon 和 Intel Mac 的 universal `.dmg`
+- Windows：安装程序 `.exe`
+- Linux：`.deb` 或 `.AppImage`
+- `SHA256SUMS`：用于校验发布文件完整性
+
+### 主要能力
+
+- 发现 Codex、Claude Code、OpenClaw、Hermes、opencode、Cursor、Qoder、Gemini CLI 和自定义路径中的 Skills。
+- 为本地 Skill 绑定 Git 来源，并按需检查更新。
+- 更新前查看文件变化和本地修改状态。
+- 覆盖前创建备份，并支持恢复旧版本。
+- 将远端 Skill 安装到用户选择的 Agent 路径。
+- 把已有本地 Skill 复制到其他 Agent，不访问远端，也不覆盖已有目录。
+- 在 Settings 中管理 Agent 路径、自定义路径、可信来源和一键更新列表。
+
+### 网络和安装行为
+
+扫描本地 Skills 不会访问远端 Git。只有预览来源、测试连接、检查更新、查看差异或执行更新等明确操作才会访问 Git 远端。启动时检查 Metis 软件更新是可选功能，可以在 Settings 中关闭。
+
+Metis 不会静默安装、提权或自动重启。应用更新安装包会保存到系统 Downloads，由用户手动完成安装。
+
+### 签名提示
+
+当前 macOS 安装包尚未使用 Apple Developer ID 签名和公证，Windows 安装包尚未使用 Authenticode 签名，因此 Gatekeeper 或 SmartScreen 可能显示未知开发者提示。请只从本仓库下载，并校验 `SHA256SUMS`。

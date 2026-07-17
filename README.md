@@ -1,142 +1,131 @@
-# Metis：Agent Skill 管理器
+# Metis：统一管理你的 Agent Skills
 
-> 一个跨平台、本地优先、开源的 AI Agent Skill 版本管理器。
+> 一个跨平台、本地优先、开源的 Agent Skill 管理器。
 
-Metis（墨提斯）是一个跨平台、本地优先、开源的 AI Agent Skill 管理器，用于发现、登记、更新、回滚和审计 Codex、Claude Code、OpenClaw、Hermes、opencode 以及其他 Agent 工具中的 skills。
+[简体中文](docs/zh-CN/README.md) | [English](docs/en/README.md) | [发布状态](https://github.com/wylycool/metis/releases)
 
-它的目标不是一开始做 skill 商店，而是先解决一个更基础也更真实的问题：
+Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code、OpenClaw、Hermes、opencode、Cursor、Qoder、Gemini CLI 等 Agent 工具中的 Skills。
 
-> 用户本机已经有很多 skills，如何让它们可见、可追踪、可更新、可回滚、可审计。
+如果你同时使用多个 Agent，或者本机已经积累了很多来自不同 Git 仓库的 Skills，Metis 可以帮你回答这些问题：
 
-## 下载
+- 我的 Skills 分别安装在哪里？
+- 它们来自哪个仓库和目录？
+- 远端有没有更新，本地改过什么？
+- 更新出问题后，能不能恢复？
+- 怎样把一个 Skill 安装到其他 Agent？
 
-下一正式版是 **Metis 1.5.0**，计划 tag 为 `desktop-v1.5.0`，目前正在进行发布准备。正式 Release 创建前不提供可能失效的 1.5.0 直接下载链接。
+## 下载与安装
 
-当前历史 Beta 安装包和全部发布记录可在 [GitHub Releases](https://github.com/wylycool/metis/releases) 查看。通过 GitHub Releases 分发的安装包尚未进行系统级签名；macOS 或 Windows 首次打开时可能需要手动允许。
+**Metis 1.5.0 正在进行正式发布前的最后准备，当前暂不提供可安装的 DMG、EXE、DEB 或 AppImage。** Releases 页面保留的历史 prerelease 目前只有 GitHub 根据干净 Tag 自动生成的源码归档，不是可直接安装的软件包。
 
-## 当前阶段
+1.5.0 正式发布并完成三平台核验后，可从 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载以下安装包：
 
-Phase 1 Core Engine 本地管理闭环、Phase 2 Desktop MVP、Phase 3 稳定化、Phase 3.5 GitHub Release 分发、Phase 4 本地治理能力、Phase 5 产品化收口和 Phase 6 前端体验重构均已完成。项目当前正在准备 **Metis 1.5.0 正式版**。
+| 系统 | 安装包 | 说明 |
+| --- | --- | --- |
+| macOS | universal `.dmg` | 同时支持 Apple Silicon 和 Intel Mac |
+| Windows | installer `.exe` | 通过安装程序完成安装 |
+| Linux | `.deb` / `.AppImage` | AppImage 首次使用时可能需要添加执行权限 |
 
-桌面应用当前提供 `Skills` 和 `Settings` 两个工作区：Skills 用于扫描、来源绑定、更新检查、diff、手动更新、备份回滚和安装；Settings 用于管理内置 Agent 路径、自定义路径、受控自动更新列表和本机 Git 检测。添加 Skill 页面支持预览远端 Git Skill 后安装到选中路径；已安装 Skill 的详情页支持把当前本地目录直接复制到其他未安装路径。
+计划中的 1.5.0 发布包尚未包含 macOS Developer ID 公证和 Windows Authenticode 签名。正式发布后首次打开时，macOS 或 Windows 可能显示未知开发者或未知发布者提示；届时请仅从本仓库的 GitHub Releases 下载，并使用 Release 中的 `SHA256SUMS` 校验文件。
 
-## 技术栈
+## 三步开始使用
 
-- **桌面框架**：Tauri
-- **前端**：TypeScript
-- **核心引擎**：Rust（独立于 UI，可供 CLI 复用）
-- **数据库**：SQLite
-- **凭据处理**：Metis 当前不存储凭据；Git 认证依赖系统 Git、SSH agent 或 Git credential helper
-- **版本管理**：Git
-- **分发**：macOS / Windows / Linux，通过 GitHub Releases
+### 1. 扫描本机 Skills
 
-## 核心价值
+打开 Metis，进入 `Skills`，点击重新扫描。Metis 会读取已配置的 Agent Skill 路径，并把发现的 Skills 汇总到一个列表中。
 
-AI Agent 工具正在快速增长，不同工具的 skill 安装路径、目录格式、更新方式和来源管理都可能不同。个人用户可以手动复制几个 skill，但当 skills 来自多个 GitHub 仓库、公司内部私有仓库、团队 zip 包或不同 Agent 运行时，手动维护很快会变得不可控。
+### 2. 绑定来源并检查更新
 
-Agent Skill Manager 希望让这些本地 skills 具备持续治理能力：
+打开一个 Skill，为它绑定 Git 仓库、仓库内目录和分支。之后可以主动检查远端更新、查看文件差异，并确认是否更新。
 
-- 可见：扫描并展示本机各 Agent 已安装的 skills。
-- 可追踪：给每个 skill 绑定 Git 来源、路径、ref 和当前版本。
-- 可更新：检测远端更新并支持用户确认后更新。
-- 可回滚：更新前自动备份，失败或异常时可恢复旧版本。
-- 可审计：记录来源、版本、更新时间、diff 和安全提醒。
-- 可团队化：支持导入、导出和锁定团队统一 skill 清单。
+### 3. 安装到其他 Agent
 
-## 目标用户
+点击“添加 Skill”可以从 Git 仓库安装远端 Skill；在已安装 Skill 的详情页，也可以把当前本地内容复制到其他尚未安装的位置。
 
-- 同时使用 Codex、Claude Code、OpenClaw、Hermes、opencode、Gemini CLI、Cursor 或其他 Agent 工具的个人开发者。
-- 维护大量 prompt、workflow、脚本和资源型 skills 的高级用户。
-- 在企业内部维护团队规范、排障流程、发布流程、行业知识和内部工具链 skills 的工程团队。
-- 需要对本机 Agent 扩展内容做来源审计、安全检查和版本回滚的组织。
+## 主要功能
 
-## MVP 范围
+### 统一发现
 
-当前 MVP 聚焦本地 skill 管理闭环：
+- 扫描多个 Agent 的默认 Skill 路径。
+- 支持添加命名的自定义监控路径。
+- 读取 `SKILL.md` 中的名称、描述和基础信息。
+- 合并展示同一个 Skill 的多个安装位置。
 
-- 自动识别本机 Codex skills 路径。
-- 自动识别本机 Claude Code skills 路径。
-- 自动识别本机 OpenClaw skills 路径。
-- 自动识别本机 Hermes skills 路径。
-- 自动识别本机 opencode skill 路径。
-- 支持通用 Agent Skills 标准目录。
-- 展示已发现的 skill 列表。
-- 解析 `SKILL.md` 中的名称、描述和基础元数据。
-- 给 skill 绑定 Git 来源 URL、仓库内路径、ref 和当前 commit。
-- 检测远端是否有更新。
-- 显示检查结果、文件差异和本地修改状态。
-- 支持手动确认更新。
-- 更新前自动备份。
-- 更新失败自动回滚。
-- 支持查看更新 diff。
-- 支持通过本机 Git、SSH agent 或 Git credential helper 访问私有仓库；Metis 不保存 Keychain、token 或私钥。Storage 仍兼容 `credential_ref` 备注字段，但当前正式 UI 不提供凭据输入入口。
-- 支持受控自动更新：只处理用户同时标记为 trusted 和 auto update、且本地未修改的 source。
-- 支持添加远端 Skill：预览 Git 来源后，选择 Codex、Claude Code、OpenClaw、Hermes、opencode 或自定义路径进行安装或更新。
-- 支持详情页本地复制：展开安装位置后，把当前已安装 Skill 复制到其他尚未安装的 Agent 或自定义路径；此过程不检查远端更新，也不覆盖已有目录。
-- 支持在 Settings 编辑内置 Agent 路径、管理命名自定义路径和检测本机 Git 环境。
+### 来源与版本追踪
 
-## 本地验证
+- 为本地 Skill 绑定 Git 来源、仓库目录和分支。
+- 主动检查远端是否有更新。
+- 展示远端变化、本地修改状态和文件差异。
+- 支持使用系统 Git 访问公开或私有仓库。
 
-```bash
-cargo test
-cargo clippy
-(cd apps/desktop && pnpm build)
-(cd apps/desktop && pnpm tauri build)
-(cd apps/desktop && pnpm tauri:build:mac-universal)
-```
+### 安全更新与回滚
 
-macOS 面向发布的首选安装包是 universal DMG，输出在 `target/universal-apple-darwin/release/bundle/dmg/Metis_<version>_universal.dmg`，同时兼容 Apple Silicon 和 Intel Mac。跨平台桌面发布包由 GitHub Actions workflow `Desktop Release Packages` 构建 macOS universal、Windows 和 Linux artifact。发布检查清单见 [docs/release-checklist.md](docs/release-checklist.md)。
+- 更新前自动创建本地备份。
+- 更新失败时尝试恢复原有内容。
+- 支持查看备份并手动回滚。
+- 在写入前校验目标路径，避免覆盖无关目录。
+- 对 Skill 目录进行静态安全检查，但不会执行其中的脚本。
 
-## 安装提示
+### 跨 Agent 安装
 
-Metis 桌面版通过 [GitHub Releases](https://github.com/wylycool/metis/releases) 直接分发，不发布到 App Store 或 Microsoft Store。下一正式版 tag 为 `desktop-v1.5.0`，当前尚在准备中。
+- 从远端来源预览并安装 Skill。
+- 一次选择多个 Agent 或自定义目标路径。
+- 将已有本地 Skill 复制到其他未安装位置。
+- 本地复制不会访问远端，也不会覆盖已有目录。
 
-- macOS：下载 universal `.dmg`，挂载后拖拽或启动 Metis。当前包未签名和公证，首次启动可能需要右键打开，或到系统设置中允许打开。
-- Windows：下载 Windows installer。当前包未做 Authenticode 签名，SmartScreen 可能提示未知发布者，需要选择继续运行。
-- Linux：下载 `.deb` 或 `.AppImage`；AppImage 如无执行权限，可先执行 `chmod +x <file>.AppImage`。
-- 校验：Release 中的 `SHA256SUMS` 可用于核对下载文件完整性，macOS/Linux 可运行 `shasum -a 256 -c SHA256SUMS`。
+### 受控的一键更新
 
-签名、公证和 Windows Authenticode 属于后续信任增强；当前未签名状态需要在发布说明和安装提示中持续明确。
+- 由用户明确标记可信来源。
+- 只有加入一键更新列表且本地未修改的 Skill 才会自动处理。
+- 用户可以随时移出列表，继续使用手动检查和更新。
 
-首次打开后的建议路径：
+## 支持的 Agent
 
-1. 在 `Skills` 工作区点击重新扫描，确认本机已安装 skills。
-2. 对需要跟踪更新的 Skill 绑定 Git 来源，并按需加入受控自动更新列表。
-3. 点击“添加 Skill”，预览远端 Git Skill 后安装或更新到选中的 Agent 或自定义路径。
-4. 进入已安装 Skill 的详情页，展开安装位置，把当前本地 Skill 复制到其他尚未安装的路径；此操作不会检查远端更新。
-5. 在 `Settings` 工作区调整内置 Agent 路径、添加命名自定义路径或检测本机 Git 环境。
+Metis 当前内置以下 Agent 路径支持：
 
-## 当前不做
+- Codex
+- Claude Code
+- OpenClaw
+- Hermes
+- opencode
+- Cursor
+- Qoder
+- Gemini CLI
+- 通用 Agent Skills 目录
+- 用户自定义路径
 
-以下方向重要，但不进入当前 1.5.0 发布范围：
+其他使用 `SKILL.md` 的 Agent 可以先通过自定义路径进行管理。
 
-- skill marketplace
-- 云同步
-- 用户账号系统
-- 在线评分和排行榜
-- 公共 skill 自动审核平台
-- AI 自动生成或改写 skill
-- 复杂企业权限管理
-- 企业后台
-- 插件市场
-- 多人协作平台
+## 隐私与网络访问
 
-## 文档索引
+Metis 以本地工作为主：
 
-- [简体中文用户文档](docs/zh-CN/README.md)：安装、使用和故障排查入口。
-- [English documentation](docs/en/README.md): installation, usage, and troubleshooting.
-- [SECURITY.md](SECURITY.md)：安全策略、凭据模型、威胁模型和隐私承诺。
-- [CONTRIBUTING.md](CONTRIBUTING.md)：贡献指南，包含开发环境设置和 Adapter 贡献规范。
+- Skill 索引、设置、备份和审计记录保存在本机。
+- Metis 不保存 Git Token、SSH 私钥或其他仓库凭据。
+- 私有仓库认证依赖系统 Git、SSH agent 或 Git credential helper。
+- 扫描和浏览本地 Skills 不需要访问网络。
+- 只有预览远端来源、检查更新、查看远端差异或执行更新等明确操作才会访问 Git 远端。
+- 可在 Settings 中关闭 Metis 启动时的软件版本检查。
 
-## 项目原则
+安全边界、已知限制和漏洞报告方式请查看 [SECURITY.md](SECURITY.md)。
 
-- 本地优先：默认不依赖云端账号或远程服务。
-- 安全优先：默认只检测更新；受控自动更新只允许 trusted source，并继续执行安全检查。
-- 来源透明：每个可管理 skill 都应能追踪来源和版本。
-- 可回滚：任何覆盖式更新都必须先备份。
-- 适配器化：每个 Agent 运行时通过独立 adapter 接入。
-- 先治理再分发：先解决已安装 skills 的管理问题，再考虑 marketplace。
+## 使用文档
 
-## 许可证
+- [简体中文用户文档](docs/zh-CN/README.md)
+- [English documentation](docs/en/README.md)
+- [快速开始](docs/zh-CN/getting-started.md)
+- [用户指南](docs/zh-CN/user-guide.md)
+- [故障排查](docs/zh-CN/troubleshooting.md)
+- [常见问题](docs/zh-CN/faq.md)
 
-本项目采用 [MIT 许可证](LICENSE)。贡献代码即表示你同意此条款。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+## 参与贡献
+
+Metis 使用 Tauri、React、TypeScript、Rust 和 SQLite 构建。欢迎报告问题、完善文档、添加 Agent 支持或提交代码改进。
+
+开发环境、测试命令和 Pull Request 要求请查看 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请不要创建公开 Issue，应按照 [SECURITY.md](SECURITY.md) 中的方式报告。
+
+普通使用问题请先查看[故障排查](docs/zh-CN/troubleshooting.md)和[支持说明](SUPPORT.md)。
+
+## License
+
+Metis 使用 [MIT License](LICENSE)。

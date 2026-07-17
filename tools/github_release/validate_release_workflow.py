@@ -15,7 +15,6 @@ CONFIG = {
     "expected_version": "1.5.0",
     "workflow": Path(".github/workflows/desktop-preview.yml"),
     "release_notes": Path("docs/release-notes/desktop.md"),
-    "release_checklist": Path("docs/release-checklist.md"),
     "cargo_manifest": Path("Cargo.toml"),
     "cargo_lock": Path("Cargo.lock"),
     "desktop_package": Path("apps/desktop/package.json"),
@@ -23,6 +22,15 @@ CONFIG = {
     "tauri_config": Path("apps/desktop/src-tauri/tauri.conf.json"),
     "latest_json_generator": Path("tools/software_update/generate_latest_json.py"),
     "signature_key_validator": Path("tools/software_update/validate_signature_key.py"),
+}
+
+ACTION_PINS = {
+    "actions/checkout": ("34e114876b0b11c390a56381ad16ebd13914f8d5", "v4"),
+    "dtolnay/rust-toolchain": ("4cda84d5c5c54efe2404f9d843567869ab1699d4", "stable"),
+    "pnpm/action-setup": ("b906affcce14559ad1aafd4ab0e942779e9f58b1", "v4"),
+    "actions/setup-node": ("49933ea5288caeca8642d1e84afbd3f7d6820020", "v4"),
+    "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4"),
+    "actions/download-artifact": ("d3f86a106a0bac45b974a628896c90dbdf5c8093", "v4"),
 }
 
 SEMVER_PATTERN = re.compile(
@@ -88,6 +96,28 @@ def workspace_versions() -> dict[str, str]:
     }
 
 
+def validate_action_pins(workflow_text: str) -> None:
+    uses_lines = re.findall(r"(?m)^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?\s*$", workflow_text)
+    assert uses_lines, "release workflow must use pinned Actions"
+
+    observed_actions: set[str] = set()
+    for action_ref, version_comment in uses_lines:
+        action, separator, commit_sha = action_ref.partition("@")
+        assert separator == "@", f"Action reference is missing @: {action_ref}"
+        assert action in ACTION_PINS, f"unexpected Action reference: {action}"
+        expected_sha, expected_comment = ACTION_PINS[action]
+        assert re.fullmatch(r"[0-9a-f]{40}", commit_sha), (
+            f"Action must use a full commit SHA: {action_ref}"
+        )
+        assert commit_sha == expected_sha, f"unexpected commit SHA for {action}: {commit_sha}"
+        assert version_comment == expected_comment, (
+            f"Action pin must retain the {expected_comment} version comment: {action_ref}"
+        )
+        observed_actions.add(action)
+
+    assert observed_actions == set(ACTION_PINS), observed_actions
+
+
 def main() -> None:
     expected_version = CONFIG["expected_version"]
     workflow_text = CONFIG["workflow"].read_text()
@@ -120,7 +150,7 @@ def main() -> None:
     assert set(release["needs"]) == {"validate", "build"}
 
     assert "refs/tags/desktop-v" in release["if"]
-    assert "actions/download-artifact@v4" in workflow_text
+    validate_action_pins(workflow_text)
     assert "SHA256SUMS" in workflow_text
     assert '"Metis_${release_version}_universal.dmg"' in workflow_text
     assert '"Metis_${release_version}_x64-setup.exe"' in workflow_text
@@ -260,7 +290,6 @@ def main() -> None:
     assert stable_release_can_be_latest("1.5.0", "1.5.1") is False
 
     assert CONFIG["release_notes"].is_file()
-    assert CONFIG["release_checklist"].is_file()
     assert "Beta" not in CONFIG["release_notes"].read_text()
     assert not Path("docs/release-notes/desktop-beta.md").exists()
     assert not Path("docs/beta-release-checklist.md").exists()

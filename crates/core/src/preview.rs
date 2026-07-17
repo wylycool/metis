@@ -1,5 +1,6 @@
 use crate::update::RemoteCommitChecker;
 use metis_adapters::standard::parse_standard_skill_metadata;
+use metis_git_provider::source::{git_source_log_key, repo_path_depth};
 use metis_storage::db::SourceRecord;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -49,13 +50,16 @@ pub fn preview_remote_skill_source<C: RemoteCommitChecker>(
     let normalized_repo_path = normalize_repo_path(&options.repo_path);
     let source_start = Instant::now();
     let (source, commit) = preview_source_with_commit(&options, &normalized_repo_path, checker)?;
+    let source_key = git_source_log_key(&source.url, &normalized_repo_path, &source.ref_);
+    let path_depth = repo_path_depth(&normalized_repo_path).to_string();
     perf_log(
         "preview",
         &[
             ("stage", "source_commit".to_string()),
             ("elapsed_ms", elapsed_ms(source_start)),
-            ("repo_path", normalized_repo_path.clone()),
-            ("ref", source.ref_.clone()),
+            ("source_key", source_key.clone()),
+            ("repo_path_depth", path_depth.clone()),
+            ("ref_present", (!source.ref_.trim().is_empty()).to_string()),
         ],
     );
     let checkout_start = Instant::now();
@@ -67,7 +71,8 @@ pub fn preview_remote_skill_source<C: RemoteCommitChecker>(
         &[
             ("stage", "checkout_to_cache".to_string()),
             ("elapsed_ms", elapsed_ms(checkout_start)),
-            ("repo_path", normalized_repo_path.clone()),
+            ("source_key", source_key.clone()),
+            ("repo_path_depth", path_depth.clone()),
         ],
     );
     let skill_dir = Path::new(&checkout.skill_dir);
@@ -87,7 +92,8 @@ pub fn preview_remote_skill_source<C: RemoteCommitChecker>(
         &[
             ("stage", "metadata".to_string()),
             ("elapsed_ms", elapsed_ms(metadata_start)),
-            ("repo_path", normalized_repo_path.clone()),
+            ("source_key", source_key.clone()),
+            ("repo_path_depth", path_depth.clone()),
         ],
     );
     perf_log(
@@ -95,8 +101,9 @@ pub fn preview_remote_skill_source<C: RemoteCommitChecker>(
         &[
             ("stage", "total".to_string()),
             ("elapsed_ms", elapsed_ms(total_start)),
-            ("repo_path", normalized_repo_path.clone()),
-            ("ref", source.ref_.clone()),
+            ("source_key", source_key),
+            ("repo_path_depth", path_depth),
+            ("ref_present", (!source.ref_.trim().is_empty()).to_string()),
         ],
     );
 
@@ -118,6 +125,7 @@ fn preview_source_with_commit<C: RemoteCommitChecker>(
     let mut last_error = None;
     for candidate in preview_ref_candidates(&options.ref_, &options.url, checker) {
         let source = preview_source_record(options, normalized_repo_path, &candidate.ref_);
+        let source_key = git_source_log_key(&source.url, normalized_repo_path, &source.ref_);
         let reused_head_commit = candidate.commit.is_some();
         let commit_start = Instant::now();
         let commit_result = candidate
@@ -130,8 +138,12 @@ fn preview_source_with_commit<C: RemoteCommitChecker>(
             &[
                 ("stage", "commit".to_string()),
                 ("elapsed_ms", elapsed_ms(commit_start)),
-                ("repo_path", normalized_repo_path.to_string()),
-                ("ref", source.ref_.clone()),
+                ("source_key", source_key),
+                (
+                    "repo_path_depth",
+                    repo_path_depth(normalized_repo_path).to_string(),
+                ),
+                ("ref_present", (!source.ref_.trim().is_empty()).to_string()),
                 ("reused_head_commit", reused_head_commit.to_string()),
             ],
         );
@@ -173,7 +185,7 @@ fn preview_ref_candidates<C: RemoteCommitChecker>(
             &[
                 ("stage", "default_branch".to_string()),
                 ("elapsed_ms", elapsed_ms(default_start)),
-                ("ref", default_branch.branch.clone()),
+                ("has_default_branch", "true".to_string()),
                 (
                     "has_head_commit",
                     default_branch.commit.is_some().to_string(),
@@ -691,15 +703,28 @@ description: {description}
 
     #[test]
     fn perf_log_line_uses_searchable_prefix_and_named_fields() {
+        let source_key = git_source_log_key(
+            "https://git.example.com/example/repository.git",
+            "skills/private-example",
+            "feature/example",
+        );
         let line = perf_log_line(
             "preview",
             &[
                 ("stage", "checkout".to_string()),
                 ("elapsed_ms", "12".to_string()),
+                ("source_key", source_key),
+                ("repo_path_depth", "2".to_string()),
             ],
         );
 
-        assert_eq!(line, "[metis perf] preview stage=checkout elapsed_ms=12");
+        assert!(line.starts_with("[metis perf] preview stage=checkout elapsed_ms=12 source_key="));
+        assert!(line.ends_with(" repo_path_depth=2"));
         assert!(!line.contains("https://"));
+        assert!(!line.contains("private-example"));
+        assert!(!line.contains("feature/example"));
+        let source = include_str!("preview.rs");
+        assert!(!source.contains("(\"repo_path\","));
+        assert!(!source.contains("(\"ref\","));
     }
 }

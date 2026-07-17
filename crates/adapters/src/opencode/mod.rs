@@ -28,15 +28,15 @@ impl AgentAdapter for OpencodeAdapter {
 
     fn candidate_paths(&self) -> Vec<SkillSearchPath> {
         vec![SkillSearchPath {
-            path_template: "$HOME/.config/opencode/skill".into(),
+            path_template: "$HOME/.config/opencode/skills".into(),
             scope: SkillScope::User,
             priority: 1,
-            description: "opencode 用户级 skill 目录".into(),
+            description: "opencode 用户级 skills 目录".into(),
         }]
     }
 
     fn is_agent_path(&self, path: &str) -> bool {
-        path.contains(".config/opencode/skill")
+        path.contains(".config/opencode/skills")
     }
 
     fn discover_skill_dirs(&self, search_root: &str) -> Result<Vec<String>, AdapterError> {
@@ -57,7 +57,7 @@ impl AgentAdapter for OpencodeAdapter {
 
     fn install_path_template(&self, scope: SkillScope) -> Option<String> {
         match scope {
-            SkillScope::User => Some("$HOME/.config/opencode/skill/{name}".into()),
+            SkillScope::User => Some("$HOME/.config/opencode/skills/{name}".into()),
             _ => None,
         }
     }
@@ -66,5 +66,24 @@ impl AgentAdapter for OpencodeAdapter {
         dirs::home_dir()
             .map(|home| home.join(".config/opencode").exists())
             .unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exposes_opencode_user_skill_path_contract() {
+        let adapter = OpencodeAdapter::new();
+
+        assert_eq!(
+            adapter.candidate_paths()[0].path_template,
+            "$HOME/.config/opencode/skills"
+        );
+        assert_eq!(
+            adapter.install_path_template(SkillScope::User).as_deref(),
+            Some("$HOME/.config/opencode/skills/{name}")
+        );
     }
 }
