@@ -3,10 +3,14 @@ import json
 import re
 import sys
 import tempfile
-import tomllib
 from pathlib import Path
 
 import yaml
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 sys.dont_write_bytecode = True
 
