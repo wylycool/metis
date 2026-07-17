@@ -2202,7 +2202,7 @@ function MetisApp() {
                 {...textInputAssistanceProps}
                 data-testid="custom-monitor-path-new"
                 value={newCustomMonitorPath}
-                placeholder="/Users/me/team-skills"
+                placeholder="/Users/example/team-skills"
                 onChange={(event) => setNewCustomMonitorPath(event.target.value)}
               />
               <button

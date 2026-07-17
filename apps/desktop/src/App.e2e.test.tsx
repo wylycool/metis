@@ -1477,7 +1477,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(within(codexPathRow).getByText("待保存")).toBeTruthy();
     expect(settingsSaveButton.disabled).toBe(false);
     await user.click(screen.getByTestId("agent-path-cancel-codex"));
-    expect(codexPathInput.value).toBe("/Users/me/.codex/skills");
+    expect(codexPathInput.value).toBe("/Users/example/.codex/skills");
     expect(codexPathInput.readOnly).toBe(true);
     expect(within(codexPathRow).queryByText("待保存")).toBeNull();
     expect(settingsSaveButton.disabled).toBe(true);
@@ -1618,7 +1618,7 @@ describe("Metis desktop GUI main flow", () => {
     expect(screen.queryByTestId("workspace-settings")).toBeNull();
     await user.click(screen.getByTestId("workspace-tab-settings-sidebar"));
     const restoredCodexPathInput = await screen.findByTestId("agent-path-codex");
-    expect((restoredCodexPathInput as HTMLInputElement).value).toBe("/Users/me/.codex/skills");
+    expect((restoredCodexPathInput as HTMLInputElement).value).toBe("/Users/example/.codex/skills");
     expect((restoredCodexPathInput as HTMLInputElement).readOnly).toBe(true);
 
     const confirmCallsBeforeCleanLeave = confirmSpy.mock.calls.length;
@@ -1652,7 +1652,7 @@ describe("Metis desktop GUI main flow", () => {
     await user.clear(screen.getByTestId("custom-monitor-name-new"));
     await user.type(screen.getByTestId("custom-monitor-name-new"), "共享示例");
     await user.clear(screen.getByTestId("custom-monitor-path-new"));
-    await user.type(screen.getByTestId("custom-monitor-path-new"), "/Users/me/.codex/skills");
+    await user.type(screen.getByTestId("custom-monitor-path-new"), "/Users/example/.codex/skills");
     await user.click(screen.getByText("保存"));
     expect(await screen.findByText("自定义路径不能和已有路径重复")).toBeTruthy();
     expect(scenario.commandCalls("save_desktop_settings")).toBe(0);
@@ -2493,7 +2493,7 @@ describe("Metis desktop GUI main flow", () => {
           {
             agent_id: "claude-code",
             agent_name: "Claude Code",
-            install_path: "/Users/me/.claude/skills/codex-planner",
+            install_path: "/Users/example/.claude/skills/codex-planner",
           },
         ],
       },
@@ -2561,12 +2561,12 @@ describe("Metis desktop GUI main flow", () => {
           {
             agent_id: "claude-code",
             agent_name: "Claude Code",
-            install_path: "/Users/me/.claude/skills/codex-planner",
+            install_path: "/Users/example/.claude/skills/codex-planner",
           },
           {
             agent_id: "custom-team-memory",
             agent_name: "共享示例",
-            install_path: "/Users/me/team-memory/codex-planner",
+            install_path: "/Users/example/team-memory/codex-planner",
           },
         ],
       },
@@ -3065,10 +3065,10 @@ describe("Metis desktop GUI main flow", () => {
     expect(introCard.getByText("codex-planner")).toBeTruthy();
     expect(introCard.getByText("Codex managed skill")).toBeTruthy();
     expect(introCard.queryByText("Codex")).toBeNull();
-    expect(introCard.queryByText("/Users/me/.codex/skills/codex-planner")).toBeNull();
+    expect(introCard.queryByText("/Users/example/.codex/skills/codex-planner")).toBeNull();
     expect(introCard.queryByText("opencode")).toBeNull();
-    expect(introCard.queryByText("/Users/me/.config/opencode/skills/codex-planner")).toBeNull();
-    expect(introCard.queryByText("/Users/me/.claude/skills/codex-planner")).toBeNull();
+    expect(introCard.queryByText("/Users/example/.config/opencode/skills/codex-planner")).toBeNull();
+    expect(introCard.queryByText("/Users/example/.claude/skills/codex-planner")).toBeNull();
     expect(
       screen
         .getByTestId("skill-intro-card-codex-planner")
@@ -3091,14 +3091,14 @@ describe("Metis desktop GUI main flow", () => {
       ),
     ).toBeTruthy();
     expect(formalAgentPaths.getByText("Codex")).toBeTruthy();
-    expect(formalAgentPaths.getByText("/Users/me/.codex/skills/codex-planner")).toBeTruthy();
+    expect(formalAgentPaths.getByText("/Users/example/.codex/skills/codex-planner")).toBeTruthy();
     expect(formalAgentPaths.queryByText("opencode")).toBeNull();
     expect(
-      formalAgentPaths.queryByText("/Users/me/.config/opencode/skills/codex-planner"),
+      formalAgentPaths.queryByText("/Users/example/.config/opencode/skills/codex-planner"),
     ).toBeNull();
     expect(await formalAgentPaths.findByTestId("target-row-claude-code")).toBeTruthy();
     expect(formalAgentPaths.getByText("Claude Code")).toBeTruthy();
-    expect(formalAgentPaths.getByText("/Users/me/.claude/skills/codex-planner")).toBeTruthy();
+    expect(formalAgentPaths.getByText("/Users/example/.claude/skills/codex-planner")).toBeTruthy();
     expect(screen.getByTestId("skill-operations-card-codex-planner")).toBeTruthy();
     expect(screen.queryByTestId("cross-agent-lazy-card-codex-planner")).toBeNull();
     expect(screen.queryByTestId("show-cross-agent-targets-codex-planner")).toBeNull();
@@ -3954,7 +3954,7 @@ describe("Metis software update flow", () => {
       checkOnStartup: true,
       availableUpdate: softwareUpdateInfo(),
       openDownloadsError: "open_path failed: No such file or directory (os error 2)",
-      openInstallerError: "failed to spawn process for /Users/demo/Downloads/Metis.dmg",
+      openInstallerError: "failed to spawn process for /Users/example/Downloads/Metis.dmg",
     });
     invokeMock.mockImplementation((command: string, args?: unknown) =>
       scenario.invoke(command, args),
@@ -4094,7 +4094,7 @@ function createSoftwareUpdateScenario(
   const downloadResult = {
     version: "1.5.1",
     file_name: "Metis_1.5.1_universal.dmg",
-    file_path: "/Users/me/Downloads/Metis_1.5.1_universal.dmg",
+    file_path: "/Users/example/Downloads/Metis_1.5.1_universal.dmg",
   };
   let settings: DesktopSettingsWithSoftwareUpdate = {
     custom_scan_paths: ["/tmp/preserved-custom-scan"],
@@ -4117,7 +4117,7 @@ function createSoftwareUpdateScenario(
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.codex/skills",
+          path: "/Users/example/.codex/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -4133,8 +4133,8 @@ function createSoftwareUpdateScenario(
       agent_name: "Codex",
       name: "software-update-skill",
       description: "Software update test fixture",
-      install_path: "/Users/me/.codex/skills/software-update-skill",
-      metadata_path: "/Users/me/.codex/skills/software-update-skill/SKILL.md",
+      install_path: "/Users/example/.codex/skills/software-update-skill",
+      metadata_path: "/Users/example/.codex/skills/software-update-skill/SKILL.md",
       metadata_status: "found",
       metadata_error: null,
       source_id: null,
@@ -4389,14 +4389,14 @@ function createMainFlowScenario(
       enabled: true,
       paths: [
         {
-          path: options.initialCodexAgentPathOverride ?? "/Users/me/.codex/skills",
+          path: options.initialCodexAgentPathOverride ?? "/Users/example/.codex/skills",
           scope: "user",
           exists: true,
           readable: true,
           writable: true,
         },
         {
-          path: "/Users/me/.config/codex/skills",
+          path: "/Users/example/.config/codex/skills",
           scope: "user",
           exists: false,
           readable: true,
@@ -4410,7 +4410,7 @@ function createMainFlowScenario(
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.claude/skills",
+          path: "/Users/example/.claude/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -4424,7 +4424,7 @@ function createMainFlowScenario(
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.openclaw/skills",
+          path: "/Users/example/.openclaw/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -4438,7 +4438,7 @@ function createMainFlowScenario(
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.hermes/skills",
+          path: "/Users/example/.hermes/skills",
           scope: "user",
           exists: false,
           readable: false,
@@ -5497,8 +5497,8 @@ function createAgentDetailScenario(
       ...agentDetailSkill("claude-codex-planner", "claude-code", "Claude Code", null),
       name: "codex-planner",
       description: "Codex managed skill",
-      install_path: "/Users/me/.claude/skills/codex-planner",
-      metadata_path: "/Users/me/.claude/skills/codex-planner/SKILL.md",
+      install_path: "/Users/example/.claude/skills/codex-planner",
+      metadata_path: "/Users/example/.claude/skills/codex-planner/SKILL.md",
     });
   }
   const agents: DesktopAgentStatus[] = [
@@ -5508,7 +5508,7 @@ function createAgentDetailScenario(
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.codex/skills",
+          path: "/Users/example/.codex/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -5522,7 +5522,7 @@ function createAgentDetailScenario(
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.claude/skills",
+          path: "/Users/example/.claude/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -5626,8 +5626,8 @@ function createAgentDetailScenario(
             remainingTargetLoadFailures -= 1;
             throw new Error("target lookup failed");
           }
-          const claudeInstallPath = "/Users/me/.claude/skills/codex-planner";
-          const customInstallPath = "/Users/me/team-memory/codex-planner";
+          const claudeInstallPath = "/Users/example/.claude/skills/codex-planner";
+          const customInstallPath = "/Users/example/team-memory/codex-planner";
           const claudeInstalled = installedTargetKeys.has(
             installTargetKey("claude-code", claudeInstallPath),
           );
@@ -5638,8 +5638,8 @@ function createAgentDetailScenario(
             {
               agent_id: "codex",
               agent_name: "Codex",
-              root_path: "/Users/me/.codex/skills",
-              install_path: "/Users/me/.codex/skills/codex-planner",
+              root_path: "/Users/example/.codex/skills",
+              install_path: "/Users/example/.codex/skills/codex-planner",
               status: "Installed",
               root_available: true,
               root_status: "available",
@@ -5649,7 +5649,7 @@ function createAgentDetailScenario(
               agent_name: options.longTargetNames
                 ? "Claude Code 团队默认智能体环境"
                 : "Claude Code",
-              root_path: "/Users/me/.claude/skills",
+              root_path: "/Users/example/.claude/skills",
               install_path: claudeInstallPath,
               status: claudeInstalled ? "Installed" : "NotInstalled",
               root_available: true,
@@ -5658,8 +5658,8 @@ function createAgentDetailScenario(
             {
               agent_id: "opencode",
               agent_name: "opencode",
-              root_path: "/Users/me/.config/opencode/skills",
-              install_path: "/Users/me/.config/opencode/skills/codex-planner",
+              root_path: "/Users/example/.config/opencode/skills",
+              install_path: "/Users/example/.config/opencode/skills/codex-planner",
               status: "Installed",
               root_available: true,
               root_status: "available",
@@ -5671,7 +5671,7 @@ function createAgentDetailScenario(
               agent_name: options.longTargetNames
                 ? "团队共享知识与工作流超长自定义目录名称"
                 : "共享示例",
-              root_path: "/Users/me/team-memory",
+              root_path: "/Users/example/team-memory",
               install_path: customInstallPath,
               status: customInstalled ? "Installed" : "NotInstalled",
               root_available: true,
@@ -5683,8 +5683,8 @@ function createAgentDetailScenario(
               {
                 agent_id: "openclaw",
                 agent_name: "OpenClaw",
-                root_path: "/Users/me/.openclaw/skills",
-                install_path: "/Users/me/.openclaw/skills/codex-planner",
+                root_path: "/Users/example/.openclaw/skills",
+                install_path: "/Users/example/.openclaw/skills/codex-planner",
                 status: "Installed",
                 root_available: true,
                 root_status: "available",
@@ -5692,8 +5692,8 @@ function createAgentDetailScenario(
               {
                 agent_id: "custom-bound",
                 agent_name: "已绑定目录",
-                root_path: "/Users/me/bound-skills",
-                install_path: "/Users/me/bound-skills/codex-planner",
+                root_path: "/Users/example/bound-skills",
+                install_path: "/Users/example/bound-skills/codex-planner",
                 status: "Installed",
                 root_available: true,
                 root_status: "available",
@@ -5701,8 +5701,8 @@ function createAgentDetailScenario(
               {
                 agent_id: "custom-unbound",
                 agent_name: "未绑定目录",
-                root_path: "/Users/me/unbound-skills",
-                install_path: "/Users/me/unbound-skills/codex-planner",
+                root_path: "/Users/example/unbound-skills",
+                install_path: "/Users/example/unbound-skills/codex-planner",
                 status: "Installed",
                 root_available: true,
                 root_status: "available",
@@ -5710,8 +5710,8 @@ function createAgentDetailScenario(
               {
                 agent_id: "custom-conflict",
                 agent_name: "冲突目录",
-                root_path: "/Users/me/conflict-skills",
-                install_path: "/Users/me/conflict-skills/codex-planner",
+                root_path: "/Users/example/conflict-skills",
+                install_path: "/Users/example/conflict-skills/codex-planner",
                 status: "ConflictNonSkill",
                 root_available: true,
                 root_status: "available",
@@ -5722,8 +5722,8 @@ function createAgentDetailScenario(
             targets.push({
               agent_id: "hermes",
               agent_name: "Hermes",
-              root_path: "/Users/me/.hermes/skills",
-              install_path: "/Users/me/.hermes/skills/codex-planner",
+              root_path: "/Users/example/.hermes/skills",
+              install_path: "/Users/example/.hermes/skills/codex-planner",
               status: "AgentRootUnavailable",
               root_available: false,
               root_status: "missing",
@@ -5825,7 +5825,7 @@ function createSearchDedupeScenario() {
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.codex/skills",
+          path: "/Users/example/.codex/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -5839,7 +5839,7 @@ function createSearchDedupeScenario() {
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.claude/skills",
+          path: "/Users/example/.claude/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -5853,22 +5853,22 @@ function createSearchDedupeScenario() {
       ...agentDetailSkill("shared-codex", "codex", "Codex", sharedSource),
       name: "shared-tool",
       description: "Shared skill across agents",
-      install_path: "/Users/me/.codex/skills/shared-tool",
-      metadata_path: "/Users/me/.codex/skills/shared-tool/SKILL.md",
+      install_path: "/Users/example/.codex/skills/shared-tool",
+      metadata_path: "/Users/example/.codex/skills/shared-tool/SKILL.md",
     },
     {
       ...agentDetailSkill("shared-claude", "claude-code", "Claude Code", sharedSource),
       name: "shared-tool",
       description: "Shared skill across agents",
-      install_path: "/Users/me/.claude/skills/shared-tool",
-      metadata_path: "/Users/me/.claude/skills/shared-tool/SKILL.md",
+      install_path: "/Users/example/.claude/skills/shared-tool",
+      metadata_path: "/Users/example/.claude/skills/shared-tool/SKILL.md",
     },
     {
       ...agentDetailSkill("claude-only", "claude-code", "Claude Code", claudeOnlySource),
       name: "claude-only",
       description: "Claude-only helper",
-      install_path: "/Users/me/.claude/skills/claude-only",
-      metadata_path: "/Users/me/.claude/skills/claude-only/SKILL.md",
+      install_path: "/Users/example/.claude/skills/claude-only",
+      metadata_path: "/Users/example/.claude/skills/claude-only/SKILL.md",
     },
   ];
 
@@ -5911,7 +5911,7 @@ function createPartialSourceDedupeScenario() {
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.codex/skills",
+          path: "/Users/example/.codex/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -5925,7 +5925,7 @@ function createPartialSourceDedupeScenario() {
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.claude/skills",
+          path: "/Users/example/.claude/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -5939,15 +5939,15 @@ function createPartialSourceDedupeScenario() {
       ...agentDetailSkill("brainstorming-codex", "codex", "Codex", brainstormingSource),
       name: "brainstorming",
       description: "Brainstorming skill",
-      install_path: "/Users/me/.codex/skills/brainstorming",
-      metadata_path: "/Users/me/.codex/skills/brainstorming/SKILL.md",
+      install_path: "/Users/example/.codex/skills/brainstorming",
+      metadata_path: "/Users/example/.codex/skills/brainstorming/SKILL.md",
     },
     {
       ...agentDetailSkill("brainstorming-claude", "claude-code", "Claude Code", null),
       name: "brainstorming",
       description: "Brainstorming skill",
-      install_path: "/Users/me/.claude/skills/brainstorming",
-      metadata_path: "/Users/me/.claude/skills/brainstorming/SKILL.md",
+      install_path: "/Users/example/.claude/skills/brainstorming",
+      metadata_path: "/Users/example/.claude/skills/brainstorming/SKILL.md",
     },
   ];
 
@@ -5990,7 +5990,7 @@ function createHomeSortScenario() {
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.codex/skills",
+          path: "/Users/example/.codex/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -6047,7 +6047,7 @@ function createMissingLocalUpdatedAtScenario() {
       enabled: true,
       paths: [
         {
-          path: "/Users/me/.codex/skills",
+          path: "/Users/example/.codex/skills",
           scope: "user",
           exists: true,
           readable: true,
@@ -6121,8 +6121,8 @@ function agentDetailSkill(
     agent_name: agentName,
     name: id,
     description: `${agentName} managed skill`,
-    install_path: `/Users/me/.${agentId}/skills/${id}`,
-    metadata_path: `/Users/me/.${agentId}/skills/${id}/SKILL.md`,
+    install_path: `/Users/example/.${agentId}/skills/${id}`,
+    metadata_path: `/Users/example/.${agentId}/skills/${id}/SKILL.md`,
     metadata_status: "found",
     metadata_error: null,
     source_id: source?.id ?? null,

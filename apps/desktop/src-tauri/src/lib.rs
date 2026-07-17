@@ -4401,7 +4401,7 @@ description: {description}
                     proxy_url: Some("  http://proxy.corp.example:8080  ".to_string()),
                     no_proxy: Some("  localhost,127.0.0.1,.corp.example  ".to_string()),
                     certificate_authority_bundle_path: Some(
-                        "  /Users/me/certs/corp-ca.pem  ".to_string(),
+                        "  /Users/example/certs/corp-ca.pem  ".to_string(),
                     ),
                 },
                 ..Default::default()
@@ -4425,7 +4425,7 @@ description: {description}
                 .enterprise_network
                 .certificate_authority_bundle_path
                 .as_deref(),
-            Some("/Users/me/certs/corp-ca.pem")
+            Some("/Users/example/certs/corp-ca.pem")
         );
         assert_eq!(
             environment,
@@ -4444,7 +4444,7 @@ description: {description}
                 ),
                 (
                     "GIT_SSL_CAINFO".to_string(),
-                    "/Users/me/certs/corp-ca.pem".to_string()
+                    "/Users/example/certs/corp-ca.pem".to_string()
                 ),
             ]
         );
