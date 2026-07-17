@@ -6,7 +6,7 @@ Metis is a local-first Agent Skill manager for discovering, installing, updating
 
 ## Documentation
 
-- [Getting Started](getting-started.md): install Metis and run your first scan.
+- [Getting Started](getting-started.md): check the release status, review requirements, and run your first scan.
 - [User Guide](user-guide.md): manage sources, updates, backups, rollbacks, and cross-Agent installation.
 - [Troubleshooting](troubleshooting.md): resolve startup, Git, path, and installation issues.
 - [FAQ](faq.md): learn about local data, network access, private repositories, and updates.

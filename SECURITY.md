@@ -14,7 +14,7 @@ If private reporting is unavailable, open a public Issue asking the maintainer f
 
 - Metis stores its index, settings, backups, and audit data locally.
 - Metis does not collect telemetry or upload Skill contents, local paths, settings, or usage data.
-- Metis does not store Git tokens, SSH private keys, or repository passwords. Private repository access relies on system Git, an SSH agent, or a Git credential helper.
+- Metis does not store Git tokens, SSH private keys, or repository passwords. Remote source actions require system Git, and private repository access relies on the user's SSH agent or Git credential helper.
 - Local scanning does not require network access. Remote access occurs after explicit actions such as previewing a source, checking for updates, viewing remote changes, or downloading an update.
 - The optional startup update check contacts GitHub Releases and can be disabled in Settings.
 - Metis performs static checks on Skill files but does not execute scripts contained in a Skill. Static warnings are not a sandbox or antivirus guarantee.
@@ -22,9 +22,9 @@ If private reporting is unavailable, open a public Issue asking the maintainer f
 
 ### Application distribution
 
-Download Metis only from this repository's [GitHub Releases](https://github.com/wylycool/metis/releases). Release assets include SHA-256 checksums.
+Metis 1.5.0 is still in final release preparation, and no installable package is currently available. After the official release, download Metis only from this repository's [GitHub Releases](https://github.com/wylycool/metis/releases); release assets will include SHA-256 checksums.
 
-Current macOS packages are not signed and notarized with Apple Developer ID, and current Windows packages are not signed with Authenticode. Gatekeeper or SmartScreen may therefore display an unknown-developer warning. The in-app Tauri update signature verifies the Metis update channel and file integrity, but it does not replace operating-system code signing.
+The planned Metis 1.5.0 macOS packages are not signed and notarized with Apple Developer ID, and the planned Windows packages are not signed with Authenticode. After release, Gatekeeper or SmartScreen may therefore display an unknown-developer warning. The in-app Tauri update signature verifies the Metis update channel and file integrity, but it does not replace operating-system code signing.
 
 ## 简体中文
 
@@ -38,7 +38,7 @@ Current macOS packages are not signed and notarized with Apple Developer ID, and
 
 - Metis 的索引、设置、备份和审计数据保存在本机。
 - Metis 不收集遥测，也不会上传 Skill 内容、本地路径、设置或使用数据。
-- Metis 不保存 Git Token、SSH 私钥或仓库密码。私有仓库访问依赖系统 Git、SSH agent 或 Git credential helper。
+- Metis 不保存 Git Token、SSH 私钥或仓库密码。远端来源操作需要系统 Git，私有仓库访问依赖用户已有的 SSH agent 或 Git credential helper。
 - 扫描本地 Skills 不需要网络。预览来源、检查更新、查看远端变化或下载安装包等明确操作才会访问远端。
 - 启动时检查软件更新是可选功能，可以在 Settings 中关闭。
 - Metis 会对 Skill 文件进行静态检查，但不会执行 Skill 中的脚本。静态提示不能替代沙箱或杀毒软件。
@@ -46,6 +46,6 @@ Current macOS packages are not signed and notarized with Apple Developer ID, and
 
 ### 应用分发
 
-请只从本仓库的 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载 Metis，并使用 Release 中的 SHA-256 校验和检查文件。
+Metis 1.5.0 正在进行正式发布前准备，当前暂无可安装的软件包。正式发布后，请只从本仓库的 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载 Metis；Release 资产将包含 SHA-256 校验和。
 
-当前 macOS 安装包尚未使用 Apple Developer ID 签名和公证，Windows 安装包尚未使用 Authenticode 签名，因此 Gatekeeper 或 SmartScreen 可能显示未知开发者提示。应用内的 Tauri 更新签名用于确认 Metis 更新通道和文件完整性，但不能替代操作系统代码签名。
+计划中的 Metis 1.5.0 macOS 安装包尚未使用 Apple Developer ID 签名和公证，Windows 安装包尚未使用 Authenticode 签名。正式发布后，Gatekeeper 或 SmartScreen 可能显示未知开发者提示。应用内的 Tauri 更新签名用于确认 Metis 更新通道和文件完整性，但不能替代操作系统代码签名。

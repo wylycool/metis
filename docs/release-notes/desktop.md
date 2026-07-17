@@ -23,6 +23,10 @@ Metis is a cross-platform, local-first Agent Skill manager.
 - Copy an existing local Skill to another Agent without accessing the remote or overwriting an existing directory.
 - Manage Agent paths, custom paths, trusted sources, and the one-click update list in Settings.
 
+### System Git requirement
+
+Local scanning, browsing, and local copying do not require Git. Source preview, connection tests, remote installation, update checks, remote diffs, and source updates require a working system Git. Private repository authentication uses the user's existing SSH agent or Git credential helper; Metis does not store repository credentials.
+
 ### Network and installation behavior
 
 Local scanning does not access a remote Git server. Git access occurs after an explicit source preview, connection test, update check, diff request, or update action. The optional startup application-update check can be disabled in Settings.
@@ -53,6 +57,10 @@ Metis 是一个跨平台、本地优先的 Agent Skill 管理器。
 - 将远端 Skill 安装到用户选择的 Agent 路径。
 - 把已有本地 Skill 复制到其他 Agent，不访问远端，也不覆盖已有目录。
 - 在 Settings 中管理 Agent 路径、自定义路径、可信来源和一键更新列表。
+
+### 系统 Git 要求
+
+本地扫描、浏览和本地复制不要求 Git。预览来源、测试连接、从远端安装、检查更新、查看远端差异和来源更新需要本机可用的系统 Git。私有仓库认证使用用户已有的 SSH agent 或 Git credential helper；Metis 不保存仓库凭据。
 
 ### 网络和安装行为
 

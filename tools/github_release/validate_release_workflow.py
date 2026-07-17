@@ -13,6 +13,7 @@ sys.dont_write_bytecode = True
 
 CONFIG = {
     "expected_version": "1.5.0",
+    "ci_workflow": Path(".github/workflows/ci.yml"),
     "workflow": Path(".github/workflows/desktop-preview.yml"),
     "release_notes": Path("docs/release-notes/desktop.md"),
     "cargo_manifest": Path("Cargo.toml"),
@@ -96,7 +97,10 @@ def workspace_versions() -> dict[str, str]:
     }
 
 
-def validate_action_pins(workflow_text: str) -> None:
+def validate_action_pins(
+    workflow_text: str,
+    expected_actions: set[str] | None = None,
+) -> None:
     uses_lines = re.findall(r"(?m)^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?\s*$", workflow_text)
     assert uses_lines, "release workflow must use pinned Actions"
 
@@ -115,11 +119,15 @@ def validate_action_pins(workflow_text: str) -> None:
         )
         observed_actions.add(action)
 
-    assert observed_actions == set(ACTION_PINS), observed_actions
+    if expected_actions is None:
+        expected_actions = set(ACTION_PINS)
+    assert observed_actions == expected_actions, observed_actions
 
 
 def main() -> None:
     expected_version = CONFIG["expected_version"]
+    ci_workflow_text = CONFIG["ci_workflow"].read_text()
+    ci_workflow = yaml.safe_load(ci_workflow_text)
     workflow_text = CONFIG["workflow"].read_text()
     workflow = yaml.safe_load(workflow_text)
     tauri_config = json.loads(CONFIG["tauri_config"].read_text())
@@ -128,6 +136,12 @@ def main() -> None:
     validate = jobs["validate"]
     build = jobs["build"]
     release = jobs["release"]
+    sign_step = next(
+        step for step in build["steps"] if step["name"] == "Sign updater package"
+    )
+    upload_step = next(
+        step for step in build["steps"] if step["name"] == "Upload desktop package"
+    )
     release_script = next(
         step["run"]
         for step in release["steps"]
@@ -144,12 +158,53 @@ def main() -> None:
         if step["name"] == "Finalize GitHub Release"
     )
 
+    assert ci_workflow["name"] == "CI"
+    assert ci_workflow["permissions"] == {"contents": "read"}
+    assert set(ci_workflow["jobs"]) == {"rust", "desktop"}
+    assert re.search(r"(?m)^  pull_request:\s*$", ci_workflow_text)
+    assert re.search(r"(?m)^  push:\s*$", ci_workflow_text)
+    assert "branches: [main]" in ci_workflow_text
+    assert "pull_request_target" not in ci_workflow_text
+    assert "workflow_dispatch" not in ci_workflow_text
+    assert "contents: write" not in ci_workflow_text
+    assert "secrets." not in ci_workflow_text
+    assert "upload-artifact" not in ci_workflow_text
+    assert "cargo fmt --check" in ci_workflow_text
+    assert "cargo test" in ci_workflow_text
+    assert "cargo clippy --all-targets --all-features" in ci_workflow_text
+    assert "pnpm test:e2e" in ci_workflow_text
+    assert "pnpm build" in ci_workflow_text
+    assert "tools/github_release/validate_release_workflow.py" in ci_workflow_text
+    validate_action_pins(
+        ci_workflow_text,
+        {
+            "actions/checkout",
+            "dtolnay/rust-toolchain",
+            "pnpm/action-setup",
+            "actions/setup-node",
+        },
+    )
+
     assert workflow["name"] == "Desktop Release Packages"
+    assert workflow["permissions"] == {"contents": "read"}
     assert validate["name"] == "Validate desktop release version"
     assert build["needs"] == "validate"
     assert set(release["needs"]) == {"validate", "build"}
 
-    assert "refs/tags/desktop-v" in release["if"]
+    release_condition = (
+        "github.event_name == 'push' && "
+        "startsWith(github.ref, 'refs/tags/desktop-v')"
+    )
+    assert release["if"] == release_condition
+    assert sign_step["if"] == release_condition
+    secret_build_steps = [
+        step["name"]
+        for step in build["steps"]
+        if "secrets." in json.dumps(step, sort_keys=True)
+    ]
+    assert secret_build_steps == ["Sign updater package"]
+    assert "unsigned-preview" in upload_step["with"]["name"]
+    assert upload_step["with"]["retention-days"] == 3
     validate_action_pins(workflow_text)
     assert "SHA256SUMS" in workflow_text
     assert '"Metis_${release_version}_universal.dmg"' in workflow_text

@@ -8,9 +8,17 @@ A scan reads the Agent paths configured in Settings and discovers first-level di
 
 When the same Skill is installed for multiple Agents, the home page groups its installation locations. The detail page lets you inspect and manage those locations.
 
+## System Git boundary
+
+Without system Git, Metis can still scan and browse local Skills, manage paths, inspect local state, and copy an installed Skill to another local location.
+
+The following actions require a working system Git: source preview, connection tests, remote installation, update checks, remote diffs, and source updates. Metis 1.5.0 does not support these remote features when system Git is unavailable.
+
 ## Sources and updates
 
 A source includes a Git repository URL, the Skill subdirectory inside the repository, and a branch or other ref. Update checks are explicit user actions; opening a detail page does not fetch in the background.
+
+“Trust this source and add it to the one-click update list” marks the source as trusted and makes the related Skill eligible for one-click update. One-click update processes only trusted Skills that are in the list and have no local modifications. Turning this setting off does not prevent manual checks or updates.
 
 Before replacing files, confirm that:
 
@@ -51,6 +59,16 @@ Installation locations on the detail page use the current local Skill as the cop
 - Control startup checks for Metis application updates and run a manual check.
 
 One-click update processes only trusted Skills that are in the list and have no local modifications. Other cases still require a manual check and confirmation.
+
+## Metis application updates
+
+- Startup checks can be disabled in Settings, and a failed check does not affect local Skill management.
+- Users can also check for a new Metis version manually in Settings.
+- A package is downloaded only after the user explicitly confirms the download.
+- Metis verifies the package and saves the verified file to the system Downloads directory.
+- Metis does not install automatically, elevate privileges, quit, or restart. The user completes installation manually.
+
+Skill source updates and Metis application updates are separate workflows: the former updates user-managed Skills, while the latter only checks for and downloads a new Metis application version.
 
 ## Private repositories
 
