@@ -23,6 +23,7 @@ CONFIG = {
     "cargo_manifest": Path("Cargo.toml"),
     "cargo_lock": Path("Cargo.lock"),
     "desktop_package": Path("apps/desktop/package.json"),
+    "nvmrc": Path(".nvmrc"),
     "desktop_manifest": Path("apps/desktop/src-tauri/Cargo.toml"),
     "tauri_config": Path("apps/desktop/src-tauri/tauri.conf.json"),
     "latest_json_generator": Path("tools/software_update/generate_latest_json.py"),
@@ -30,12 +31,12 @@ CONFIG = {
 }
 
 ACTION_PINS = {
-    "actions/checkout": ("34e114876b0b11c390a56381ad16ebd13914f8d5", "v4"),
+    "actions/checkout": ("9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0", "v7.0.0"),
     "dtolnay/rust-toolchain": ("4cda84d5c5c54efe2404f9d843567869ab1699d4", "stable"),
-    "pnpm/action-setup": ("b906affcce14559ad1aafd4ab0e942779e9f58b1", "v4"),
-    "actions/setup-node": ("49933ea5288caeca8642d1e84afbd3f7d6820020", "v4"),
-    "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4"),
-    "actions/download-artifact": ("d3f86a106a0bac45b974a628896c90dbdf5c8093", "v4"),
+    "pnpm/action-setup": ("0ebf47130e4866e96fce0953f49152a61190b271", "v6.0.9"),
+    "actions/setup-node": ("820762786026740c76f36085b0efc47a31fe5020", "v7.0.0"),
+    "actions/upload-artifact": ("043fb46d1a93c77aae656e7c1c64a875d1fc6a0a", "v7.0.1"),
+    "actions/download-artifact": ("3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c", "v8.0.1"),
 }
 
 SEMVER_PATTERN = re.compile(
@@ -135,6 +136,7 @@ def main() -> None:
     workflow_text = CONFIG["workflow"].read_text()
     workflow = yaml.safe_load(workflow_text)
     tauri_config = json.loads(CONFIG["tauri_config"].read_text())
+    desktop_package = json.loads(CONFIG["desktop_package"].read_text())
     desktop_manifest = tomllib.loads(CONFIG["desktop_manifest"].read_text())
     jobs = workflow["jobs"]
     validate = jobs["validate"]
@@ -179,6 +181,15 @@ def main() -> None:
     assert "pnpm test:e2e" in ci_workflow_text
     assert "pnpm build" in ci_workflow_text
     assert "tools/github_release/validate_release_workflow.py" in ci_workflow_text
+    assert CONFIG["nvmrc"].read_text().strip() == "24"
+    assert desktop_package["packageManager"] == "pnpm@10.34.5"
+    assert desktop_package["engines"] == {
+        "node": ">=24 <25",
+        "pnpm": "10.34.5",
+    }
+    assert ci_workflow_text.count("node-version: 24") == 1
+    assert ci_workflow_text.count("version: 10.34.5") == 1
+    assert "node-version: 22" not in ci_workflow_text
     validate_action_pins(
         ci_workflow_text,
         {
@@ -209,6 +220,9 @@ def main() -> None:
     assert secret_build_steps == ["Sign updater package"]
     assert "unsigned-preview" in upload_step["with"]["name"]
     assert upload_step["with"]["retention-days"] == 3
+    assert workflow_text.count("node-version: 24") == 1
+    assert workflow_text.count("version: 10.34.5") == 1
+    assert "node-version: 22" not in workflow_text
     validate_action_pins(workflow_text)
     assert "SHA256SUMS" in workflow_text
     assert '"Metis_${release_version}_universal.dmg"' in workflow_text
