@@ -14,12 +14,13 @@ English | [简体中文](../zh-CN/troubleshooting.md)
 - Confirm that `git --version` works in a terminal.
 - If Metis was launched from the desktop, make sure Git is available through the system PATH.
 - For a private repository, run `git ls-remote <repository-url>` in a terminal first to verify the SSH agent or credential helper.
+- Without Git, local scanning, browsing, and local copying remain available, but remote preview, installation, update checks, and source updates are unavailable.
 
 ## Source preview or update check fails
 
 - Verify the repository URL, ref, and Skill subdirectory.
 - Confirm that the target subdirectory contains `SKILL.md`.
-- Check the network, proxy, enterprise certificate, and Git-host permissions.
+- If system Git uses a proxy or custom certificate, first confirm in a terminal that it can access the same repository. Metis does not provide separate proxy or certificate settings.
 - Do not place a token directly in the repository URL.
 
 ## Installation, copy, or update fails
@@ -36,10 +37,11 @@ Info usually indicates scripts or executable files. Warning may indicate downloa
 ## Application update or installer issues
 
 - A failed startup update check does not affect local Skill management; retry manually in Settings later.
-- Current macOS and Windows packages do not have operating-system code signing and may show an unknown-developer warning.
-- Use packages only from this repository's Releases and verify `SHA256SUMS`.
+- Metis 1.5.0 is still in final release preparation, and no installable package is currently available.
+- After the official release, macOS and Windows packages will still lack operating-system code signing and may show an unknown-developer warning.
+- After release, use packages only from this repository's Releases and verify `SHA256SUMS`.
 - Metis does not install a downloaded update automatically; complete installation manually from Downloads.
 
 ## Reporting a problem
 
-If the problem continues, open a GitHub Issue with the Metis version, operating system, reproduction steps, and sanitized logs. Remove tokens, private repository URLs, personal data, and complete local paths. Report vulnerabilities privately through [SECURITY.md](../../SECURITY.md).
+If the problem continues, open a [GitHub Issue](https://github.com/wylycool/metis/issues) with the Metis version, operating system, reproduction steps, and sanitized logs. Remove tokens, private repository URLs, personal data, and complete local paths. Report vulnerabilities privately through [SECURITY.md](../../SECURITY.md).

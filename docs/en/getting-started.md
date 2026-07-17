@@ -20,21 +20,28 @@ If a Linux AppImage is not executable, run:
 chmod +x Metis_*.AppImage
 ```
 
-## 2. Scan local Skills
+## 2. Requirements
+
+- Scanning and browsing local Skills, and copying an installed Skill to another local location, do not require system Git.
+- Source preview, connection tests, remote installation, update checks, remote diffs, and source updates require a working system Git.
+- Use `Settings` to check whether Git is available. Metis 1.5.0 does not support remote repository features when system Git is unavailable.
+- Private repository authentication relies on system Git, an SSH agent, or a Git credential helper. Metis has no token field and does not store credentials.
+
+## 3. Scan local Skills
 
 Open Metis, go to `Skills`, and run a new scan. Metis checks Codex, Claude Code, OpenClaw, Hermes, opencode, Cursor, Qoder, Gemini CLI, and custom paths.
 
 If nothing is found, check the Agent paths in `Settings` and confirm that the target directory contains `SKILL.md`.
 
-## 3. Bind a Git source
+## 4. Bind a Git source
 
 Open a Skill and enter its Git repository URL, repository subdirectory, and ref. For a private repository, configure an SSH agent or Git credential helper first. Metis does not store tokens or private keys.
 
-## 4. Check and apply updates
+## 5. Check and apply updates
 
 After checking for updates, review the result, local modifications, and file diff before applying the update. A replacement update creates a backup first, and you can restore that backup later if needed.
 
-## 5. Add or copy a Skill
+## 6. Add or copy a Skill
 
 - Remote installation: choose “Add Skill”, paste a GitHub Skill directory page or repository URL, preview it, and select target paths.
 - Local copy: expand installation locations on the detail page and copy the current content to another Agent. This action does not access the remote or overwrite an existing directory.

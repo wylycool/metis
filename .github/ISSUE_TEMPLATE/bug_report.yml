@@ -1,0 +1,92 @@
+name: "🐛 Bug Report / Bug 报告"
+description: "Report reproducible errors or unexpected behavior. / 报告可复现的错误或异常行为。"
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve Metis. Do not include tokens, private repository URLs, personal information, complete local paths, or uncoordinated vulnerability details.
+
+        感谢你帮助改进 Metis。请勿提交 Token、私有仓库地址、个人信息、完整本机路径或尚未协调披露的漏洞细节。
+
+  - type: checkboxes
+    id: self_checks
+    attributes:
+      label: "Self Checks / 提交前检查"
+      options:
+        - label: "I searched existing Issues, including closed ones. / 我已搜索现有及已关闭的 Issues。"
+          required: true
+        - label: "I reviewed the FAQ and troubleshooting guide. / 我已查看常见问题和故障排查。"
+          required: true
+        - label: "I removed credentials, private URLs, personal data, and complete local paths. / 我已移除凭据、私有地址、个人数据和完整本机路径。"
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "Metis Version / Metis 版本"
+      description: "Use the version shown in Settings. / 请填写 Settings 中显示的版本。"
+      placeholder: "e.g. 1.5.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operating_system
+    attributes:
+      label: "Operating System / 操作系统"
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other / 其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: "Affected Area / 涉及功能"
+      options:
+        - "Skill scanning and discovery / Skill 扫描与发现"
+        - "Source binding or remote installation / 来源绑定或远端安装"
+        - "Update check or diff / 更新检查或差异查看"
+        - "Backup or rollback / 备份或回滚"
+        - "Agent or custom paths / Agent 或自定义路径"
+        - "Metis application update / Metis 软件更新"
+        - "Interface or accessibility / 界面或可访问性"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to Reproduce / 复现步骤"
+      placeholder: |
+        1. Open ... / 打开……
+        2. Select ... / 选择……
+        3. Observe ... / 看到……
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: "Expected Behavior / 预期行为"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: "Actual Behavior / 实际行为"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: "Sanitized Logs or Additional Context / 脱敏日志或补充信息"
+      description: "Optional. Remove tokens, private URLs, personal data, and complete local paths before posting. / 可选。提交前请删除 Token、私有地址、个人数据和完整本机路径。"

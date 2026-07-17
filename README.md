@@ -28,6 +28,12 @@ Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code
 
 计划中的 1.5.0 发布包尚未包含 macOS Developer ID 公证和 Windows Authenticode 签名。正式发布后首次打开时，macOS 或 Windows 可能显示未知开发者或未知发布者提示；届时请仅从本仓库的 GitHub Releases 下载，并使用 Release 中的 `SHA256SUMS` 校验文件。
 
+## 使用前提
+
+- 扫描、浏览本地 Skills，以及把已安装 Skill 复制到其他本地位置，不要求安装 Git，也不会访问 Git 远端。
+- 预览远端来源、测试连接、从远端安装、检查更新、查看远端差异和应用来源更新，需要本机可用的系统 Git。
+- Metis 不保存 Git Token、SSH 私钥或仓库密码；私有仓库认证继续使用系统 Git、SSH agent 或 Git credential helper。
+
 ## 三步开始使用
 
 ### 1. 扫描本机 Skills
@@ -79,6 +85,12 @@ Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code
 - 只有加入一键更新列表且本地未修改的 Skill 才会自动处理。
 - 用户可以随时移出列表，继续使用手动检查和更新。
 
+### Metis 软件更新
+
+- 可在启动后静默检查稳定版，也可在 Settings 中手动检查或关闭启动检查。
+- 发现新版后由用户确认下载，Metis 会校验安装包并保存到系统 Downloads。
+- Metis 不会自动安装、提权、退出或重启；系统安装仍由用户手动完成。
+
 ## 支持的 Agent
 
 Metis 当前内置以下 Agent 路径支持：
@@ -91,10 +103,9 @@ Metis 当前内置以下 Agent 路径支持：
 - Cursor
 - Qoder
 - Gemini CLI
-- 通用 Agent Skills 目录
 - 用户自定义路径
 
-其他使用 `SKILL.md` 的 Agent 可以先通过自定义路径进行管理。
+其他使用 `SKILL.md` 的 Agent 可以通过命名的自定义路径进行管理。
 
 ## 隐私与网络访问
 

@@ -1,0 +1,64 @@
+name: "📖 Documentation Issue / 文档问题"
+description: "Report unclear, missing, outdated, or incorrect documentation. / 报告不清楚、缺失、过时或错误的文档。"
+title: "[Docs] "
+labels:
+  - documentation
+body:
+  - type: checkboxes
+    id: self_checks
+    attributes:
+      label: "Self Checks / 提交前检查"
+      options:
+        - label: "I searched existing Issues, including closed ones. / 我已搜索现有及已关闭的 Issues。"
+          required: true
+        - label: "This report does not contain credentials, private URLs, personal data, or complete local paths. / 本报告不包含凭据、私有地址、个人数据或完整本机路径。"
+          required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: "Language / 语言"
+      multiple: true
+      options:
+        - English
+        - 简体中文
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: "Document Location / 文档位置"
+      description: "Provide a repository link, file, or section name. / 请提供仓库链接、文件或章节名称。"
+      placeholder: "e.g. README.md or docs/zh-CN/getting-started.md"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: "Issue Type / 问题类型"
+      options:
+        - "Incorrect information / 信息错误"
+        - "Outdated information / 内容过时"
+        - "Missing information / 信息缺失"
+        - "Unclear wording / 表述不清"
+        - "Translation mismatch / 翻译不一致"
+        - "Broken link / 链接失效"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description / 问题描述"
+      description: "Explain what is wrong and what users need to understand. / 请说明问题，以及用户实际需要理解的内容。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested_change
+    attributes:
+      label: "Suggested Change / 修改建议"
+      description: "Optional. Focus on user-visible behavior and avoid unnecessary implementation details. / 可选。请聚焦用户可见功能，避免不必要的技术实现细节。"

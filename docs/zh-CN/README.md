@@ -6,7 +6,7 @@ Metis 是一个本地优先的 Agent Skill 管理器，用于发现、安装、�
 
 ## 文档导航
 
-- [快速开始](getting-started.md)：下载安装并完成第一次扫描。
+- [快速开始](getting-started.md)：了解发布状态、使用前提并完成第一次扫描。
 - [用户指南](user-guide.md)：了解来源绑定、更新、备份、回滚和跨 Agent 安装。
 - [故障排查](troubleshooting.md)：处理启动、Git、路径和安装问题。
 - [常见问题](faq.md)：了解数据保存、网络访问、私有仓库和更新方式。

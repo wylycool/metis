@@ -1,0 +1,7 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Security Vulnerability / 安全漏洞"
+    url: "https://github.com/wylycool/metis/security/advisories/new"
+    about: |
+      Report vulnerabilities privately through GitHub Security Advisories.
+      请通过 GitHub Security Advisories 私下报告漏洞，不要公开漏洞细节。

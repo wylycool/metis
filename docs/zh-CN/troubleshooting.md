@@ -14,12 +14,13 @@
 - 确认终端中可以执行 `git --version`。
 - 如果通过图形界面启动 Metis，确认 Git 位于系统可发现的 PATH 中。
 - 私有仓库先在终端执行一次 `git ls-remote <仓库地址>`，确认 SSH agent 或 credential helper 可用。
+- 没有 Git 时仍可扫描、浏览和本地复制 Skill，但远端预览、安装、检查更新和来源更新不可用。
 
 ## 来源预览或更新检查失败
 
 - 检查仓库地址、分支和仓库内 Skill 目录。
 - 确认目标目录包含 `SKILL.md`。
-- 检查网络、代理、企业证书和 Git 主机的访问权限。
+- 如果系统 Git 使用代理或自定义证书，请先在终端确认同一仓库可以访问；Metis 不提供独立的代理或证书设置。
 - 不要把 Token 直接放进仓库 URL。
 
 ## 无法安装、复制或更新
@@ -36,10 +37,11 @@ Info 通常表示 Skill 中包含脚本或可执行文件；Warning 可能表示
 ## 软件更新或安装包问题
 
 - 启动检查失败不会影响本地 Skill 管理，可以稍后在 Settings 手动重试。
-- 当前 macOS 和 Windows 包未完成操作系统代码签名，可能出现未知开发者提示。
-- 只使用本仓库 Releases 的安装包，并核对 `SHA256SUMS`。
+- Metis 1.5.0 正在进行正式发布前准备，当前暂无可安装的软件包。
+- 正式发布后，macOS 和 Windows 包仍未包含操作系统代码签名，可能出现未知开发者提示。
+- 正式发布后只使用本仓库 Releases 的安装包，并核对 `SHA256SUMS`。
 - Metis 下载新版后不会自动安装，需要用户在 Downloads 中手动完成。
 
 ## 提交问题
 
-仍无法解决时，请在 GitHub Issues 中提供 Metis 版本、操作系统、复现步骤和脱敏日志。务必删除 Token、私有仓库地址、个人信息和完整本地路径。安全漏洞请按照 [SECURITY.md](../../SECURITY.md) 私下报告。
+仍无法解决时，请在 [GitHub Issues](https://github.com/wylycool/metis/issues) 中提供 Metis 版本、操作系统、复现步骤和脱敏日志。务必删除 Token、私有仓库地址、个人信息和完整本地路径。安全漏洞请按照 [SECURITY.md](../../SECURITY.md) 私下报告。

@@ -1,0 +1,66 @@
+name: "✨ Feature Request / 功能建议"
+description: "Describe a user problem or improvement. / 描述用户问题或改进建议。"
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please focus on the user need and desired outcome. A technical implementation proposal is not required.
+
+        请重点描述用户需求和期望结果，不需要提供技术实现方案。
+
+  - type: checkboxes
+    id: self_checks
+    attributes:
+      label: "Self Checks / 提交前检查"
+      options:
+        - label: "I searched existing Issues, including closed ones. / 我已搜索现有及已关闭的 Issues。"
+          required: true
+        - label: "This request does not contain credentials, private URLs, personal data, or complete local paths. / 本建议不包含凭据、私有地址、个人数据或完整本机路径。"
+          required: true
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: "Related Area / 相关功能"
+      options:
+        - "Skill scanning and discovery / Skill 扫描与发现"
+        - "Sources and updates / 来源与更新"
+        - "Backup and rollback / 备份与回滚"
+        - "Cross-Agent installation / 跨 Agent 安装"
+        - "Agent or custom paths / Agent 或自定义路径"
+        - "Metis application update / Metis 软件更新"
+        - "Documentation or support / 文档或支持"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem or Use Case / 问题或使用场景"
+      description: "What are you trying to accomplish, and what is difficult today? / 你想完成什么，目前遇到了什么困难？"
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired_outcome
+    attributes:
+      label: "Desired Outcome / 期望结果"
+      description: "Describe what a successful user experience would look like. / 请描述理想情况下用户能够获得什么结果。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_workaround
+    attributes:
+      label: "Current Workaround / 当前替代方式"
+      description: "Optional. How do you handle this today? / 可选。你目前如何处理这个问题？"
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: "Additional Context / 补充信息"
+      description: "Optional. Add sanitized examples or screenshots if they help explain the user need. / 可选。可以添加有助于说明需求的脱敏示例或截图。"

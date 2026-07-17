@@ -1,0 +1,62 @@
+name: "❓ Usage Question / 使用问题"
+description: "Ask about using or configuring Metis. / 询问 Metis 的使用或配置。"
+title: "[Question] "
+labels:
+  - question
+body:
+  - type: checkboxes
+    id: self_checks
+    attributes:
+      label: "Self Checks / 提交前检查"
+      options:
+        - label: "I reviewed the user guide, FAQ, and troubleshooting guide. / 我已查看用户指南、常见问题和故障排查。"
+          required: true
+        - label: "I searched existing Issues, including closed ones. / 我已搜索现有及已关闭的 Issues。"
+          required: true
+        - label: "I removed credentials, private URLs, personal data, and complete local paths. / 我已移除凭据、私有地址、个人数据和完整本机路径。"
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "Metis Version / Metis 版本"
+      placeholder: "e.g. 1.5.0"
+
+  - type: dropdown
+    id: operating_system
+    attributes:
+      label: "Operating System / 操作系统"
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Not applicable / 不适用
+
+  - type: dropdown
+    id: related_area
+    attributes:
+      label: "Related Area / 相关功能"
+      options:
+        - "Skill scanning and discovery / Skill 扫描与发现"
+        - "Sources and updates / 来源与更新"
+        - "Backup and rollback / 备份与回滚"
+        - "Cross-Agent installation / 跨 Agent 安装"
+        - "Agent or custom paths / Agent 或自定义路径"
+        - "Metis application update / Metis 软件更新"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "Question / 问题"
+      description: "Describe what you want to do and where you are blocked. / 请描述你想完成什么，以及目前卡在哪里。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: attempted
+    attributes:
+      label: "What Have You Tried? / 已尝试的方法"
+      description: "Optional. Include sanitized results from steps you already tried. / 可选。请提供已尝试步骤的脱敏结果。"

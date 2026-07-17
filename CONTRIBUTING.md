@@ -10,7 +10,7 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ### Before opening an issue
 
-- Search existing GitHub Issues first.
+- Search existing [GitHub Issues](https://github.com/wylycool/metis/issues) first.
 - For bugs, include the Metis version, operating system, reproduction steps, expected behavior, and actual behavior.
 - Remove tokens, private repository URLs, personal data, and complete local paths from logs and screenshots.
 - Report security vulnerabilities privately through [SECURITY.md](SECURITY.md), not through a public Issue.
@@ -20,10 +20,10 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 Requirements:
 
 - Rust stable
-- Node.js 18+
-- pnpm
+- Node.js 22
+- pnpm 10
 - Git
-- Platform prerequisites for Tauri 2
+- [Platform prerequisites for Tauri 2](https://v2.tauri.app/start/prerequisites/)
 
 ```bash
 git clone https://github.com/wylycool/metis.git
@@ -55,7 +55,7 @@ Implement the adapter contract in `crates/adapters`, add path-discovery and meta
 
 ### 提交 Issue 前
 
-- 先搜索现有 GitHub Issues。
+- 先搜索现有 [GitHub Issues](https://github.com/wylycool/metis/issues)。
 - 报告 Bug 时，请提供 Metis 版本、操作系统、复现步骤、预期行为和实际行为。
 - 从日志和截图中移除 Token、私有仓库地址、个人数据和完整本地路径。
 - 安全漏洞请按照 [SECURITY.md](SECURITY.md) 私下报告，不要创建公开 Issue。
@@ -65,10 +65,10 @@ Implement the adapter contract in `crates/adapters`, add path-discovery and meta
 需要安装：
 
 - Rust stable
-- Node.js 18+
-- pnpm
+- Node.js 22
+- pnpm 10
 - Git
-- Tauri 2 对应平台的系统依赖
+- [Tauri 2 对应平台的系统依赖](https://v2.tauri.app/start/prerequisites/)
 
 ```bash
 git clone https://github.com/wylycool/metis.git
