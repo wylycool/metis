@@ -20,8 +20,8 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 Requirements:
 
 - Rust stable
-- Node.js 22
-- pnpm 10
+- Node.js 24
+- pnpm 10.34.5
 - Git
 - [Platform prerequisites for Tauri 2](https://v2.tauri.app/start/prerequisites/)
 
@@ -65,8 +65,8 @@ Implement the adapter contract in `crates/adapters`, add path-discovery and meta
 需要安装：
 
 - Rust stable
-- Node.js 22
-- pnpm 10
+- Node.js 24
+- pnpm 10.34.5
 - Git
 - [Tauri 2 对应平台的系统依赖](https://v2.tauri.app/start/prerequisites/)
 
