@@ -2,7 +2,7 @@
 
 > 一个跨平台、本地优先、开源的 Agent Skill 管理器。
 
-[简体中文](docs/zh-CN/README.md) | [English](docs/en/README.md) | [下载 Metis](https://github.com/wylycool/metis/releases)
+[简体中文](docs/zh-CN/README.md) | [English](docs/en/README.md) | [发布状态](https://github.com/wylycool/metis/releases)
 
 Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code、OpenClaw、Hermes、opencode、Cursor、Qoder、Gemini CLI 等 Agent 工具中的 Skills。
 
@@ -16,7 +16,9 @@ Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载适合当前系统的安装包。
+**Metis 1.5.0 正在进行正式发布前的最后准备，当前暂不提供可安装的 DMG、EXE、DEB 或 AppImage。** Releases 页面保留的历史 prerelease 目前只有 GitHub 根据干净 Tag 自动生成的源码归档，不是可直接安装的软件包。
+
+1.5.0 正式发布并完成三平台核验后，可从 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载以下安装包：
 
 | 系统 | 安装包 | 说明 |
 | --- | --- | --- |
@@ -24,9 +26,7 @@ Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code
 | Windows | installer `.exe` | 通过安装程序完成安装 |
 | Linux | `.deb` / `.AppImage` | AppImage 首次使用时可能需要添加执行权限 |
 
-当前发布包尚未完成 macOS Developer ID 公证和 Windows Authenticode 签名。首次打开时，macOS 或 Windows 可能显示未知开发者或未知发布者提示，请仅从本仓库的 GitHub Releases 下载，并使用 Release 中的 `SHA256SUMS` 校验文件。
-
-下一正式版为 **Metis 1.5.0**。在正式 Release 发布前，Releases 页面中可能只有历史 Beta 版本。
+计划中的 1.5.0 发布包尚未包含 macOS Developer ID 公证和 Windows Authenticode 签名。正式发布后首次打开时，macOS 或 Windows 可能显示未知开发者或未知发布者提示；届时请仅从本仓库的 GitHub Releases 下载，并使用 Release 中的 `SHA256SUMS` 校验文件。
 
 ## 三步开始使用
 
