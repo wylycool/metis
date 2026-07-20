@@ -174,7 +174,10 @@ mod tests {
     }
 
     fn set_modified(path: &Path, modified_time: SystemTime) {
-        let file = fs::File::open(path).expect("test file should open");
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .open(path)
+            .expect("test file should open for time update");
         let times = fs::FileTimes::new()
             .set_modified(modified_time)
             .set_accessed(modified_time);

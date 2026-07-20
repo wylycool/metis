@@ -46,6 +46,7 @@ pub struct SystemGitRuntimeResolver;
 
 impl GitRuntimeResolver for SystemGitRuntimeResolver {
     fn resolve(&self) -> Result<GitRuntime, String> {
+        #[cfg(not(target_os = "windows"))]
         let started = Instant::now();
         eprintln!(
             "[metis][git-runtime] resolve start timeout_ms={}",
