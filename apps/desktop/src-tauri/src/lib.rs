@@ -3242,18 +3242,16 @@ mod tests {
         );
         assert_eq!(codex_target.status, "NotInstalled");
         for (agent_id, expected_root_suffix) in [
-            ("cursor", ".cursor/skills"),
-            ("qoder", ".qoder/skills"),
-            ("gemini-cli", ".gemini/skills"),
+            ("cursor", PathBuf::from(".cursor").join("skills")),
+            ("qoder", PathBuf::from(".qoder").join("skills")),
+            ("gemini-cli", PathBuf::from(".gemini").join("skills")),
         ] {
             let target = targets
                 .iter()
                 .find(|target| target.agent_id == agent_id)
                 .expect("new builtin target should exist");
-            assert!(target.root_path.ends_with(expected_root_suffix));
-            assert!(target
-                .install_path
-                .ends_with(&format!("{expected_root_suffix}/example")));
+            assert!(Path::new(&target.root_path).ends_with(&expected_root_suffix));
+            assert!(Path::new(&target.install_path).ends_with(expected_root_suffix.join("example")));
         }
 
         let custom_target = targets
@@ -4101,8 +4099,10 @@ description: {description}
             .local_updated_at
             .clone()
             .expect("scan should cache local updated at");
-        let skill_file =
-            fs::File::open(skill_dir.join("SKILL.md")).expect("skill file should open");
+        let skill_file = fs::OpenOptions::new()
+            .write(true)
+            .open(skill_dir.join("SKILL.md"))
+            .expect("skill file should open for time update");
         let future_time = SystemTime::now() + std::time::Duration::from_secs(60);
         let times = fs::FileTimes::new()
             .set_modified(future_time)
@@ -5824,7 +5824,7 @@ description: {description}
 
     #[test]
     fn scan_skills_command_runs_filesystem_work_in_blocking_worker() {
-        let source = include_str!("lib.rs");
+        let source = include_str!("lib.rs").replace("\r\n", "\n");
         let start = source
             .find("#[tauri::command]\nasync fn scan_skills(")
             .expect("scan_skills command should be async");

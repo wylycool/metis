@@ -703,7 +703,7 @@ fn refresh_regular_file_mtimes_inner(path: &Path, modified_time: SystemTime) -> 
         if !metadata.is_file() {
             continue;
         }
-        let file = fs::File::open(&entry_path)?;
+        let file = fs::OpenOptions::new().write(true).open(&entry_path)?;
         let times = fs::FileTimes::new()
             .set_modified(modified_time)
             .set_accessed(modified_time);

@@ -166,7 +166,17 @@ def main() -> None:
 
     assert ci_workflow["name"] == "CI"
     assert ci_workflow["permissions"] == {"contents": "read"}
-    assert set(ci_workflow["jobs"]) == {"rust", "desktop"}
+    assert set(ci_workflow["jobs"]) == {"rust", "windows-rust", "desktop"}
+    windows_rust = ci_workflow["jobs"]["windows-rust"]
+    assert windows_rust["name"] == "Windows Rust tests"
+    assert windows_rust["runs-on"] == "windows-latest"
+    assert windows_rust["timeout-minutes"] == 20
+    assert [step["name"] for step in windows_rust["steps"]] == [
+        "Checkout",
+        "Setup Rust",
+        "Run Windows Rust tests",
+    ]
+    assert windows_rust["steps"][-1]["run"] == "cargo test -p metis-desktop --lib"
     assert re.search(r"(?m)^  pull_request:\s*$", ci_workflow_text)
     assert re.search(r"(?m)^  push:\s*$", ci_workflow_text)
     assert "branches: [main]" in ci_workflow_text
