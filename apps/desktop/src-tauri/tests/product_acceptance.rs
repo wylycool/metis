@@ -16,13 +16,16 @@ fn p0_product_acceptance_runs_against_real_home_git_sqlite_and_backups() {
     let workspace = temp_dir("product-acceptance");
     let fixture = ProductAcceptanceFixture::create(&workspace);
     let previous_home = std::env::var_os("HOME");
+    let previous_user_profile = std::env::var_os("USERPROFILE");
     let previous_xdg_config_home = std::env::var_os("XDG_CONFIG_HOME");
     std::env::set_var("HOME", &fixture.home);
+    std::env::set_var("USERPROFILE", &fixture.home);
     std::env::set_var("XDG_CONFIG_HOME", fixture.home.join(".config"));
 
     let result = run_p0_product_acceptance(&fixture);
 
     restore_env("HOME", previous_home);
+    restore_env("USERPROFILE", previous_user_profile);
     restore_env("XDG_CONFIG_HOME", previous_xdg_config_home);
     fs::remove_dir_all(&workspace).expect("product acceptance workspace should be removed");
 

@@ -176,7 +176,7 @@ def main() -> None:
         "Setup Rust",
         "Run Windows Rust tests",
     ]
-    assert windows_rust["steps"][-1]["run"] == "cargo test -p metis-desktop --lib"
+    assert windows_rust["steps"][-1]["run"] == "cargo test -p metis-desktop"
     assert re.search(r"(?m)^  pull_request:\s*$", ci_workflow_text)
     assert re.search(r"(?m)^  push:\s*$", ci_workflow_text)
     assert "branches: [main]" in ci_workflow_text
