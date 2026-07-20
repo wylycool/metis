@@ -1,9 +1,9 @@
 use metis_desktop_lib::{
     apply_skill_update_for_state_with_checker, bind_skill_source_for_state,
     check_skill_updates_for_state_with_checker, get_skill_diff_for_state_with_checker,
-    list_skill_backups_for_state, restore_skill_backup_for_state, scan_skills_for_state,
-    DesktopAppState, DesktopBindSourceRequest, DesktopRestoreBackupRequest, DesktopScanRequest,
-    DesktopUpdateCheckRequest,
+    list_skill_backups_for_state, restore_skill_backup_for_state, save_desktop_settings_for_state,
+    scan_skills_for_state, DesktopAgentPathOverride, DesktopAppState, DesktopBindSourceRequest,
+    DesktopRestoreBackupRequest, DesktopScanRequest, DesktopSettings, DesktopUpdateCheckRequest,
 };
 use metis_git_provider::fetch::{EnvironmentGitRunner, GitCliProvider};
 use std::fs;
@@ -12,21 +12,12 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
-fn p0_product_acceptance_runs_against_real_home_git_sqlite_and_backups() {
+fn p0_product_acceptance_runs_against_isolated_agent_roots_git_sqlite_and_backups() {
     let workspace = temp_dir("product-acceptance");
     let fixture = ProductAcceptanceFixture::create(&workspace);
-    let previous_home = std::env::var_os("HOME");
-    let previous_user_profile = std::env::var_os("USERPROFILE");
-    let previous_xdg_config_home = std::env::var_os("XDG_CONFIG_HOME");
-    std::env::set_var("HOME", &fixture.home);
-    std::env::set_var("USERPROFILE", &fixture.home);
-    std::env::set_var("XDG_CONFIG_HOME", fixture.home.join(".config"));
 
     let result = run_p0_product_acceptance(&fixture);
 
-    restore_env("HOME", previous_home);
-    restore_env("USERPROFILE", previous_user_profile);
-    restore_env("XDG_CONFIG_HOME", previous_xdg_config_home);
     fs::remove_dir_all(&workspace).expect("product acceptance workspace should be removed");
 
     result.expect("P0 product acceptance should pass");
@@ -34,6 +25,33 @@ fn p0_product_acceptance_runs_against_real_home_git_sqlite_and_backups() {
 
 fn run_p0_product_acceptance(fixture: &ProductAcceptanceFixture) -> Result<(), String> {
     let state = DesktopAppState::new(&fixture.data_root, &fixture.cache_root);
+    save_desktop_settings_for_state(
+        &state,
+        DesktopSettings {
+            agent_path_overrides: vec![
+                DesktopAgentPathOverride {
+                    agent_id: "codex".to_string(),
+                    path: fixture
+                        .home
+                        .join(".codex")
+                        .join("skills")
+                        .to_string_lossy()
+                        .to_string(),
+                },
+                DesktopAgentPathOverride {
+                    agent_id: "claude-code".to_string(),
+                    path: fixture
+                        .home
+                        .join(".claude")
+                        .join("skills")
+                        .to_string_lossy()
+                        .to_string(),
+                },
+            ],
+            ..DesktopSettings::default()
+        },
+    )
+    .map_err(|error| format!("保存验收路径失败: {error}"))?;
     let checker = GitCliProvider::with_cache_root(
         EnvironmentGitRunner::new(vec![
             (
@@ -48,8 +66,14 @@ fn run_p0_product_acceptance(fixture: &ProductAcceptanceFixture) -> Result<(), S
         state.cache_root().to_string_lossy().to_string(),
     );
 
-    let initial_scan = scan_skills_for_state(&state, DesktopScanRequest::default())
-        .map_err(|error| format!("首次启动与扫描失败: {error}"))?;
+    let initial_scan = scan_skills_for_state(
+        &state,
+        DesktopScanRequest {
+            agent_ids: Some(vec!["codex".to_string(), "claude-code".to_string()]),
+            custom_paths: Vec::new(),
+        },
+    )
+    .map_err(|error| format!("首次启动与扫描失败: {error}"))?;
     assert_at_least_skill_count(&initial_scan.skills, 2)?;
     assert!(
         initial_scan.warnings.iter().any(|warning| warning
@@ -304,7 +328,7 @@ fn write_product_acceptance_report(report: &ProductAcceptanceReport) -> Result<(
          - 备份数: {}\n\
          - 回滚备份: `{}`\n\n\
          ## 覆盖范围\n\n\
-         - 首次启动与扫描：真实 HOME 下 Codex / Claude fixture。\n\
+         - 首次启动与扫描：隔离路径下的 Codex / Claude fixture。\n\
          - 绑定来源：真实本地 Git repo。\n\
          - 检查更新：真实 Git ref / commits behind / diff summary。\n\
          - 查看 diff：真实 `git diff` 输出。\n\
@@ -403,12 +427,4 @@ fn repo_root() -> PathBuf {
         .join("../../..")
         .canonicalize()
         .expect("repo root should resolve")
-}
-
-fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
-    if let Some(value) = value {
-        std::env::set_var(key, value);
-    } else {
-        std::env::remove_var(key);
-    }
 }
