@@ -25,7 +25,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ0M0JFQTIxNzQzOTBCNjQKUldSa0N6bDBJZW83MURCWmoyVEFTNzg1VGNVcXBPTWpUWi9yUm9LUW9XbS9na3lIMTBOR0R1OGoK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY2Q0ZDMjVGRkM1OTIxNTcKUldSWElWbjhYOExQOXRyN1RwVzJzenJ2cU1KRDJOR1A0T25BN2F2R1ZpUjZ6ZkJMdWFWOTQ1dVYK",
       "endpoints": [
         "https://github.com/wylycool/metis/releases/latest/download/latest.json"
       ]
