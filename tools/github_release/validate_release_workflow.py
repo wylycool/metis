@@ -1,6 +1,8 @@
 import importlib.util
 import json
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -135,6 +137,11 @@ def main() -> None:
     ci_workflow = yaml.safe_load(ci_workflow_text)
     workflow_text = CONFIG["workflow"].read_text()
     workflow = yaml.safe_load(workflow_text)
+    triggers = workflow.get("on", workflow.get(True))
+    signed_rehearsal = triggers["workflow_dispatch"]["inputs"]["signed_rehearsal"]
+    assert signed_rehearsal["type"] == "boolean"
+    assert signed_rehearsal["default"] is False
+    assert "rehearsal" in workflow["jobs"]
     tauri_config = json.loads(CONFIG["tauri_config"].read_text())
     desktop_package = json.loads(CONFIG["desktop_package"].read_text())
     desktop_manifest = tomllib.loads(CONFIG["desktop_manifest"].read_text())
@@ -142,6 +149,7 @@ def main() -> None:
     validate = jobs["validate"]
     build = jobs["build"]
     release = jobs["release"]
+    rehearsal = jobs["rehearsal"]
     sign_step = next(
         step for step in build["steps"] if step["name"] == "Sign updater package"
     )
@@ -220,8 +228,117 @@ def main() -> None:
         "github.event_name == 'push' && "
         "startsWith(github.ref, 'refs/tags/desktop-v')"
     )
+    rehearsal_condition = (
+        "github.event_name == 'workflow_dispatch' && inputs.signed_rehearsal && "
+        "github.ref == 'refs/heads/main'"
+    )
     assert release["if"] == release_condition
-    assert sign_step["if"] == release_condition
+    assert sign_step["if"] == f"({release_condition}) || ({rehearsal_condition})"
+    guard = next(
+        step for step in validate["steps"]
+        if step["name"] == "Restrict signed rehearsal to main"
+    )
+    assert guard["if"] == (
+        "github.event_name == 'workflow_dispatch' && inputs.signed_rehearsal"
+    )
+    assert guard["shell"] == "bash"
+    assert validate["steps"].index(guard) < next(
+        i for i, step in enumerate(validate["steps"])
+        if step["name"] == "Validate package versions and tag"
+    )
+    for ref, expected in {
+        "refs/heads/main": 0,
+        "refs/heads/feat/example-change": 1,
+        "refs/tags/desktop-v1.5.0": 1,
+    }.items():
+        result = subprocess.run(
+            ["bash", "-c", guard["run"]],
+            env={"GITHUB_REF": ref}, capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == expected, (
+            f"signed rehearsal guard accepted unexpected ref: {ref}"
+        )
+    assert rehearsal["if"] == rehearsal_condition
+    assert set(rehearsal["needs"]) == {"validate", "build"}
+    assert rehearsal["permissions"] == {"contents": "read"}
+    assert [step["name"] for step in rehearsal["steps"]] == [
+        "Checkout",
+        "Download signed rehearsal packages",
+        "Prepare release assets",
+        "Upload signed rehearsal assets",
+    ]
+    rehearsal_download = rehearsal["steps"][1]
+    assert rehearsal_download["with"]["pattern"] == "metis-desktop-*-signed-rehearsal"
+    rehearsal_upload = rehearsal["steps"][-1]
+    assert rehearsal_upload["with"] == {
+        "name": "metis-desktop-signed-rehearsal-assets",
+        "path": "release-assets/*",
+        "if-no-files-found": "error",
+        "retention-days": 3,
+    }
+    release_prepare = next(
+        step["run"] for step in release["steps"]
+        if step["name"] == "Prepare release assets"
+    )
+    rehearsal_prepare = next(
+        step["run"] for step in rehearsal["steps"]
+        if step["name"] == "Prepare release assets"
+    )
+    assert rehearsal_prepare == release_prepare.replace(
+        'release_version="${GITHUB_REF_NAME#desktop-v}"',
+        '''release_version="$(python3 -c 'import json; print(json.load(open("apps/desktop/package.json"))["version"])')"''',
+    ), "rehearsal and release must prepare identical assets"
+    with tempfile.TemporaryDirectory(prefix="metis-rehearsal-assets-") as directory:
+        fixture = Path(directory)
+        package = fixture / "apps/desktop/package.json"
+        package.parent.mkdir(parents=True)
+        package.write_text(json.dumps({"version": expected_version}))
+        generator = fixture / "tools/software_update/generate_latest_json.py"
+        generator.parent.mkdir(parents=True)
+        shutil.copyfile(CONFIG["latest_json_generator"], generator)
+        notes = fixture / "docs/release-notes/desktop.md"
+        notes.parent.mkdir(parents=True)
+        notes.write_text("Rehearsal fixture notes\n")
+        downloads = fixture / "release-downloads"
+        downloads.mkdir()
+        names = [
+            f"Metis_{expected_version}_universal.dmg",
+            f"Metis_{expected_version}_x64-setup.exe",
+            f"Metis_{expected_version}_amd64.AppImage",
+            f"Metis_{expected_version}_amd64.deb",
+        ]
+        for name in names:
+            (downloads / name).write_bytes(b"installer fixture")
+        for name in names[:3]:
+            (downloads / (name + ".sig")).write_text("fixture-signature")
+        prepared = subprocess.run(
+            ["bash", "-c", rehearsal_prepare], cwd=fixture,
+            capture_output=True, text=True, check=False,
+        )
+        assert prepared.returncode == 0, "signed rehearsal asset assembly failed"
+        assets = fixture / "release-assets"
+        assert len(list(assets.iterdir())) == 9
+        assert len((assets / "SHA256SUMS").read_text().splitlines()) == 8
+        assert (
+            json.loads((assets / "latest.json").read_text())["version"]
+            == expected_version
+        )
+        shutil.rmtree(assets)
+        (downloads / (names[0] + ".sig")).unlink()
+        rejected = subprocess.run(
+            ["bash", "-c", rehearsal_prepare], cwd=fixture,
+            capture_output=True, text=True, check=False,
+        )
+        assert rejected.returncode != 0, (
+            "unsigned packages must not pass signed asset assembly"
+        )
+    assert [
+        name for name, job in jobs.items()
+        if job.get("permissions", {}).get("contents") == "write"
+    ] == ["release"]
+    assert [
+        name for name, job in jobs.items() if "secrets." in json.dumps(job)
+    ] == ["build"]
     secret_build_steps = [
         step["name"]
         for step in build["steps"]
@@ -229,6 +346,11 @@ def main() -> None:
     ]
     assert secret_build_steps == ["Sign updater package"]
     assert "unsigned-preview" in upload_step["with"]["name"]
+    assert "signed-rehearsal" in upload_step["with"]["name"]
+    assert (
+        "inputs.signed_rehearsal && github.ref == 'refs/heads/main'"
+        in upload_step["with"]["name"]
+    )
     assert upload_step["with"]["retention-days"] == 3
     assert workflow_text.count("node-version: 24") == 1
     assert workflow_text.count("version: 10.34.5") == 1

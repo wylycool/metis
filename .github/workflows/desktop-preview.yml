@@ -2,6 +2,12 @@ name: Desktop Release Packages
 
 on:
   workflow_dispatch:
+    inputs:
+      signed_rehearsal:
+        description: "Sign and validate test packages without publishing (main only)"
+        type: boolean
+        required: false
+        default: false
   push:
     tags:
       - "desktop-v*"
@@ -17,6 +23,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Restrict signed rehearsal to main
+        if: github.event_name == 'workflow_dispatch' && inputs.signed_rehearsal
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Signed rehearsal is only available from main."
+            exit 1
+          fi
 
       - name: Validate package versions and tag
         env:
@@ -180,7 +196,7 @@ jobs:
         run: pnpm tauri build ${{ matrix.platform.build_args }}
 
       - name: Sign updater package
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/desktop-v')
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/desktop-v')) || (github.event_name == 'workflow_dispatch' && inputs.signed_rehearsal && github.ref == 'refs/heads/main')
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -207,8 +223,93 @@ jobs:
       - name: Upload desktop package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ github.event_name == 'push' && matrix.platform.artifact || format('{0}-unsigned-preview', matrix.platform.artifact) }}
+          name: ${{ github.event_name == 'push' && matrix.platform.artifact || (inputs.signed_rehearsal && github.ref == 'refs/heads/main' && format('{0}-signed-rehearsal', matrix.platform.artifact)) || format('{0}-unsigned-preview', matrix.platform.artifact) }}
           path: ${{ matrix.platform.bundle }}
+          if-no-files-found: error
+          retention-days: 3
+
+  rehearsal:
+    name: Validate signed rehearsal assets
+    needs: [validate, build]
+    if: github.event_name == 'workflow_dispatch' && inputs.signed_rehearsal && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download signed rehearsal packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: metis-desktop-*-signed-rehearsal
+          path: release-downloads
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          find release-downloads -type f \( \
+            -name "*.dmg" -o \
+            -name "*.exe" -o \
+            -name "*.msi" -o \
+            -name "*.deb" -o \
+            -name "*.AppImage" -o \
+            -name "*.sig" \
+          \) -print0 | while IFS= read -r -d '' file; do
+            artifact_dir="$(basename "$(dirname "$(dirname "$file")")")"
+            parent_dir="$(basename "$(dirname "$file")")"
+            base_name="$(basename "$file")"
+            target_name="$base_name"
+            if [[ -e "release-assets/$target_name" ]]; then
+              target_name="${artifact_dir}-${parent_dir}-${base_name}"
+            fi
+            cp "$file" "release-assets/$target_name"
+          done
+
+          asset_count="$(find release-assets -maxdepth 1 -type f | wc -l | tr -d ' ')"
+          if [[ "$asset_count" -eq 0 ]]; then
+            echo "No release assets were collected from workflow artifacts."
+            exit 1
+          fi
+
+          release_version="$(python3 -c 'import json; print(json.load(open("apps/desktop/package.json"))["version"])')"
+          expected_assets=(
+            "Metis_${release_version}_universal.dmg"
+            "Metis_${release_version}_x64-setup.exe"
+            "Metis_${release_version}_amd64.deb"
+            "Metis_${release_version}_amd64.AppImage"
+            "Metis_${release_version}_universal.dmg.sig"
+            "Metis_${release_version}_x64-setup.exe.sig"
+            "Metis_${release_version}_amd64.AppImage.sig"
+          )
+          for expected_asset in "${expected_assets[@]}"; do
+            if [[ ! -f "release-assets/$expected_asset" ]]; then
+              echo "Missing required release asset: $expected_asset"
+              find release-assets -maxdepth 1 -type f -print
+              exit 1
+            fi
+          done
+
+          python3 tools/software_update/generate_latest_json.py
+
+          (
+            cd release-assets
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 shasum -a 256 > SHA256SUMS
+          )
+
+          ls -la release-assets
+
+      - name: Upload signed rehearsal assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: metis-desktop-signed-rehearsal-assets
+          path: release-assets/*
           if-no-files-found: error
           retention-days: 3
 
