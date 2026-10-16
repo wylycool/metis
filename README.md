@@ -4,9 +4,9 @@
 
 # Metis
 
-### 统一管理你的 Agent Skills
+### 一个 Skill，只装一次，到处可用
 
-一个跨平台、本地优先、开源的 Agent Skill 管理器。
+一键安装到多个 Agent，后续更新自动同步，告别重复下载和来回复制。
 
 [![Version](https://img.shields.io/github/v/release/wylycool/metis?display_name=release&color=blue&label=version)](https://github.com/wylycool/metis/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/wylycool/metis/releases/latest)
