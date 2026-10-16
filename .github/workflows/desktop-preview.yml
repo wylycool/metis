@@ -194,7 +194,7 @@ jobs:
             find "${{ matrix.platform.bundle }}" -maxdepth 3 -type f -print
             exit 1
           fi
-          pnpm --dir apps/desktop tauri signer sign "${updater_packages[0]}"
+          pnpm --dir apps/desktop tauri signer sign "$GITHUB_WORKSPACE/${updater_packages[0]}"
           if [[ ! -s "${updater_packages[0]}.sig" ]]; then
             echo "Updater signature was not created: ${updater_packages[0]}.sig"
             exit 1
@@ -346,7 +346,32 @@ jobs:
             release_flags=(--prerelease --latest=false)
           else
             latest_tag="$(
-              gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name 2>/dev/null || true
+              python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          response = subprocess.run(
+              ["gh", "api", f"repos/{os.environ['GITHUB_REPOSITORY']}/releases/latest"],
+              capture_output=True,
+              text=True,
+              timeout=30,
+          )
+          try:
+              payload = json.loads(response.stdout)
+          except ValueError:
+              raise SystemExit("Unable to determine the latest release: invalid API response.")
+          if not isinstance(payload, dict):
+              raise SystemExit("Unable to determine the latest release: unexpected API response.")
+          if response.returncode:
+              if str(payload.get("status")) != "404":
+                  raise SystemExit("Unable to determine the latest release: GitHub API request failed.")
+          else:
+              tag = payload.get("tag_name")
+              if not isinstance(tag, str) or not tag:
+                  raise SystemExit("Unable to determine the latest release: missing tag name.")
+              print(tag)
+          PY
             )"
             if [[ -z "$latest_tag" ]]; then
               release_flags=(--prerelease=false --latest)

@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -127,6 +128,97 @@ def validate_action_pins(
     if expected_actions is None:
         expected_actions = set(ACTION_PINS)
     assert observed_actions == expected_actions, observed_actions
+
+
+def validate_signer_paths(sign_script: str, platforms: list[dict]) -> None:
+    with tempfile.TemporaryDirectory(prefix="metis signer checks ") as directory:
+        root = Path(directory)
+        (root / "apps/desktop").mkdir(parents=True)
+        binary_dir = root / "bin"
+        binary_dir.mkdir()
+        pnpm = binary_dir / "pnpm"
+        pnpm.write_text(
+            '#!/bin/bash\nset -euo pipefail\n'
+            '[[ "$1" == --dir && "$3 $4 $5" == "tauri signer sign" ]]\n'
+            'cd "$2"\n[[ -f "$6" ]]\nprintf signature > "$6.sig"\n'
+        )
+        pnpm.chmod(0o755)
+        environment = {"PATH": f"{binary_dir}:/usr/bin:/bin", "GITHUB_WORKSPACE": str(root)}
+        for platform in platforms:
+            relative = platform["updater_package"].replace("*", "1.5.1")
+            package = root / relative
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_bytes(b"fixture installer")
+            script = sign_script.replace(
+                "${{ matrix.platform.updater_package }}", platform["updater_package"]
+            ).replace("${{ matrix.platform.name }}", platform["name"]).replace(
+                "${{ matrix.platform.bundle }}", platform["bundle"]
+            )
+            # Execute the actual glob/sign/existence checks, without cryptographic credentials.
+            script = script.split("PYTHONDONTWRITEBYTECODE=1", 1)[0]
+            result = subprocess.run(
+                ["/bin/bash", "-c", script], cwd=root, env=environment,
+                capture_output=True, text=True, timeout=15,
+            )
+            assert result.returncode == 0, (platform["name"], result.stderr, result.stdout)
+            assert Path(str(package) + ".sig").is_file(), platform["name"]
+
+
+def validate_release_finalization(finalize_script: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="metis-finalize-checks-") as directory:
+        root = Path(directory)
+        binary_dir = root / "bin"
+        binary_dir.mkdir()
+        (binary_dir / "python3").symlink_to(sys.executable)
+        gh = binary_dir / "gh"
+        gh.write_text('''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+if sys.argv[1] == "api":
+    raw = os.environ["METIS_TEST_API_BODY"]
+    code = int(os.environ["METIS_TEST_API_EXIT"])
+    # gh does not apply --jq to HTTP error responses.
+    if code == 0 and "--jq" in sys.argv:
+        raw = json.loads(raw).get("tag_name", "")
+    print(raw)
+    raise SystemExit(code)
+if sys.argv[1:3] == ["release", "edit"]:
+    Path(os.environ["METIS_TEST_EDIT_LOG"]).write_text(json.dumps(sys.argv[1:]))
+    raise SystemExit(0)
+raise SystemExit("unexpected gh operation")
+''')
+        gh.chmod(0o755)
+        scenarios = [
+            ("first release", "1.5.1", '{"message":"Not Found","status":"404"}', 1, True, "--latest"),
+            ("new release", "1.5.1", '{"tag_name":"desktop-v1.5.0"}', 0, True, "--latest"),
+            ("old release", "1.5.0", '{"tag_name":"desktop-v1.5.1"}', 0, True, "--latest=false"),
+            ("prerelease", "1.5.1-beta.1", "invalid", 1, True, "--latest=false"),
+            ("unauthorized", "1.5.1", '{"status":"401"}', 1, False, None),
+            ("forbidden", "1.5.1", '{"status":"403"}', 1, False, None),
+            ("server error", "1.5.1", '{"status":"500"}', 1, False, None),
+            ("invalid JSON", "1.5.1", "invalid", 1, False, None),
+            ("missing tag", "1.5.1", "{}", 0, False, None),
+        ]
+        log = root / "edit.json"
+        for name, version, body, code, succeeds, latest_flag in scenarios:
+            log.unlink(missing_ok=True)
+            environment = {
+                "PATH": f"{binary_dir}:/usr/bin:/bin",
+                "GITHUB_REF_NAME": f"desktop-v{version}",
+                "GITHUB_REPOSITORY": "example-org/example-app",
+                "METIS_TEST_API_BODY": body, "METIS_TEST_API_EXIT": str(code),
+                "METIS_TEST_EDIT_LOG": str(log),
+            }
+            result = subprocess.run(
+                ["/bin/bash", "-c", finalize_script], cwd=root, env=environment,
+                capture_output=True, text=True, timeout=15,
+            )
+            assert (result.returncode == 0) == succeeds, (name, result.stderr, result.stdout)
+            assert log.exists() == succeeds, name
+            if succeeds:
+                arguments = json.loads(log.read_text())
+                assert latest_flag in arguments, (name, arguments)
+                assert "--draft=false" in arguments, name
 
 
 def main() -> None:
@@ -281,9 +373,11 @@ def main() -> None:
     assert '--title "Metis ${release_version}"' in finalize_script
     assert 'version_without_build="${release_version%%+*}"' in finalize_script
     assert '[[ "$version_without_build" == *-* ]]' in finalize_script
-    assert "repos/${GITHUB_REPOSITORY}/releases/latest" in finalize_script
+    assert "repos/{os.environ['GITHUB_REPOSITORY']}/releases/latest" in finalize_script
     assert 'latest_version="${latest_tag#desktop-v}"' in finalize_script
     assert "current_core >= latest_core" in finalize_script
+    validate_signer_paths(sign_step["run"], build["strategy"]["matrix"]["platform"])
+    validate_release_finalization(finalize_script)
 
     updater = tauri_config["plugins"]["updater"]
     assert updater["endpoints"] == [
