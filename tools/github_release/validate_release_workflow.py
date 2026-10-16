@@ -16,7 +16,7 @@ sys.dont_write_bytecode = True
 
 
 CONFIG = {
-    "expected_version": "1.5.0",
+    "expected_version": "1.5.1",
     "ci_workflow": Path(".github/workflows/ci.yml"),
     "workflow": Path(".github/workflows/desktop-preview.yml"),
     "release_notes": Path("docs/release-notes/desktop.md"),

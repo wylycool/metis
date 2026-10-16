@@ -2102,7 +2102,7 @@ dependencies = [
 
 [[package]]
 name = "metis-adapters"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "dirs 5.0.1",
  "log",
@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "metis-core"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
@@ -2131,7 +2131,7 @@ dependencies = [
 
 [[package]]
 name = "metis-desktop"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",
@@ -2153,7 +2153,7 @@ dependencies = [
 
 [[package]]
 name = "metis-git-provider"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "chrono",
  "log",
@@ -2164,7 +2164,7 @@ dependencies = [
 
 [[package]]
 name = "metis-security"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "log",
  "serde",
@@ -2175,7 +2175,7 @@ dependencies = [
 
 [[package]]
 name = "metis-storage"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
