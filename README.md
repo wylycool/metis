@@ -16,9 +16,9 @@ Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code
 
 ## 下载与安装
 
-**Metis 1.5.0 正在进行正式发布前的最后准备，当前暂不提供可安装的 DMG、EXE、DEB 或 AppImage。** Releases 页面保留的历史 prerelease 目前只有 GitHub 根据干净 Tag 自动生成的源码归档，不是可直接安装的软件包。
+请从 [GitHub Releases](https://github.com/wylycool/metis/releases) 选择包含当前系统安装包的版本。只下载 Release 资产中的 DMG、EXE、DEB 或 AppImage；`Source code (zip)` 和 `Source code (tar.gz)` 是源码归档，不能直接安装。若页面没有对应安装包，请等待该版本的安装包发布。
 
-1.5.0 正式发布并完成三平台核验后，可从 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载以下安装包：
+各平台安装包类型如下：
 
 | 系统 | 安装包 | 说明 |
 | --- | --- | --- |
@@ -26,7 +26,9 @@ Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code
 | Windows | installer `.exe` | 通过安装程序完成安装 |
 | Linux | `.deb` / `.AppImage` | AppImage 首次使用时可能需要添加执行权限 |
 
-计划中的 1.5.0 发布包尚未包含 macOS Developer ID 公证和 Windows Authenticode 签名。正式发布后首次打开时，macOS 或 Windows 可能显示未知开发者或未知发布者提示；届时请仅从本仓库的 GitHub Releases 下载，并使用 Release 中的 `SHA256SUMS` 校验文件。
+macOS 安装时，打开 DMG，把 Metis 拖到 Applications，复制完成后推出 DMG，再从“应用程序”打开 Metis。Windows 运行 EXE 安装程序；Linux 按系统选择 DEB 或 AppImage。
+
+Metis 1.5.0 的 macOS 包未使用 Apple Developer ID 签名和公证，Windows 包未使用 Authenticode 签名。首次打开时，macOS 或 Windows 可能显示未知开发者或未知发布者提示；请仅从本仓库的 GitHub Releases 下载，并使用 Release 中的 `SHA256SUMS` 校验文件。
 
 ## 使用前提
 

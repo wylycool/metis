@@ -34,7 +34,7 @@
 
 ## 为什么安装包显示未知开发者？
 
-计划中的 1.5.0 macOS 和 Windows 安装包尚未完成操作系统代码签名。正式发布后请只从本仓库 GitHub Releases 下载并校验 `SHA256SUMS`。更多信息见 [安全策略](../../SECURITY.md)。
+Metis 1.5.0 macOS 和 Windows 安装包尚未完成操作系统代码签名。请只从本仓库 GitHub Releases 下载并校验 `SHA256SUMS`。更多信息见 [安全策略](../../SECURITY.md)。
 
 ## 卸载 Metis 会删除我的 Agent Skills 吗？
 

@@ -4,15 +4,17 @@
 
 ## 1. 安装 Metis
 
-Metis 1.5.0 正在进行正式发布前的准备，当前暂不提供可安装的 DMG、EXE、DEB 或 AppImage。Releases 页面保留的历史 prerelease 目前只有 GitHub 自动生成的源码归档，不是可直接安装的软件包。
+前往 [GitHub Releases](https://github.com/wylycool/metis/releases)，选择包含当前系统安装包的版本。`Source code` 是源码归档，不是安装包；若没有对应安装包，请等待该版本的安装包发布。
 
-1.5.0 正式发布并完成三平台核验后，可前往 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载当前系统的安装包：
+按系统选择：
 
 - macOS：universal `.dmg`
 - Windows：安装程序 `.exe`
 - Linux：`.deb` 或 `.AppImage`
 
-计划中的 macOS 和 Windows 安装包尚未完成操作系统代码签名，正式发布后首次启动时可能出现未知开发者提示。请只从官方 Releases 下载，并使用 `SHA256SUMS` 校验文件。
+macOS：打开 DMG，把 Metis 拖到 Applications，复制完成后推出 DMG，再从“应用程序”打开 Metis。Windows：运行 EXE 安装程序，按提示完成安装。
+
+Metis 1.5.0 的 macOS 和 Windows 安装包尚未完成操作系统代码签名，首次启动时可能出现未知开发者提示。请只从官方 Releases 下载，并使用 `SHA256SUMS` 校验文件。
 
 Linux AppImage 如果无法启动，可以先执行：
 
