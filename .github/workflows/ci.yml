@@ -14,12 +14,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      full_checks: ${{ steps.changes.outputs.full_checks }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Test change selection
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/github_release -p test_ci_changes.py
+
+      - name: Check patch whitespace
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if git cat-file -e "$CI_BASE_SHA^{commit}" 2>/dev/null; then
+            git diff --check "$CI_BASE_SHA" HEAD
+          else
+            echo "Baseline unavailable; full checks required."
+          fi
+
+      - name: Classify changed paths
+        id: changes
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tools/github_release/ci_changes.py
+
   rust:
     name: Rust checks
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.full_checks != 'false') }}
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
     steps:
+      - name: Require successful change classification
+        if: cancelled() || needs.changes.result != 'success'
+        run: exit 1
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -54,10 +93,16 @@ jobs:
 
   windows-rust:
     name: Windows Rust tests
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.full_checks != 'false') }}
     runs-on: windows-latest
     timeout-minutes: 20
 
     steps:
+      - name: Require successful change classification
+        if: cancelled() || needs.changes.result != 'success'
+        run: exit 1
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -69,10 +114,16 @@ jobs:
 
   desktop:
     name: Desktop checks
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.full_checks != 'false') }}
     runs-on: ubuntu-22.04
     timeout-minutes: 20
 
     steps:
+      - name: Require successful change classification
+        if: cancelled() || needs.changes.result != 'success'
+        run: exit 1
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
