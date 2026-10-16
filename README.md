@@ -8,11 +8,11 @@
 
 一个跨平台、本地优先、开源的 Agent Skill 管理器。
 
-[![Version](https://img.shields.io/github/v/release/wylycool/metis?color=blue&label=version)](https://github.com/wylycool/metis/releases/latest)
+[![Version](https://img.shields.io/github/v/release/wylycool/metis?display_name=release&color=blue&label=version)](https://github.com/wylycool/metis/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/wylycool/metis/releases/latest)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-orange.svg)](https://tauri.app/)
 [![Downloads](https://img.shields.io/github/downloads/wylycool/metis/total)](https://github.com/wylycool/metis/releases)
-[![License](https://img.shields.io/github/license/wylycool/metis)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/wylycool/metis/ci.yml?branch=main&label=CI)](https://github.com/wylycool/metis/actions/workflows/ci.yml)
 
 [简体中文](docs/zh-CN/README.md) | [English](docs/en/README.md) | [下载安装](https://github.com/wylycool/metis/releases/latest)
