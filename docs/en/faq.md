@@ -34,7 +34,7 @@ You can try adding its Skill root as a custom path. Skills in that directory mus
 
 ## Why does the installer show an unknown developer?
 
-The planned Metis 1.5.0 macOS and Windows packages do not yet have operating-system code signing. After release, download only from this repository's GitHub Releases and verify `SHA256SUMS`. See the [Security Policy](../../SECURITY.md) for details.
+Metis 1.5.0 macOS and Windows packages do not yet have operating-system code signing. Download only from this repository's GitHub Releases and verify `SHA256SUMS`. See the [Security Policy](../../SECURITY.md) for details.
 
 ## Does uninstalling Metis delete my Agent Skills?
 

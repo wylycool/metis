@@ -4,15 +4,17 @@ English | [简体中文](../zh-CN/getting-started.md)
 
 ## 1. Install Metis
 
-Metis 1.5.0 is still in final release preparation. No installable DMG, EXE, DEB, or AppImage is currently available. The retained historical prereleases contain only GitHub-generated source archives, not ready-to-install application packages.
+Open [GitHub Releases](https://github.com/wylycool/metis/releases) and choose a release containing a package for your platform. `Source code` archives are not installers. If the package is absent, wait until it is published.
 
-After 1.5.0 is published and verified on all three platforms, download the package for your platform from [GitHub Releases](https://github.com/wylycool/metis/releases):
+Choose the package for your platform:
 
 - macOS: universal `.dmg`
 - Windows: installer `.exe`
 - Linux: `.deb` or `.AppImage`
 
-The planned macOS and Windows packages do not yet have operating-system code signing, so the first launch after release may show an unknown-developer warning. Download only from the official Releases page and verify `SHA256SUMS`.
+On macOS, open the DMG, drag Metis to Applications, eject the DMG after copying, then open Metis from Applications. On Windows, run the EXE installer and follow its instructions.
+
+Metis 1.5.0 macOS and Windows packages do not yet have operating-system code signing, so the first launch may show an unknown-developer warning. Download only from the official Releases page and verify `SHA256SUMS`.
 
 If a Linux AppImage is not executable, run:
 

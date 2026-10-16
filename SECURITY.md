@@ -22,9 +22,9 @@ If private reporting is unavailable, open a public Issue asking the maintainer f
 
 ### Application distribution
 
-Metis 1.5.0 is still in final release preparation, and no installable package is currently available. After the official release, download Metis only from this repository's [GitHub Releases](https://github.com/wylycool/metis/releases); release assets will include SHA-256 checksums.
+Download Metis only from this repository's [GitHub Releases](https://github.com/wylycool/metis/releases), and verify the package with the release's `SHA256SUMS`. Select a release containing a package for your platform; GitHub-generated source archives are not installers. If a package is absent, wait until it is published.
 
-The planned Metis 1.5.0 macOS packages are not signed and notarized with Apple Developer ID, and the planned Windows packages are not signed with Authenticode. After release, Gatekeeper or SmartScreen may therefore display an unknown-developer warning. The in-app Tauri update signature verifies the Metis update channel and file integrity, but it does not replace operating-system code signing.
+Metis 1.5.0 macOS packages are not signed and notarized with Apple Developer ID, and Windows packages are not signed with Authenticode. Gatekeeper or SmartScreen may therefore display an unknown-developer warning. The in-app Tauri update signature verifies the Metis update channel and file integrity, but it does not replace operating-system code signing.
 
 ## 简体中文
 
@@ -46,6 +46,6 @@ The planned Metis 1.5.0 macOS packages are not signed and notarized with Apple D
 
 ### 应用分发
 
-Metis 1.5.0 正在进行正式发布前准备，当前暂无可安装的软件包。正式发布后，请只从本仓库的 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载 Metis；Release 资产将包含 SHA-256 校验和。
+请只从本仓库的 [GitHub Releases](https://github.com/wylycool/metis/releases) 下载 Metis，并使用对应 Release 的 `SHA256SUMS` 校验安装包。请选择含有当前系统安装包的版本；GitHub 自动生成的源码归档不是安装包。若缺少对应安装包，请等待发布。
 
-计划中的 Metis 1.5.0 macOS 安装包尚未使用 Apple Developer ID 签名和公证，Windows 安装包尚未使用 Authenticode 签名。正式发布后，Gatekeeper 或 SmartScreen 可能显示未知开发者提示。应用内的 Tauri 更新签名用于确认 Metis 更新通道和文件完整性，但不能替代操作系统代码签名。
+Metis 1.5.0 macOS 安装包尚未使用 Apple Developer ID 签名和公证，Windows 安装包尚未使用 Authenticode 签名。Gatekeeper 或 SmartScreen 可能显示未知开发者提示。应用内的 Tauri 更新签名用于确认 Metis 更新通道和文件完整性，但不能替代操作系统代码签名。

@@ -37,9 +37,9 @@ Info usually indicates scripts or executable files. Warning may indicate downloa
 ## Application update or installer issues
 
 - A failed startup update check does not affect local Skill management; retry manually in Settings later.
-- Metis 1.5.0 is still in final release preparation, and no installable package is currently available.
-- After the official release, macOS and Windows packages will still lack operating-system code signing and may show an unknown-developer warning.
-- After release, use packages only from this repository's Releases and verify `SHA256SUMS`.
+- If a release contains only `Source code` and no package for your platform, wait until the package is published; source archives are not installers.
+- Metis 1.5.0 macOS and Windows packages lack operating-system code signing and may show an unknown-developer warning.
+- Use packages only from this repository's Releases and verify `SHA256SUMS`.
 - Metis does not install a downloaded update automatically; complete installation manually from Downloads.
 
 ## Reporting a problem
