@@ -1,8 +1,23 @@
-# Metis：统一管理你的 Agent Skills
+<div align="center">
 
-> 一个跨平台、本地优先、开源的 Agent Skill 管理器。
+<img src="apps/desktop/src-tauri/icons/128x128.png" width="96" height="96" alt="Metis">
 
-[简体中文](docs/zh-CN/README.md) | [English](docs/en/README.md) | [发布状态](https://github.com/wylycool/metis/releases)
+# Metis
+
+### 统一管理你的 Agent Skills
+
+一个跨平台、本地优先、开源的 Agent Skill 管理器。
+
+[![Version](https://img.shields.io/github/v/release/wylycool/metis?color=blue&label=version)](https://github.com/wylycool/metis/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/wylycool/metis/releases/latest)
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-orange.svg)](https://tauri.app/)
+[![Downloads](https://img.shields.io/github/downloads/wylycool/metis/total)](https://github.com/wylycool/metis/releases)
+[![License](https://img.shields.io/github/license/wylycool/metis)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/wylycool/metis/ci.yml?branch=main&label=CI)](https://github.com/wylycool/metis/actions/workflows/ci.yml)
+
+[简体中文](docs/zh-CN/README.md) | [English](docs/en/README.md) | [下载安装](https://github.com/wylycool/metis/releases/latest)
+
+</div>
 
 Metis 帮你在一个桌面应用里发现、安装和维护 Codex、Claude Code、OpenClaw、Hermes、opencode、Cursor、Qoder、Gemini CLI 等 Agent 工具中的 Skills。
 
