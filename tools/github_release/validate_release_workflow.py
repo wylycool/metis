@@ -258,12 +258,40 @@ def main() -> None:
 
     assert ci_workflow["name"] == "CI"
     assert ci_workflow["permissions"] == {"contents": "read"}
-    assert set(ci_workflow["jobs"]) == {"rust", "windows-rust", "desktop"}
+    assert set(ci_workflow["jobs"]) == {"changes", "rust", "windows-rust", "desktop"}
+    changes = ci_workflow["jobs"]["changes"]
+    assert changes["outputs"] == {"full_checks": "${{ steps.changes.outputs.full_checks }}"}
+    assert changes["steps"][0]["with"]["fetch-depth"] == 0
+    classify = next(step for step in changes["steps"] if step.get("id") == "changes")
+    assert classify["env"] == {
+        "CI_EVENT": "${{ github.event_name }}",
+        "CI_BASE_SHA": "${{ github.event.pull_request.base.sha || github.event.before }}",
+        "CI_HEAD_SHA": "${{ github.event.pull_request.head.sha || github.sha }}",
+    }
+    assert classify["run"] == "PYTHONDONTWRITEBYTECODE=1 python3 tools/github_release/ci_changes.py"
+    for job_id, name in {
+        "rust": "Rust checks", "windows-rust": "Windows Rust tests", "desktop": "Desktop checks",
+    }.items():
+        job = ci_workflow["jobs"][job_id]
+        assert job["name"] == name
+        assert job["needs"] == "changes"
+        assert job["if"] == (
+            "${{ always() && (needs.changes.result != 'success' || "
+            "needs.changes.outputs.full_checks != 'false') }}"
+        )
+        assert job["steps"][0] == {
+            "name": "Require successful change classification",
+            "if": "cancelled() || needs.changes.result != 'success'", "run": "exit 1",
+        }
+    # Required checks must be emitted even for documentation-only changes.
+    assert "paths-ignore:" not in ci_workflow_text
+    assert "paths:" not in ci_workflow_text
     windows_rust = ci_workflow["jobs"]["windows-rust"]
     assert windows_rust["name"] == "Windows Rust tests"
     assert windows_rust["runs-on"] == "windows-latest"
     assert windows_rust["timeout-minutes"] == 20
     assert [step["name"] for step in windows_rust["steps"]] == [
+        "Require successful change classification",
         "Checkout",
         "Setup Rust",
         "Run Windows Rust tests",
